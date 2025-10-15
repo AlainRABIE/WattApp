@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import app from '../../constants/firebaseConfig';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { useRouter } from 'expo-router';
 
 const LoginScreen: React.FC = () => {
@@ -7,8 +9,28 @@ const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const auth = getAuth(app);
+
+  const handleLogin = async () => {
+    Keyboard.dismiss();
+    setLoading(true);
+    setError('');
+    try {
+  await signInWithEmailAndPassword(auth, email, password);
+  router.replace('../home/home'); // Redirige vers la page home après connexion
+    } catch (e: any) {
+      setError(e.message);
+    }
+    setLoading(false);
+  };
+
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <Image source={require('../../assets/images/favicon.png')} style={styles.logo} />
       <Text style={styles.title}>Connexion</Text>
       <TextInput
@@ -26,13 +48,14 @@ const LoginScreen: React.FC = () => {
         onChangeText={setPassword}
         secureTextEntry
       />
-      <TouchableOpacity style={styles.button}>
-        <Text style={styles.buttonText}>Se connecter</Text>
+      {error ? <Text style={{ color: 'red', marginBottom: 10 }}>{error}</Text> : null}
+      <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
+        <Text style={styles.buttonText}>{loading ? "Chargement..." : "Se connecter"}</Text>
       </TouchableOpacity>
-  <TouchableOpacity onPress={() => router.push('../register')}>
+      <TouchableOpacity onPress={() => router.push('../register')}>
         <Text style={styles.link}>Pas de compte ? Inscris-toi !</Text>
       </TouchableOpacity>
-    </View>
+  </KeyboardAvoidingView>
   );
 };
 

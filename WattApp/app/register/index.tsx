@@ -1,23 +1,82 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import app, { db } from '../../constants/firebaseConfig';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { useRouter } from 'expo-router';
 
 const RegisterScreen: React.FC = () => {
   const router = useRouter();
   const [username, setUsername] = useState('');
+  const [nom, setNom] = useState('');
+  const [prenom, setPrenom] = useState('');
+  const [age, setAge] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const auth = getAuth(app);
+
+  const handleRegister = async () => {
+    Keyboard.dismiss();
+    setLoading(true);
+    setError('');
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      // Ajoute l'utilisateur dans Firestore
+      await addDoc(collection(db, 'users'), {
+        mail: email,
+        nom,
+        prenom,
+        age,
+        pseudo: username,
+        CreateAt: serverTimestamp(),
+        LoginAt: serverTimestamp(),
+        uid: user.uid,
+      });
+      router.replace('../(tabs)'); // Redirige vers login après inscription
+    } catch (e: any) {
+      setError(e.message);
+    }
+    setLoading(false);
+  };
+
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <Image source={require('../../assets/images/favicon.png')} style={styles.logo} />
       <Text style={styles.title}>Inscription</Text>
       <TextInput
         style={styles.input}
-        placeholder="Nom d'utilisateur"
+        placeholder="Nom d'utilisateur (pseudo)"
         value={username}
         onChangeText={setUsername}
         autoCapitalize="none"
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Nom"
+        value={nom}
+        onChangeText={setNom}
+        autoCapitalize="words"
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Prénom"
+        value={prenom}
+        onChangeText={setPrenom}
+        autoCapitalize="words"
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Âge"
+        value={age}
+        onChangeText={setAge}
+        keyboardType="numeric"
       />
       <TextInput
         style={styles.input}
@@ -34,13 +93,14 @@ const RegisterScreen: React.FC = () => {
         onChangeText={setPassword}
         secureTextEntry
       />
-      <TouchableOpacity style={styles.button}>
-        <Text style={styles.buttonText}>S'inscrire</Text>
+      {error ? <Text style={{ color: 'red', marginBottom: 10 }}>{error}</Text> : null}
+      <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
+        <Text style={styles.buttonText}>{loading ? "Chargement..." : "S'inscrire"}</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={() => router.back()}>
         <Text style={styles.link}>Déjà un compte ? Connecte-toi !</Text>
       </TouchableOpacity>
-    </View>
+  </KeyboardAvoidingView>
   );
 };
 
