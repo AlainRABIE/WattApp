@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
@@ -13,6 +13,7 @@ const RegisterScreen: React.FC = () => {
   const [age, setAge] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [photoURL, setPhotoURL] = useState('');
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -32,10 +33,23 @@ const RegisterScreen: React.FC = () => {
         prenom,
         age,
         pseudo: username,
+        photoURL: photoURL || '',
         CreateAt: serverTimestamp(),
         LoginAt: serverTimestamp(),
         uid: user.uid,
       });
+      // Mets à jour le profil Firebase Auth (displayName + photoURL)
+      try {
+        if (photoURL || username) {
+          await updateProfile(user, {
+            displayName: username || undefined,
+            photoURL: photoURL || undefined,
+          });
+        }
+      } catch (err) {
+        // non-blocking: log
+        console.warn('updateProfile error', err);
+      }
       router.replace('../(tabs)'); // Redirige vers login après inscription
     } catch (e: any) {
       setError(e.message);
@@ -92,6 +106,13 @@ const RegisterScreen: React.FC = () => {
         value={password}
         onChangeText={setPassword}
         secureTextEntry
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="URL de la photo de profil (optionnel)"
+        value={photoURL}
+        onChangeText={setPhotoURL}
+        autoCapitalize="none"
       />
       {error ? <Text style={{ color: 'red', marginBottom: 10 }}>{error}</Text> : null}
       <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
