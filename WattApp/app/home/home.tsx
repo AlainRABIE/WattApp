@@ -1,7 +1,7 @@
 
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Image, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { getAuth } from 'firebase/auth';
@@ -89,6 +89,27 @@ const Home: React.FC = () => {
 	const [displayName, setDisplayName] = useState('');
 	const [photoURL, setPhotoURL] = useState<string | null>(null);
 
+	const { width, height } = useWindowDimensions();
+	// treat as tablet when the longest side is >= 768
+	const isTablet = Math.max(width, height) >= 768;
+
+	const renderBookItem = (item: any) => (
+		<View key={item.id} style={isTablet ? styles.livreCardTablet : styles.livreCardHorizontal}>
+			<View style={isTablet ? styles.livreImageBoxTablet : styles.livreImageBoxHorizontal}>
+				<Image source={{ uri: item.couverture }} style={isTablet ? styles.livreImageTablet : styles.livreImageHorizontal} />
+			</View>
+			<Text style={styles.livreTitre}>{item.titre}</Text>
+			<Text style={styles.livreAuteur}>par {item.auteur}</Text>
+			<View style={styles.tagsRow}>
+				{item.tags.map((tag: string) => (
+					<View key={tag} style={styles.tagBox}>
+						<Text style={styles.tagText}>{tag}</Text>
+					</View>
+				))}
+			</View>
+		</View>
+	);
+
 	useEffect(() => {
 		const loadProfile = async () => {
 			const auth = getAuth(app);
@@ -117,86 +138,37 @@ const Home: React.FC = () => {
 
 	return (
 			<View style={styles.container}>
-				<View style={styles.avatarContainer}>
-						<TouchableOpacity onPress={() => router.push('../friends')} style={{ marginRight: 10 }}>
-						<Ionicons name="people" size={18} color="#FFA94D" />
-					</TouchableOpacity>
-						<TouchableOpacity onPress={openExplore} style={{ marginRight: 10 }}>
-							<Ionicons name="search" size={18} color="#FFA94D" />
-						</TouchableOpacity>
+				{/* Small user button (top-left) */}
+				<View style={styles.userButtonContainer} pointerEvents="box-none">
 					<TouchableOpacity onPress={() => router.push('../profile')}>
-						<Image source={{ uri: photoURL || avatarUrl }} style={styles.avatar} />
+						<Image source={{ uri: photoURL || avatarUrl }} style={styles.userButtonImage} />
 					</TouchableOpacity>
 				</View>
+
 			<StatusBar barStyle="light-content" />
 					{/* Header supprimé pour un rendu épuré */}
 			<ScrollView contentContainerStyle={styles.content}>
 				{/* Section Nouveautés */}
 				<Text style={styles.sectionTitle}>Nouveautés de vos auteurs</Text>
-										<View style={styles.sectionBox}>
-											<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-												{livresExemple.map(livre => (
-													<View key={livre.id} style={styles.livreCardHorizontal}>
-														<View style={styles.livreImageBoxHorizontal}>
-															<Image source={{ uri: livre.couverture }} style={styles.livreImageHorizontal} />
-														</View>
-														<Text style={styles.livreTitre}>{livre.titre}</Text>
-														<Text style={styles.livreAuteur}>par {livre.auteur}</Text>
-														<View style={styles.tagsRow}>
-															{livre.tags.map(tag => (
-																<View key={tag} style={styles.tagBox}>
-																	<Text style={styles.tagText}>{tag}</Text>
-																</View>
-															))}
-														</View>
-													</View>
-												))}
-											</ScrollView>
-										</View>
+				<View style={[styles.sectionBox, isTablet && styles.sectionBoxTablet]}>
+					<ScrollView horizontal showsHorizontalScrollIndicator={false}>
+						{livresExemple.map(livre => renderBookItem(livre))}
+					</ScrollView>
+				</View>
 
 						{/* Section Style de lecture */}
 						<Text style={styles.sectionTitle}>Votre style de lecture</Text>
-						<View style={styles.sectionBox}>
+						<View style={[styles.sectionBox, isTablet && styles.sectionBoxTablet]}>
 							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-								{livresLecture.map(livre => (
-									<View key={livre.id} style={styles.livreCardHorizontal}>
-										<View style={styles.livreImageBoxHorizontal}>
-											<Image source={{ uri: livre.couverture }} style={styles.livreImageHorizontal} />
-										</View>
-										<Text style={styles.livreTitre}>{livre.titre}</Text>
-										<Text style={styles.livreAuteur}>par {livre.auteur}</Text>
-										<View style={styles.tagsRow}>
-											{livre.tags.map(tag => (
-												<View key={tag} style={styles.tagBox}>
-													<Text style={styles.tagText}>{tag}</Text>
-												</View>
-											))}
-										</View>
-									</View>
-								))}
+								{livresLecture.map(livre => renderBookItem(livre))}
 							</ScrollView>
 						</View>
 
 						{/* Section Continuez à lire */}
 						<Text style={styles.sectionTitle}>Continuez à lire</Text>
-						<View style={styles.sectionBox}>
+						<View style={[styles.sectionBox, isTablet && styles.sectionBoxTablet]}>
 							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-								{livresContinuer.map(livre => (
-									<View key={livre.id} style={styles.livreCardHorizontal}>
-										<View style={styles.livreImageBoxHorizontal}>
-											<Image source={{ uri: livre.couverture }} style={styles.livreImageHorizontal} />
-										</View>
-										<Text style={styles.livreTitre}>{livre.titre}</Text>
-										<Text style={styles.livreAuteur}>par {livre.auteur}</Text>
-										<View style={styles.tagsRow}>
-											{livre.tags.map(tag => (
-												<View key={tag} style={styles.tagBox}>
-													<Text style={styles.tagText}>{tag}</Text>
-												</View>
-											))}
-										</View>
-									</View>
-								))}
+								{livresContinuer.map(livre => renderBookItem(livre))}
 							</ScrollView>
 						</View>
 
@@ -206,17 +178,10 @@ const Home: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-	avatarContainer: {
-		position: 'absolute',
-		top: 30,
-		right: 20,
-		zIndex: 10,
-		backgroundColor: 'transparent',
-	},
 				avatar: {
-					width: 45,
-					height: 45,
-					borderRadius: 22.5,
+					width: 50,
+					height: 50,
+					borderRadius: 25,
 					borderWidth: 2,
 					borderColor: '#FFA94D',
 					backgroundColor: '#181818',
@@ -318,6 +283,7 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 		padding: 20,
+		paddingTop: 120, // leave more space for fixed avatar/header overlay
 	},
 	button: {
 		backgroundColor: '#FFA94D',
@@ -381,6 +347,42 @@ const styles = StyleSheet.create({
 				color: '#888',
 				fontSize: 16,
 				fontStyle: 'italic',
+			},
+			livreCardTablet: {
+				marginRight: 24,
+				width: 180,
+				alignItems: 'flex-start',
+			},
+			livreImageBoxTablet: {
+				width: 140,
+				height: 200,
+				borderRadius: 10,
+				overflow: 'hidden',
+				backgroundColor: '#181818',
+				marginBottom: 12,
+			},
+			livreImageTablet: {
+				width: '100%',
+				height: '100%',
+				resizeMode: 'cover',
+			},
+			sectionBoxTablet: {
+				padding: 24,
+				borderRadius: 14,
+			},
+			userButtonContainer: {
+				position: 'absolute',
+				top: 12,
+				left: 12,
+				zIndex: 80,
+			},
+			userButtonImage: {
+				width: 44,
+				height: 44,
+				borderRadius: 22,
+				borderWidth: 2,
+				borderColor: '#FFA94D',
+				backgroundColor: '#181818',
 			},
 });
 
