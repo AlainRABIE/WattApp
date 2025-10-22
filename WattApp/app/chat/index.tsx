@@ -50,7 +50,7 @@ export default function ChatsList() {
           const other = item.participantsMeta?.[otherId] || { displayName: 'Utilisateur', photoURL: null };
           return (
             <TouchableOpacity style={styles.row} onPress={() => (router as any).push(`/chat/${item.id}`)}>
-              <Image source={{ uri: other.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(other.displayName || 'User')}&background=FFA94D&color=181818&size=128` }} style={styles.avatar} />
+              <Image source={{ uri: other.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(other.displayName || 'User')}&length=${((other.displayName || 'User') as string).trim().includes(' ') ? 2 : 1}&background=FFA94D&color=181818&size=128` }} style={styles.avatar} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{other.displayName || 'Utilisateur'}</Text>
                 <Text style={styles.subtitle}>{item.lastMessageText || ''}</Text>

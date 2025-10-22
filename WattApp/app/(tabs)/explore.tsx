@@ -49,7 +49,7 @@ export default function ExploreScreen() {
 
   const renderItem = ({ item }: { item: any }) => (
     <TouchableOpacity style={styles.row} onPress={() => Alert.alert(item.pseudo || item.displayName || 'Utilisateur', item.mail || item.email || '')}>
-      <Image source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.pseudo || item.displayName || 'User')}&background=FFA94D&color=181818&size=128` }} style={styles.avatar} />
+  <Image source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.pseudo || item.displayName || 'User')}&length=${((item.pseudo || item.displayName || 'User') as string).trim().includes(' ') ? 2 : 1}&background=FFA94D&color=181818&size=128` }} style={styles.avatar} />
       <View style={{ flex: 1 }}>
         <Text style={styles.name}>{item.pseudo || item.displayName || 'Utilisateur'}</Text>
         <Text style={styles.email}>{item.mail || item.email || ''}</Text>

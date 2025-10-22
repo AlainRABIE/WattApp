@@ -249,7 +249,7 @@ export default function FriendsScreen() {
 
   const renderItem = ({ item }: { item: any }) => (
     <TouchableOpacity style={styles.row} onPress={() => Alert.alert(item.pseudo || item.displayName || 'Utilisateur', item.mail || item.email || '')}>
-      <Image source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.pseudo || item.displayName || 'User')}&background=FFA94D&color=181818&size=128` }} style={styles.avatar} />
+  <Image source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.pseudo || item.displayName || 'User')}&length=${((item.pseudo || item.displayName || 'User') as string).trim().includes(' ') ? 2 : 1}&background=FFA94D&color=181818&size=128` }} style={styles.avatar} />
       <View style={{ flex: 1 }}>
         <Text style={styles.name}>{item.pseudo || item.displayName || 'Utilisateur'}</Text>
         <Text style={styles.email}>{item.mail || item.email || ''}</Text>
@@ -277,7 +277,7 @@ export default function FriendsScreen() {
     const from = item.fromUser || { displayName: item.fromUid };
     return (
       <View style={styles.row}>
-        <Image source={{ uri: from.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(from.pseudo || from.displayName || 'User')}&background=FFA94D&color=181818&size=128` }} style={styles.avatar} />
+  <Image source={{ uri: from.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(from.pseudo || from.displayName || 'User')}&length=${((from.pseudo || from.displayName || 'User') as string).trim().includes(' ') ? 2 : 1}&background=FFA94D&color=181818&size=128` }} style={styles.avatar} />
         <View style={{ flex: 1 }}>
           <Text style={styles.name}>{from.pseudo || from.displayName || 'Utilisateur'}</Text>
           <Text style={styles.email}>{from.mail || from.email || ''}</Text>
@@ -336,7 +336,7 @@ export default function FriendsScreen() {
                 if (!user) return null;
                 return (
                   <View style={styles.row}>
-                    <Image source={{ uri: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.pseudo || user.displayName || 'User')}&background=FFA94D&color=181818&size=128` }} style={styles.avatar} />
+                    <Image source={{ uri: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.pseudo || user.displayName || 'User')}&length=${((user.pseudo || user.displayName || 'User') as string).trim().includes(' ') ? 2 : 1}&background=FFA94D&color=181818&size=128` }} style={styles.avatar} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.name}>{user.pseudo || user.displayName || 'Utilisateur'}</Text>
                       <Text style={styles.email}>{user.mail || user.email || ''}</Text>

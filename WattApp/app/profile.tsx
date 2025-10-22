@@ -173,7 +173,13 @@ const Profile: React.FC = () => {
             setUploading(false);
           }
         }}>
-          <Image source={{ uri: photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName || email || 'User')}&background=FFA94D&color=181818&size=128` }} style={styles.avatarLarge} />
+          {(() => {
+            const name = (displayName || email || 'User') as string;
+            const len = name.trim().includes(' ') ? 2 : 1;
+            return (
+              <Image source={{ uri: photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&length=${len}&background=FFA94D&color=181818&size=128` }} style={styles.avatarLarge} />
+            );
+          })()}
         </TouchableOpacity>
         {uploading ? <ActivityIndicator style={{ marginLeft: 12 }} color="#FFA94D" /> : null}
         <View style={styles.metaText}>

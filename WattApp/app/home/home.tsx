@@ -59,8 +59,7 @@ const Home: React.FC = () => {
 			tags: ['chronique'],
 		},
 	];
-	// Avatar exemple (image libre de droits)
-	const avatarUrl = 'https://ui-avatars.com/api/?name=User&background=FFA94D&color=181818&size=128';
+	// Avatar fallback will be computed from user displayName/email (keeps initials consistent with Profile)
 	// Exemples de livres en dur
 		const livresExemple = [
 			{
@@ -88,6 +87,11 @@ const Home: React.FC = () => {
 	const [email, setEmail] = useState('');
 	const [displayName, setDisplayName] = useState('');
 	const [photoURL, setPhotoURL] = useState<string | null>(null);
+
+	// compute a fallback avatar URL based on the loaded user name so Home matches Profile
+	const nameForAvatar = (displayName || email || 'User') as string;
+	const avatarLen = nameForAvatar.trim().includes(' ') ? 2 : 1;
+	const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(nameForAvatar)}&length=${avatarLen}&background=FFA94D&color=181818&size=128`;
 
 	const { width, height } = useWindowDimensions();
 	// treat as tablet when the longest side is >= 768
@@ -372,9 +376,9 @@ const styles = StyleSheet.create({
 			},
 			userButtonContainer: {
 				position: 'absolute',
-				top: 12,
-				left: 12,
-				zIndex: 80,
+				top: 80,
+				right: 12,
+				zIndex: 120,
 			},
 			userButtonImage: {
 				width: 44,

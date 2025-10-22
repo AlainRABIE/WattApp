@@ -72,10 +72,10 @@ export default function TabLayout() {
             source={{
               uri:
                 (authUser
-                  ? photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                      (displayName || email || 'User') as string
-                    )}&background=FFA94D&color=181818&size=128`
-                  : 'https://ui-avatars.com/api/?name=User&background=FFA94D&color=181818&size=128'),
+                  ? photoURL || (`https://ui-avatars.com/api/?name=${encodeURIComponent(
+                        (displayName || email || 'User') as string
+                      )}&length=${((displayName || email || 'User') as string).trim().includes(' ') ? 2 : 1}&background=FFA94D&color=181818&size=192`)
+                    : 'https://ui-avatars.com/api/?name=User&length=1&background=FFA94D&color=181818&size=192'),
             }}
             style={[styles.avatar, isTablet && styles.avatarTablet]}
           />
