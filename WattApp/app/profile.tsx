@@ -185,9 +185,7 @@ const Profile: React.FC = () => {
         <View style={styles.metaText}>
           <Text style={styles.nameLarge}>{displayName || 'Utilisateur'}</Text>
           <Text style={styles.email}>{email}</Text>
-          {/* Debug info for troubleshooting */}
-          <Text style={{ color: '#888', fontSize: 11, marginTop: 6 }}>{`uid: ${getAuth(app).currentUser?.uid ?? 'none'}`}</Text>
-          <Text style={{ color: '#888', fontSize: 11 }}>{`storage bucket: ${app.options?.storageBucket ?? 'unknown'}`}</Text>
+          {/* debug info removed for production */}
         </View>
       </View>
 
@@ -211,12 +209,12 @@ const Profile: React.FC = () => {
           </View>
         </View>
 
-        <View style={styles.actionColumn}>
-          <TouchableOpacity style={styles.primaryButton} onPress={() => router.push('../write')}>
-            <Text style={styles.primaryText}>Écrire</Text>
+        <View style={styles.actionColumnSingle}>
+          <TouchableOpacity style={styles.primaryButtonSingle} onPress={() => router.push('../profile/edit')}>
+            <Text style={styles.primaryText}>Éditer le profil</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('../profile/edit')}>
-            <Text style={styles.secondaryText}>Éditer</Text>
+          <TouchableOpacity style={styles.secondaryButtonSmall} onPress={() => router.push('/write')}>
+            <Text style={styles.secondaryText}>Commencer à écrire</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -297,10 +295,13 @@ const styles = StyleSheet.create({
   statNumber: { color: '#FFA94D', fontSize: 18, fontWeight: '700' },
   statLabel: { color: '#fff', fontSize: 12 },
   actionColumn: { flexDirection: 'column' },
+  actionColumnSingle: { flexDirection: 'column', alignItems: 'flex-end' },
   primaryButton: { backgroundColor: '#FFA94D', padding: 10, borderRadius: 8, alignItems: 'center', marginBottom: 8, minWidth: 100 },
   primaryText: { color: '#181818', fontWeight: '700' },
+  primaryButtonSingle: { backgroundColor: '#FFA94D', padding: 12, borderRadius: 8, alignItems: 'center', minWidth: 160 },
   secondaryButton: { borderColor: '#FFA94D', borderWidth: 1, padding: 8, borderRadius: 8, alignItems: 'center', minWidth: 100 },
   secondaryText: { color: '#FFA94D' },
+  secondaryButtonSmall: { borderColor: '#FFA94D', borderWidth: 1, padding: 10, borderRadius: 8, alignItems: 'center', minWidth: 160, marginTop: 8 },
   tabsRow: { width: '100%', flexDirection: 'row', paddingHorizontal: 10, marginTop: 18 },
   tabButton: { flex: 1, paddingVertical: 10, alignItems: 'center' },
   tabActive: { borderBottomWidth: 2, borderBottomColor: '#FFA94D' },
