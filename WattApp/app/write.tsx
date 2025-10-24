@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useEffect } from 'react';
+import { getAuth } from 'firebase/auth';
+import app, { db } from '../constants/firebaseConfig';
+import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import NoteLayout from './components/NoteLayout';
 
 type Template = { id: string; title: string; subtitle: string; starter: string; color: string };
@@ -22,6 +26,22 @@ const WriteScreen: React.FC = () => {
   const [title, setTitle] = useState<string>('');
   const [body, setBody] = useState<string>('');
   const [isPortrait, setIsPortrait] = useState<boolean>(true);
+  const [drafts, setDrafts] = useState<any[]>([]);
+
+  useEffect(() => {
+    let unsub: any;
+    const load = async () => {
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+      if (!user) return;
+      const q = query(collection(db, 'books'), where('authorUid', '==', user.uid), where('status', '==', 'draft'), orderBy('createdAt', 'desc'));
+      unsub = onSnapshot(q, snap => {
+        setDrafts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+    };
+    load();
+    return () => { if (unsub) unsub(); };
+  }, []);
 
   function chooseTemplate(t: Template) {
     // open dedicated editor for this template
@@ -100,6 +120,21 @@ const WriteScreen: React.FC = () => {
       </View>
 
       {/* Editor inputs below selection */}
+      <View style={styles.sectionLarge}>
+        <Text style={styles.sectionTitleLarge}>Mes brouillons</Text>
+        {drafts.length === 0 ? (
+          <Text style={styles.placeholder}>Tu n'as pas encore de brouillons.</Text>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingVertical: 8 }}>
+            {drafts.map(d => (
+              <TouchableOpacity key={d.id} style={styles.draftCard} onPress={() => (router as any).push(`/book/${d.id}`)}>
+                <Text style={styles.draftTitle} numberOfLines={1}>{d.title || '(Sans titre)'}</Text>
+                <Text style={styles.draftMeta}>{d.templateId || d.type || '—'}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+      </View>
       <View style={{ paddingHorizontal: 20, marginTop: 18 }}>
         <TextInput value={title} onChangeText={setTitle} placeholder="Titre de l'œuvre" placeholderTextColor="#888" style={styles.input} />
         <TextInput value={body} onChangeText={setBody} placeholder={selected ? undefined : "Début de votre histoire..."} placeholderTextColor="#888" style={[styles.input, { height: 220 }]} multiline />
@@ -145,6 +180,10 @@ const styles = StyleSheet.create({
   recentLabel: { color: '#ccc', fontSize: 12, marginTop: 6, textAlign: 'center' },
   previewTitle: { fontWeight: '700', fontSize: 12, marginTop: 8, paddingHorizontal: 6 },
   previewLine: { fontSize: 11, paddingHorizontal: 6, color: '#444' },
+  placeholder: { color: '#888', fontStyle: 'italic' },
+  draftCard: { width: 160, height: 84, backgroundColor: '#222', borderRadius: 8, padding: 10, marginRight: 12, justifyContent: 'center' },
+  draftTitle: { color: '#fff', fontWeight: '700' },
+  draftMeta: { color: '#aaa', fontSize: 12, marginTop: 6 },
   oversizedRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
   oversizedCard: { flex: 1, marginRight: 10, alignItems: 'center' },
   oversizedPreview: { width: '100%', height: 140, borderRadius: 8, backgroundColor: '#fff' },
