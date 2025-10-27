@@ -319,15 +319,30 @@ const BookEditor: React.FC = () => {
           {/* Contenu */}
           <View style={styles.inputSection}>
             <Text style={styles.inputLabel}>Contenu</Text>
-            <TextInput
-              value={body}
-              onChangeText={setBody}
-              placeholder={template?.starter || "Commencez à écrire votre histoire..."}
-              placeholderTextColor="#888"
-              style={styles.bodyInput}
-              multiline
-              textAlignVertical="top"
-            />
+            <View style={styles.textInputContainer}>
+              {/* Template background overlay */}
+              {template?.backgroundImage && (
+                <Image 
+                  source={{ uri: template.backgroundImage }} 
+                  style={styles.templateBackgroundOverlay}
+                  resizeMode="cover"
+                />
+              )}
+              
+              <TextInput
+                value={body}
+                onChangeText={setBody}
+                placeholder={template?.starter || "Commencez à écrire votre histoire..."}
+                placeholderTextColor="#888"
+                style={[
+                  styles.bodyInput,
+                  template?.backgroundImage && styles.bodyInputWithTemplate,
+                  { zIndex: 2, position: 'relative' } // Au-dessus du template
+                ]}
+                multiline
+                textAlignVertical="top"
+              />
+            </View>
           </View>
         </ScrollView>
       </View>
@@ -472,6 +487,25 @@ const styles = StyleSheet.create({
     minHeight: 400,
     borderWidth: 1,
     borderColor: '#333',
+  },
+  bodyInputWithTemplate: {
+    backgroundColor: 'rgba(35, 35, 35, 0.8)', // Semi-transparent pour voir le template
+  },
+  textInputContainer: {
+    position: 'relative',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  templateBackgroundOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    opacity: 0.3, // Transparence pour la lisibilité
+    zIndex: 1,
   },
   
   // Cover styles

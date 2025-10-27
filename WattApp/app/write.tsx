@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../constants/firebaseConfig';
 import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import NoteLayout from './components/NoteLayout';
+import TemplateManager from './components/TemplateManager';
 
 type Template = { id: string; title: string; subtitle: string; starter: string; color: string };
 
@@ -18,6 +19,16 @@ export const TEMPLATES: Template[] = [
   { id: 'manga', title: 'Manga', subtitle: 'Scènes et dialogues, format visuel', starter: "Page 1\n\n[Planche 1]\nPersonnage: \n- \n", color: '#F8BBD0' },
   { id: 'nouvelle', title: 'Nouvelle', subtitle: "Courte, percutante", starter: "Le matin où tout a changé...", color: '#C8E6C9' },
   { id: 'poesie', title: 'Poésie', subtitle: 'Vers et rimes', starter: "Sur le pavé, la lune danse...", color: '#E1BEE7' },
+  
+  // Nouveaux templates inspirés de TheGoodocs
+  { id: 'cornell', title: 'Cornell Notes', subtitle: 'Méthode Cornell pour prise de notes', starter: "📝 Sujet: \n\n📋 Notes principales:\n\n\n🔍 Résumé:\n", color: '#F0F8FF' },
+  { id: 'bullet-journal', title: 'Bullet Journal', subtitle: 'Organisation quotidienne', starter: "📅 Date: \n\n• Tâches importantes\n○ Événements\n- Notes\n! Priorité\n", color: '#FFF5EE' },
+  { id: 'pointille', title: 'Pointillé', subtitle: 'Grille de points discrets', starter: '', color: '#FAFAFA' },
+  { id: 'seyes', title: 'Seyès', subtitle: 'Réglure française traditionnelle', starter: '', color: '#FFFFFF' },
+  { id: 'meeting', title: 'Réunion', subtitle: 'Prise de notes de réunion', starter: "📅 Date: \n👥 Participants: \n🎯 Objectifs:\n\n📝 Points abordés:\n\n✅ Actions à retenir:\n", color: '#F0FFF0' },
+  { id: 'daily-planner', title: 'Planning Jour', subtitle: 'Organisation quotidienne', starter: "📅 Date: \n\n🌅 Matin:\n\n☀️ Après-midi:\n\n🌙 Soir:\n\n📌 Priorités:\n", color: '#FFF8DC' },
+  { id: 'creative', title: 'Créatif', subtitle: 'Espace libre pour créativité', starter: "💡 Idée:\n\n🎨 Inspiration:\n\n✨ Développement:\n", color: '#FFFACD' },
+  { id: 'lecture', title: 'Fiche Lecture', subtitle: 'Notes de lecture structurées', starter: "📚 Titre: \n✍️ Auteur: \n📖 Genre: \n\n💭 Résumé:\n\n⭐ Avis personnel:\n", color: '#F5F5DC' },
 ];
 
 const WriteScreen: React.FC = () => {
@@ -28,6 +39,8 @@ const WriteScreen: React.FC = () => {
   const [isPortrait, setIsPortrait] = useState<boolean>(true);
   const [drafts, setDrafts] = useState<any[]>([]);
   const [saving, setSaving] = useState<boolean>(false);
+  const [showTemplateManager, setShowTemplateManager] = useState<boolean>(false);
+  const [recentTemplates, setRecentTemplates] = useState<any[]>([]);
 
   useEffect(() => {
     let unsub: any;
@@ -124,7 +137,9 @@ const WriteScreen: React.FC = () => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Sélectionner un modèle</Text>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.iconBtn}><Text style={styles.iconText}>Fichiers</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => setShowTemplateManager(true)}>
+            <Text style={styles.iconText}>📋 Templates</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn}><Text style={styles.iconText}>Photos</Text></TouchableOpacity>
         </View>
       </View>
@@ -145,38 +160,28 @@ const WriteScreen: React.FC = () => {
       <View style={styles.sectionLarge}>
         <Text style={styles.sectionTitleLarge}>Récents</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingVertical: 8 }}>
-          {TEMPLATES.map(t => (
+          {(recentTemplates.length > 0 ? recentTemplates : TEMPLATES.slice(0, 6)).map(t => (
             <TouchableOpacity key={`recent-${t.id}`} onPress={() => chooseTemplate(t)} style={styles.recentThumbWrap}>
               <View style={[styles.recentThumb, { backgroundColor: t.color || '#eee' }]}> 
-                {/* Mini preview: title + up to 2 starter lines */}
-                <Text style={[styles.previewTitle, (t.color && t.color.toUpperCase().includes('FFF')) ? { color: '#222' } : { color: '#222' }]} numberOfLines={1}>{t.title}</Text>
-                {t.starter ? t.starter.split('\n').slice(0,2).map((ln, i) => (
-                  <Text key={i} style={[styles.previewLine, (t.color && t.color.toUpperCase().includes('FFF')) ? { color: '#333' } : { color: '#333' }]} numberOfLines={1}>{ln}</Text>
-                )) : null}
+                {t.backgroundImage ? (
+                  <Image 
+                    source={{ uri: t.backgroundImage }} 
+                    style={styles.recentBackgroundImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <>
+                    <Text style={[styles.previewTitle, (t.color && t.color.toUpperCase().includes('FFF')) ? { color: '#222' } : { color: '#222' }]} numberOfLines={1}>{t.title}</Text>
+                    {t.starter ? t.starter.split('\n').slice(0,2).map((ln: string, i: number) => (
+                      <Text key={i} style={[styles.previewLine, (t.color && t.color.toUpperCase().includes('FFF')) ? { color: '#333' } : { color: '#333' }]} numberOfLines={1}>{ln}</Text>
+                    )) : null}
+                  </>
+                )}
               </View>
               <Text style={styles.recentLabel}>{t.title}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
-      </View>
-
-      {/* Notes surdimensionnées */}
-      <View style={styles.sectionLarge}>
-        <Text style={styles.sectionTitleLarge}>Notes surdimensionnées</Text>
-        <View style={styles.oversizedRow}>
-          <TouchableOpacity style={styles.oversizedCard} onPress={() => chooseTemplate({ id: 'vierge', title: 'Vierge', subtitle: 'Vierge', starter: '', color: '#FFF' })}>
-            <View style={styles.oversizedPreview} />
-            <Text style={styles.oversizedLabel}>Vierge</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.oversizedCard} onPress={() => chooseTemplate({ id: 'quadrillage', title: 'Quadrillage', subtitle: 'Quadrillage', starter: '', color: '#FFF' })}>
-            <View style={[styles.oversizedPreview, styles.gridPreview]} />
-            <Text style={styles.oversizedLabel}>Quadrillage</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.oversizedCard} onPress={() => chooseTemplate({ id: 'reglure', title: 'À régule', subtitle: 'À régule', starter: '', color: '#FFF' })}>
-            <View style={[styles.oversizedPreview, styles.linedPreview]} />
-            <Text style={styles.oversizedLabel}>À régule</Text>
-          </TouchableOpacity>
-        </View>
       </View>
 
       {/* Editor inputs below selection */}
@@ -210,6 +215,31 @@ const WriteScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
       </ScrollView>
+      
+      <TemplateManager
+        visible={showTemplateManager}
+        onClose={() => setShowTemplateManager(false)}
+        onSelectTemplate={(template) => {
+          setSelected(template);
+          setBody(template.starter || '');
+          setShowTemplateManager(false);
+          
+          // Si c'est un template personnalisé, utiliser un éditeur générique
+          if (template.isCustom) {
+            (router as any).push({
+              pathname: '/write/custom',
+              params: { 
+                templateData: JSON.stringify(template)
+              }
+            });
+          } else {
+            // Template prédéfini, utiliser l'éditeur existant
+            (router as any).push(`/write/${template.id}`);
+          }
+        }}
+        recentTemplates={recentTemplates}
+        onUpdateRecentTemplates={setRecentTemplates}
+      />
     </NoteLayout>
   );
 };
@@ -242,6 +272,15 @@ const styles = StyleSheet.create({
   sectionTitleLarge: { color: '#fff', fontWeight: '700', marginBottom: 8 },
   recentThumbWrap: { alignItems: 'center', marginRight: 12 },
   recentThumb: { width: 96, height: 120, borderRadius: 6, backgroundColor: '#222', overflow: 'hidden' },
+  recentBackgroundImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
   recentInner: { flex: 1, backgroundColor: '#eee' },
   recentLabel: { color: '#ccc', fontSize: 12, marginTop: 6, textAlign: 'center' },
   previewTitle: { fontWeight: '700', fontSize: 12, marginTop: 8, paddingHorizontal: 6 },
@@ -250,12 +289,6 @@ const styles = StyleSheet.create({
   draftCard: { width: 160, height: 84, backgroundColor: '#222', borderRadius: 8, padding: 10, marginRight: 12, justifyContent: 'center' },
   draftTitle: { color: '#fff', fontWeight: '700' },
   draftMeta: { color: '#aaa', fontSize: 12, marginTop: 6 },
-  oversizedRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-  oversizedCard: { flex: 1, marginRight: 10, alignItems: 'center' },
-  oversizedPreview: { width: '100%', height: 140, borderRadius: 8, backgroundColor: '#fff' },
-  gridPreview: { backgroundColor: '#f7f7e6' },
-  linedPreview: { backgroundColor: '#f3f3f3' },
-  oversizedLabel: { color: '#ccc', marginTop: 8 },
   input: { backgroundColor: '#232323', color: '#fff', borderRadius: 8, padding: 12, marginBottom: 12 },
   saveButton: { backgroundColor: '#FFA94D', padding: 12, borderRadius: 8, alignItems: 'center' },
   saveButtonDisabled: { backgroundColor: '#666', opacity: 0.7 },
