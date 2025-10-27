@@ -51,8 +51,17 @@ const TemplateEditor: React.FC = () => {
         status: 'draft',
         createdAt: serverTimestamp(),
       });
-      Alert.alert('Brouillon créé', 'Votre brouillon a été enregistré.');
-  (router as any).push(`/book/${docRef.id}`);
+      
+      Alert.alert(
+        'Brouillon créé', 
+        'Votre brouillon a été enregistré avec succès !',
+        [
+          {
+            text: 'OK',
+            onPress: () => (router as any).push('/library/Library')
+          }
+        ]
+      );
     } catch (e: any) {
       console.warn('createDraft error', e);
       Alert.alert('Erreur', e?.message ?? String(e));

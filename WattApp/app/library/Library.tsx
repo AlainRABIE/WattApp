@@ -78,6 +78,7 @@ const Library: React.FC = () => {
   const isTablet = Math.max(width, height) >= 768;
 
   const [books, setBooks] = useState<Book[]>([]);
+  const [drafts, setDrafts] = useState<Book[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>('');
 
@@ -94,20 +95,52 @@ const Library: React.FC = () => {
         const user = auth.currentUser;
         if (!user) {
           // no user, show sample
-          if (mounted) setBooks(sampleBooks);
+          if (mounted) {
+            setBooks(sampleBooks);
+            setDrafts([]);
+          }
           return;
         }
-        const q = query(collection(db, 'books'), where('ownerUid', '==', user.uid));
-        const snap = await getDocs(q);
-        if (snap.empty) {
-          if (mounted) setBooks(sampleBooks);
-        } else {
-          const list: Book[] = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
-          if (mounted) setBooks(list);
+        
+        // Charger les livres avec ownerUid (livres de la bibliothèque)
+        const qBooks = query(collection(db, 'books'), where('ownerUid', '==', user.uid));
+        const snapBooks = await getDocs(qBooks);
+        
+        // Charger les brouillons avec authorUid (créés par l'utilisateur)
+        const qDrafts = query(collection(db, 'books'), where('authorUid', '==', user.uid));
+        const snapDrafts = await getDocs(qDrafts);
+        
+        if (mounted) {
+          // Livres de la bibliothèque
+          if (snapBooks.empty) {
+            setBooks(sampleBooks);
+          } else {
+            const booksList: Book[] = snapBooks.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+            setBooks(booksList);
+          }
+          
+          // Brouillons (filtrer seulement les drafts)
+          if (!snapDrafts.empty) {
+            const allUserBooks = snapDrafts.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+            const userDrafts = allUserBooks
+              .filter((book: any) => book.status === 'draft')
+              .sort((a: any, b: any) => {
+                // Tri par date de création décroissante
+                const dateA = a.createdAt?.toDate?.() || new Date(0);
+                const dateB = b.createdAt?.toDate?.() || new Date(0);
+                return dateB.getTime() - dateA.getTime();
+              });
+            setDrafts(userDrafts);
+          } else {
+            setDrafts([]);
+          }
         }
       } catch (err) {
         console.warn('Failed to load library books', err);
-        if (mounted) setBooks(sampleBooks);
+        if (mounted) {
+          setBooks(sampleBooks);
+          setDrafts([]);
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -177,7 +210,7 @@ const Library: React.FC = () => {
               {/* Section: Livres lus - Carousel horizontal */}
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>📖 Livres lus</Text>
+                  <Text style={styles.sectionTitle}>� Livres lus</Text>
                   <Text style={styles.sectionCount}>{readBooks.length}</Text>
                 </View>
                 <ScrollView 
@@ -242,6 +275,67 @@ const Library: React.FC = () => {
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
+              </View>
+
+              {/* Section: Mes brouillons - Carousel horizontal */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>📝 Mes brouillons</Text>
+                  <Text style={styles.sectionCount}>{drafts.length}</Text>
+                </View>
+                {drafts.length === 0 ? (
+                  <View style={styles.emptySection}>
+                    <Text style={styles.emptySectionText}>Aucun brouillon</Text>
+                    <Text style={styles.emptySectionSubtext}>Créez votre premier brouillon</Text>
+                  </View>
+                ) : (
+                  <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={false} 
+                    contentContainerStyle={styles.horizontalList}
+                  >
+                    {drafts.map((draft: any) => (
+                      <TouchableOpacity 
+                        key={draft.id} 
+                        style={styles.draftCard} 
+                        onPress={() => (router as any).push(`/book/${draft.id}`)}
+                      >
+                        <View style={styles.draftCover}>
+                          {draft.coverImage ? (
+                            <Image 
+                              source={{ uri: draft.coverImage }} 
+                              style={styles.draftCoverImage}
+                            />
+                          ) : (
+                            <Text style={styles.draftIcon}>📄</Text>
+                          )}
+                        </View>
+                        <View style={styles.draftCardContent}>
+                          <Text style={styles.draftTitle} numberOfLines={2}>
+                            {draft.title || '(Sans titre)'}
+                          </Text>
+                          <Text style={styles.draftTemplate} numberOfLines={1}>
+                            {draft.templateId || 'Sans template'}
+                          </Text>
+                          <Text style={styles.draftDate} numberOfLines={1}>
+                            Créé: {draft.createdAt?.toDate?.()?.toLocaleDateString?.('fr-FR') || 'Date inconnue'}
+                          </Text>
+                          {draft.updatedAt && (
+                            <Text style={styles.draftUpdatedDate} numberOfLines={1}>
+                              Modifié: {draft.updatedAt?.toDate?.()?.toLocaleString?.('fr-FR', {
+                                day: '2-digit',
+                                month: '2-digit', 
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              }) || 'Date inconnue'}
+                            </Text>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
               </View>
             </>
           )}
@@ -430,6 +524,88 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginBottom: 6,
+  },
+
+  // Draft cards (Mes brouillons)
+  draftCard: {
+    width: 160,
+    marginRight: 16,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#444',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  draftCover: {
+    width: '100%',
+    height: 140,
+    borderRadius: 8,
+    backgroundColor: '#1A1A1A',
+    marginBottom: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  draftCoverImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  draftIcon: {
+    fontSize: 48,
+    color: '#666',
+  },
+  draftCardContent: {
+    alignItems: 'center',
+  },
+  draftTitle: {
+    color: '#FFA94D',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  draftTemplate: {
+    color: '#999',
+    fontSize: 11,
+    textAlign: 'center',
+    marginBottom: 4,
+    fontStyle: 'italic',
+  },
+  draftDate: {
+    color: '#666',
+    fontSize: 10,
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  draftUpdatedDate: {
+    color: '#FFA94D',
+    fontSize: 9,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+
+  // Empty section
+  emptySection: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  emptySectionText: {
+    color: '#999',
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  emptySectionSubtext: {
+    color: '#666',
+    fontSize: 14,
   },
 
   statsRow: {

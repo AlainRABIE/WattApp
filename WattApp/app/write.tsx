@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../constants/firebaseConfig';
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import NoteLayout from './components/NoteLayout';
 
 type Template = { id: string; title: string; subtitle: string; starter: string; color: string };
@@ -27,6 +27,7 @@ const WriteScreen: React.FC = () => {
   const [body, setBody] = useState<string>('');
   const [isPortrait, setIsPortrait] = useState<boolean>(true);
   const [drafts, setDrafts] = useState<any[]>([]);
+  const [saving, setSaving] = useState<boolean>(false);
 
   useEffect(() => {
     let unsub: any;
@@ -34,9 +35,25 @@ const WriteScreen: React.FC = () => {
       const auth = getAuth(app);
       const user = auth.currentUser;
       if (!user) return;
-      const q = query(collection(db, 'books'), where('authorUid', '==', user.uid), where('status', '==', 'draft'), orderBy('createdAt', 'desc'));
+      
+      // Requête simplifiée pour éviter l'index composite
+      const q = query(
+        collection(db, 'books'), 
+        where('authorUid', '==', user.uid)
+      );
+      
       unsub = onSnapshot(q, snap => {
-        setDrafts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        // Filtrer et trier côté client pour éviter l'index Firebase
+        const allBooks = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+        const draftBooks = allBooks
+          .filter((book: any) => book.status === 'draft')
+          .sort((a: any, b: any) => {
+            // Tri par date de création décroissante
+            const dateA = a.createdAt?.toDate?.() || new Date(0);
+            const dateB = b.createdAt?.toDate?.() || new Date(0);
+            return dateB.getTime() - dateA.getTime();
+          });
+        setDrafts(draftBooks);
       });
     };
     load();
@@ -48,10 +65,53 @@ const WriteScreen: React.FC = () => {
     (router as any).push(`/write/${t.id}`);
   }
 
-  function createDraft() {
-    // Placeholder: in the future save to Firestore 'books' collection as draft
-    console.log('Creating draft', { template: selected?.id, title, body });
-    router.back();
+  async function createDraft() {
+    if (!title.trim() && !body.trim()) {
+      Alert.alert('Erreur', 'Veuillez saisir au moins un titre ou du contenu');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+      if (!user) {
+        Alert.alert('Erreur', 'Utilisateur non authentifié');
+        return;
+      }
+
+      const docRef = await addDoc(collection(db, 'books'), {
+        title: title.trim() || '(Sans titre)',
+        body: body.trim(),
+        templateId: selected?.id || null,
+        authorUid: user.uid,
+        status: 'draft',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      // Réinitialiser les champs
+      setTitle('');
+      setBody('');
+      setSelected(null);
+      
+      // Rediriger vers la bibliothèque
+      Alert.alert(
+        'Brouillon créé', 
+        'Votre brouillon a été enregistré avec succès !',
+        [
+          {
+            text: 'OK',
+            onPress: () => (router as any).push('/library/Library')
+          }
+        ]
+      );
+    } catch (e: any) {
+      console.warn('createDraft error', e);
+      Alert.alert('Erreur', `Impossible de sauvegarder: ${e?.message ?? String(e)}`);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -139,8 +199,14 @@ const WriteScreen: React.FC = () => {
         <TextInput value={title} onChangeText={setTitle} placeholder="Titre de l'œuvre" placeholderTextColor="#888" style={styles.input} />
         <TextInput value={body} onChangeText={setBody} placeholder={selected ? undefined : "Début de votre histoire..."} placeholderTextColor="#888" style={[styles.input, { height: 220 }]} multiline />
 
-        <TouchableOpacity style={styles.saveButton} onPress={createDraft}>
-          <Text style={styles.saveText}>{selected ? `Créer (${selected.title})` : 'Créer (sans template)'}</Text>
+        <TouchableOpacity 
+          style={[styles.saveButton, saving && styles.saveButtonDisabled]} 
+          onPress={createDraft}
+          disabled={saving}
+        >
+          <Text style={styles.saveText}>
+            {saving ? 'Sauvegarde...' : (selected ? `Créer (${selected.title})` : 'Créer (sans template)')}
+          </Text>
         </TouchableOpacity>
       </View>
       </ScrollView>
@@ -192,6 +258,7 @@ const styles = StyleSheet.create({
   oversizedLabel: { color: '#ccc', marginTop: 8 },
   input: { backgroundColor: '#232323', color: '#fff', borderRadius: 8, padding: 12, marginBottom: 12 },
   saveButton: { backgroundColor: '#FFA94D', padding: 12, borderRadius: 8, alignItems: 'center' },
+  saveButtonDisabled: { backgroundColor: '#666', opacity: 0.7 },
   saveText: { color: '#181818', fontWeight: '700' },
 });
 
