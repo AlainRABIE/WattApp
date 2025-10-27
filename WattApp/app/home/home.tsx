@@ -1,7 +1,7 @@
 
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Image, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, ScrollView, Image, useWindowDimensions, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { getAuth } from 'firebase/auth';
@@ -97,6 +97,11 @@ const Home: React.FC = () => {
 	// treat as tablet when the longest side is >= 768
 	const isTablet = Math.max(width, height) >= 768;
 
+	// Avatar placement: compute top offset so the avatar stays fixed below the status bar
+	const avatarSize = 48; // size of the fixed profile circle
+	const topOffset = Platform.OS === 'ios' ? 44 : (StatusBar.currentHeight ?? 0) + 8;
+	const contentPaddingTop = topOffset + avatarSize + 12; // keep content from being hidden under avatar
+
 	const renderBookItem = (item: any) => (
 		<View key={item.id} style={isTablet ? styles.livreCardTablet : styles.livreCardHorizontal}>
 			<View style={isTablet ? styles.livreImageBoxTablet : styles.livreImageBoxHorizontal}>
@@ -142,16 +147,11 @@ const Home: React.FC = () => {
 
 	return (
 			<View style={styles.container}>
-				{/* Small user button (top-left) */}
-				<View style={styles.userButtonContainer} pointerEvents="box-none">
-					<TouchableOpacity onPress={() => router.push('../profile')}>
-						<Image source={{ uri: photoURL || avatarUrl }} style={styles.userButtonImage} />
-					</TouchableOpacity>
-				</View>
+				{/* user button removed from Home - profile stays visible in BottomNav only */}
 
 			<StatusBar barStyle="light-content" />
 					{/* Header supprimé pour un rendu épuré */}
-			<ScrollView contentContainerStyle={styles.content}>
+			<ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, { paddingTop: contentPaddingTop }]}>
 				{/* Section Nouveautés */}
 				<Text style={styles.sectionTitle}>Nouveautés de vos auteurs</Text>
 				<View style={[styles.sectionBox, isTablet && styles.sectionBoxTablet]}>

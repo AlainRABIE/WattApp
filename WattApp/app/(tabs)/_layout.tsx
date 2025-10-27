@@ -58,7 +58,8 @@ export default function TabLayout() {
 
   return (
     <View style={styles.wrapper}>
-      <Tabs screenOptions={{ headerShown: false }} />
+      {/* Hide the Tabs default tab bar, we'll use a custom BottomNav */}
+      <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }} />
 
       {/* Fixed avatar overlay - shows user avatar if logged in, otherwise generic and links to register/login */}
       <View style={[styles.avatarOverlay, isTablet && styles.avatarOverlayTablet]}>
@@ -71,6 +72,7 @@ export default function TabLayout() {
         </TouchableOpacity>
         {/* Debug status: show if signed in or not (visible to developer) */}
       </View>
+      {/* Bottom navigation is handled at the root layout so it appears on non-tab pages (Home) */}
     </View>
   );
 }
