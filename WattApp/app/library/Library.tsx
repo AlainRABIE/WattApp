@@ -131,21 +131,30 @@ const Library: React.FC = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <View style={styles.headerRow}>
-        <Text style={styles.title}>Bibliothèque</Text>
-        <TouchableOpacity onPress={() => router.push('/write')} style={styles.addBtn}>
-          <Text style={styles.addText}>Ajouter</Text>
-        </TouchableOpacity>
-      </View>
+      
+      {/* Header avec padding pour éviter la BottomNav */}
+      <View style={styles.headerSection}>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Bibliothèque</Text>
+          <TouchableOpacity onPress={() => router.push('/write')} style={styles.addBtn}>
+            <Text style={styles.addText}>+ Nouveau</Text>
+          </TouchableOpacity>
+        </View>
 
-      <View style={styles.searchRow}>
-        <TextInput
-          placeholder="Rechercher titre, auteur, tag..."
-          placeholderTextColor="#999"
-          value={search}
-          onChangeText={setSearch}
-          style={styles.searchInput}
-        />
+        <View style={styles.searchRow}>
+          <View style={styles.searchContainer}>
+            <TextInput
+              placeholder="Rechercher titre, auteur, tag..."
+              placeholderTextColor="#888"
+              value={search}
+              onChangeText={setSearch}
+              style={styles.searchInput}
+            />
+            <View style={styles.searchIcon}>
+              <Text style={styles.searchIconText}>🔍</Text>
+            </View>
+          </View>
+        </View>
       </View>
 
       {loading ? (
@@ -153,43 +162,87 @@ const Library: React.FC = () => {
           <ActivityIndicator size="large" color="#FFA94D" />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={[styles.list, isTablet && styles.listTablet]}>
+        <ScrollView 
+          contentContainerStyle={[styles.list, isTablet && styles.listTablet]}
+          showsVerticalScrollIndicator={false}
+        >
           {filtered.length === 0 ? (
-            <Text style={styles.empty}>Aucun livre trouvé.</Text>
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyIcon}>📚</Text>
+              <Text style={styles.empty}>Aucun livre trouvé</Text>
+              <Text style={styles.emptySubtext}>Essayez une autre recherche</Text>
+            </View>
           ) : (
             <>
-              {/* Section: Livres lus */}
-              <Text style={styles.sectionTitle}>Livres lus</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                {readBooks.map(book => (
-                  <TouchableOpacity key={book.id} style={[styles.card, { width: 160, marginRight: 12 }]} onPress={() => Alert.alert(book.titre, `${book.auteur}\n\nTags: ${(book.tags || []).join(', ')}`)}>
-                    <Image source={{ uri: book.couverture || 'https://via.placeholder.com/120x180.png?text=Cover' }} style={[{ width: 70, height: 100, borderRadius: 8, marginRight: 8 }]} />
-                    <View style={styles.cardBody}>
-                      <Text style={styles.bookTitle}>{book.titre}</Text>
-                      <Text style={styles.bookAuthor}>par {book.auteur}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+              {/* Section: Livres lus - Carousel horizontal */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>📖 Livres lus</Text>
+                  <Text style={styles.sectionCount}>{readBooks.length}</Text>
+                </View>
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false} 
+                  contentContainerStyle={styles.horizontalList}
+                >
+                  {readBooks.map(book => (
+                    <TouchableOpacity 
+                      key={book.id} 
+                      style={styles.horizontalCard} 
+                      onPress={() => Alert.alert(book.titre, `${book.auteur}\n\nTags: ${(book.tags || []).join(', ')}`)}
+                    >
+                      <Image 
+                        source={{ uri: book.couverture || 'https://via.placeholder.com/120x180.png?text=Cover' }} 
+                        style={styles.horizontalCover} 
+                      />
+                      <View style={styles.horizontalCardContent}>
+                        <Text style={styles.horizontalBookTitle} numberOfLines={2}>{book.titre}</Text>
+                        <Text style={styles.horizontalBookAuthor} numberOfLines={1}>par {book.auteur}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
 
-              {/* Section: Mes créations */}
-              <Text style={styles.sectionTitle}>Mes créations</Text>
-                {createdBooks.map(book => (
-                <TouchableOpacity key={book.id} style={[styles.card, isTablet && styles.cardTablet]} onPress={() => Alert.alert(book.titre, `${book.auteur} • ${book.views ?? 0} vues\n\nTags: ${(book.tags || []).join(', ')}`)}>
-                  <Image source={{ uri: book.couverture || 'https://via.placeholder.com/120x180.png?text=Cover' }} style={[styles.cover, isTablet && styles.coverTablet]} />
-                  <View style={styles.cardBody}>
-                    <Text style={styles.bookTitle}>{book.titre}</Text>
-                    <Text style={styles.bookAuthor}>par {book.auteur} • {book.views ?? 0} vues</Text>
-                    <View style={styles.tagsRow}>
-                      {(book.tags || []).slice(0, 3).map(tag => (
-                        <View key={tag} style={styles.tagBox}>
-                          <Text style={styles.tagText}>{tag}</Text>
+              {/* Section: Mes créations - Carousel horizontal */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>✍️ Mes créations</Text>
+                  <Text style={styles.sectionCount}>{createdBooks.length}</Text>
+                </View>
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false} 
+                  contentContainerStyle={styles.horizontalList}
+                >
+                  {createdBooks.map(book => (
+                    <TouchableOpacity 
+                      key={book.id} 
+                      style={styles.creationCard} 
+                      onPress={() => Alert.alert(book.titre, `${book.auteur} • ${book.views ?? 0} vues\n\nTags: ${(book.tags || []).join(', ')}`)}
+                    >
+                      <Image 
+                        source={{ uri: book.couverture || 'https://via.placeholder.com/120x180.png?text=Cover' }} 
+                        style={styles.creationCover} 
+                      />
+                      <View style={styles.creationCardContent}>
+                        <Text style={styles.creationBookTitle} numberOfLines={2}>{book.titre}</Text>
+                        <Text style={styles.creationBookAuthor} numberOfLines={1}>par {book.auteur}</Text>
+                        <View style={styles.statsRow}>
+                          <Text style={styles.viewsText}>👁 {book.views ?? 0} vues</Text>
                         </View>
-                      ))}
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ))}
+                        <View style={styles.tagsRow}>
+                          {(book.tags || []).slice(0, 2).map(tag => (
+                            <View key={tag} style={styles.tagBox}>
+                              <Text style={styles.tagText}>{tag}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
             </>
           )}
         </ScrollView>
@@ -202,57 +255,237 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#181818',
-    paddingTop: Platform.OS === 'ios' ? 44 : (StatusBar.currentHeight || 0) + 8,
-    paddingHorizontal: 16,
+  },
+  headerSection: {
+    paddingTop: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 80, // Plus d'espace pour la BottomNav
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    backgroundColor: '#181818',
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 20,
   },
   title: {
     color: '#FFA94D',
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
   },
   addBtn: {
-    backgroundColor: '#FFA94D',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    backgroundColor: 'rgba(255, 169, 77, 0.1)',
+    borderWidth: 1,
+    borderColor: '#FFA94D',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
   },
-  addText: { color: '#181818', fontWeight: '700' },
+  addText: { 
+    color: '#FFA94D', 
+    fontWeight: '600',
+    fontSize: 14,
+  },
   searchRow: {
-    marginBottom: 12,
+    marginBottom: 8,
+  },
+  searchContainer: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   searchInput: {
+    flex: 1,
     backgroundColor: '#232323',
     color: '#fff',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#333',
   },
-  loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list: { paddingBottom: 120 },
-  listTablet: { paddingBottom: 120, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start' },
-  card: { flexDirection: 'row', backgroundColor: '#232323', borderRadius: 10, padding: 10, marginBottom: 12, alignItems: 'center' },
-  cardTablet: { width: '48%', marginRight: 12 },
-  cover: { width: 80, height: 120, borderRadius: 8, marginRight: 12, backgroundColor: '#181818' },
-  coverTablet: { width: 120, height: 180 },
-  cardBody: { flex: 1 },
-  bookTitle: { color: '#FFA94D', fontSize: 16, fontWeight: '700', marginBottom: 4 },
-  bookAuthor: { color: '#fff', marginBottom: 8 },
-  tagsRow: { flexDirection: 'row', flexWrap: 'wrap' },
-  tagBox: { backgroundColor: '#181818', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, marginRight: 6, marginBottom: 6, borderWidth: 1, borderColor: '#FFA94D' },
-  tagText: { color: '#FFA94D', fontSize: 12, fontWeight: '700' },
-  empty: { color: '#fff', textAlign: 'center', marginTop: 24 },
+  searchIcon: {
+    position: 'absolute',
+    right: 12,
+    padding: 4,
+  },
+  searchIconText: {
+    fontSize: 16,
+  },
+  loader: { 
+    flex: 1, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    paddingTop: 60,
+  },
+  list: { 
+    paddingBottom: 140, // Plus d'espace pour la BottomNav
+    paddingHorizontal: 20,
+  },
+  listTablet: { 
+    paddingBottom: 140, 
+  },
+  
+  // Section styles
+  section: {
+    marginBottom: 32,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: '#FFA94D',
-    marginTop: 8,
+  },
+  sectionCount: {
+    backgroundColor: 'rgba(255, 169, 77, 0.1)',
+    color: '#FFA94D',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // Horizontal cards (Livres lus)
+  horizontalList: {
+    paddingRight: 20,
+  },
+  horizontalCard: {
+    width: 140,
+    marginRight: 16,
+    backgroundColor: '#232323',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  horizontalCover: {
+    width: '100%',
+    height: 160,
+    borderRadius: 8,
+    backgroundColor: '#181818',
     marginBottom: 8,
+  },
+  horizontalCardContent: {
+    alignItems: 'center',
+  },
+  horizontalBookTitle: {
+    color: '#FFA94D',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  horizontalBookAuthor: {
+    color: '#ccc',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+
+  // Creation cards (Mes créations) - Style similaire mais avec plus d'infos
+  creationCard: {
+    width: 160,
+    marginRight: 16,
+    backgroundColor: '#232323',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  creationCover: {
+    width: '100%',
+    height: 160,
+    borderRadius: 8,
+    backgroundColor: '#181818',
+    marginBottom: 8,
+  },
+  creationCardContent: {
+    alignItems: 'center',
+  },
+  creationBookTitle: {
+    color: '#FFA94D',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  creationBookAuthor: {
+    color: '#ccc',
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    justifyContent: 'center',
+  },
+  viewsText: {
+    color: '#888',
+    fontSize: 11,
+  },
+  tagsRow: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap',
+    marginTop: 4,
+    justifyContent: 'center',
+  },
+  tagBox: { 
+    backgroundColor: 'rgba(255, 169, 77, 0.1)', 
+    borderRadius: 8, 
+    paddingHorizontal: 6, 
+    paddingVertical: 2, 
+    marginRight: 4, 
+    marginBottom: 4, 
+    borderWidth: 1, 
+    borderColor: 'rgba(255, 169, 77, 0.3)',
+  },
+  tagText: { 
+    color: '#FFA94D', 
+    fontSize: 10, 
+    fontWeight: '500',
+  },
+
+  // Empty state
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 60,
+    paddingBottom: 40,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  empty: { 
+    color: '#fff', 
+    textAlign: 'center', 
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    color: '#888',
+    textAlign: 'center',
+    fontSize: 14,
   },
 });
 
