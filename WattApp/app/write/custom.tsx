@@ -17,8 +17,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../constants/firebaseConfig';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
-import PDFAnnotatorClean from '../components/PDFAnnotatorClean';
-import PDFDrawingEditorComplete from '../components/PDFDrawingEditorClean';
+import PDFDrawingEditorComplete from '../components/PDFDrawingEditorComplete';
 
 // Interface pour les traits de dessin PDF
 interface Stroke {
@@ -179,6 +178,21 @@ export default function CustomTemplateEditor() {
     }
   };
 
+  // Fonctions spécifiques pour les PDFs depuis l'en-tête
+  const handlePDFSaveDraft = () => {
+    setSaveType('draft');
+    setModalTitle('');
+    setModalCoverImage(null);
+    setShowSaveModal(true);
+  };
+
+  const handlePDFPublish = () => {
+    setSaveType('publish');
+    setModalTitle('');
+    setModalCoverImage(null);
+    setShowSaveModal(true);
+  };
+
   const handleModalSave = async () => {
     if (!modalTitle.trim()) {
       Alert.alert('Attention', 'Veuillez donner un nom à votre annotation PDF.');
@@ -242,23 +256,39 @@ export default function CustomTemplateEditor() {
         <View style={styles.overlay} />
       )}
       
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* En-tête avec outils */}
-        <View style={styles.header}>
+      {/* En-tête fixe comme Notes+ */}
+      <View style={styles.notesHeader}>
+        <View style={styles.notesLeftSection}>
           <TouchableOpacity 
-            style={styles.backButton}
+            style={styles.notesBackButton}
             onPress={() => router.back()}
           >
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.templateTitle}>{template.name}</Text>
-          <TouchableOpacity 
-            style={styles.toolsButton}
-            onPress={() => setShowToolbar(!showToolbar)}
-          >
-            <Text style={styles.toolsButtonText}>🖊️</Text>
+            <Text style={styles.notesBackText}>‹ Retour</Text>
           </TouchableOpacity>
         </View>
+        
+        <View style={styles.notesHeaderButtons}>
+          <TouchableOpacity 
+            style={[styles.notesHeaderButton, styles.notesDraftHeaderButton]}
+            onPress={template.isPDF ? handlePDFSaveDraft : saveDraft}
+          >
+            <Text style={styles.notesHeaderButtonText}>Brouillon</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.notesHeaderButton, styles.notesPublishHeaderButton]}
+            onPress={template.isPDF ? handlePDFPublish : publishBook}
+          >
+            <Text style={styles.notesHeaderButtonText}>Publier</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <ScrollView 
+        style={styles.notesScrollView}
+        contentContainerStyle={styles.notesContent}
+        showsVerticalScrollIndicator={false}
+      >
 
         {/* Barre d'outils flottante */}
         {showToolbar && (
@@ -367,16 +397,27 @@ export default function CustomTemplateEditor() {
 
         {/* Contenu - Adaptatif selon le template */}
         {template.isPDF ? (
-          // Mode annotation PDF avancé avec Apple Pencil support
-          <View style={styles.pdfAnnotationContainer}>
-            <PDFDrawingEditorComplete
-              pdfUri={template.backgroundImage}
-              onSave={(strokes: Stroke[]) => {
-                setPdfAnnotations(strokes);
-                setContent(JSON.stringify(strokes)); // Sauvegarder les dessins comme contenu
-              }}
-            />
-          </View>
+          // Mode annotation PDF en plein écran
+          <PDFDrawingEditorComplete
+            pdfUri={template.backgroundImage}
+            onSave={(strokes: Stroke[]) => {
+              setPdfAnnotations(strokes);
+              setContent(JSON.stringify(strokes));
+              setShowSaveModal(true);
+            }}
+            onSaveDraft={(strokes: Stroke[]) => {
+              setPdfAnnotations(strokes);
+              setContent(JSON.stringify(strokes));
+              setSaveType('draft');
+              setShowSaveModal(true);
+            }}
+            onPublish={(strokes: Stroke[]) => {
+              setPdfAnnotations(strokes);
+              setContent(JSON.stringify(strokes));
+              setSaveType('publish');
+              setShowSaveModal(true);
+            }}
+          />
         ) : template.backgroundImage ? (
           // Template avec image de fond mais pas PDF
           <View style={styles.templateOverlay}>
@@ -412,32 +453,7 @@ export default function CustomTemplateEditor() {
           />
         )}
 
-        {/* Boutons d'action */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity 
-            style={[
-              styles.draftButton,
-              template.backgroundImage && styles.transparentButton,
-              template.isPDF && { backgroundColor: '#444', borderWidth: 1, borderColor: '#666' }
-            ]} 
-            onPress={saveDraft}
-          >
-            <Text style={[
-              styles.draftButtonText,
-              template.isPDF && { color: '#fff' }
-            ]}>Sauvegarder le brouillon</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[
-              styles.publishButton,
-              template.backgroundImage && styles.transparentButton,
-              template.isPDF && { backgroundColor: '#0a7ea4', borderWidth: 1, borderColor: '#087ea4' }
-            ]} 
-            onPress={publishBook}
-          >
-            <Text style={styles.publishButtonText}>Publier</Text>
-          </TouchableOpacity>
-        </View>
+
       </ScrollView>
 
       {/* Modal de sauvegarde pour PDF */}
@@ -491,6 +507,8 @@ export default function CustomTemplateEditor() {
           </View>
         </View>
       )}
+
+
     </SafeAreaView>
   );
 }
@@ -528,7 +546,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingBottom: 100,
+    paddingBottom: 20,
   },
   header: {
     flexDirection: 'row',
@@ -620,31 +638,45 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 15,
+    gap: 12,
+    marginTop: 15,
+    marginBottom: 10,
   },
   draftButton: {
     flex: 1,
-    backgroundColor: 'rgba(100, 100, 100, 0.8)',
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: 'rgba(255, 149, 0, 0.9)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   draftButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '600',
   },
   publishButton: {
     flex: 1,
-    backgroundColor: 'rgba(0, 122, 255, 0.8)',
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: 'rgba(52, 199, 89, 0.9)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   publishButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '600',
   },
   transparentButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.85)',
@@ -734,13 +766,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
   },
   pdfAnnotationContainer: {
-    height: 700,
-    marginBottom: 10,
+    flex: 1, // Prendre tout l'espace disponible
     borderRadius: 10,
     overflow: 'hidden',
     backgroundColor: '#232323',
     borderWidth: 1,
     borderColor: '#444',
+    position: 'absolute', // Position absolue pour couvrir tout l'écran
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
 
   // Styles pour la modal de sauvegarde
@@ -851,5 +887,116 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+
+  // Styles Notes+ Layout
+  notesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: Platform.OS === 'ios' ? 0 : 10,
+    paddingHorizontal: 20,
+    paddingBottom: 15,
+    backgroundColor: 'transparent',
+    zIndex: 100,
+  },
+  notesBackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  notesBackText: {
+    fontSize: 17,
+    color: '#007AFF',
+    fontWeight: '400',
+  },
+  notesActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 15,
+  },
+  notesToolButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notesToolIcon: {
+    fontSize: 16,
+  },
+  notesScrollView: {
+    flex: 1,
+  },
+  notesContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 100,
+  },
+  notesCompactActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  notesCompactButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  notesDraftButton: {
+    backgroundColor: '#FF9500',
+  },
+  notesPublishButton: {
+    backgroundColor: '#34C759',
+  },
+  notesButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  // Nouveaux styles pour les boutons en-tête
+  notesLeftSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  notesHeaderButtons: {
+    flexDirection: 'row',
+    marginLeft: 20,
+    gap: 10,
+  },
+  notesHeaderButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    minWidth: 80,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  notesDraftHeaderButton: {
+    backgroundColor: 'rgba(255, 149, 0, 0.9)',
+  },
+  notesPublishHeaderButton: {
+    backgroundColor: 'rgba(52, 199, 89, 0.9)',
+  },
+  notesHeaderButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

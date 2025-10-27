@@ -35,13 +35,14 @@ interface Stroke {
 interface PDFDrawingEditorProps {
   pdfUri: string;
   onSave: (strokes: Stroke[]) => void;
+  onSaveDraft?: (strokes: Stroke[]) => void;
+  onPublish?: (strokes: Stroke[]) => void;
 }
 
-export default function PDFDrawingEditor({ pdfUri, onSave }: PDFDrawingEditorProps) {
+export default function PDFDrawingEditor({ pdfUri, onSave, onSaveDraft, onPublish }: PDFDrawingEditorProps) {
   // États pour le dessin
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [currentStroke, setCurrentStroke] = useState('');
-  const [isDrawing, setIsDrawing] = useState(false);
   
   // États pour les outils
   const [selectedTool, setSelectedTool] = useState<'pen' | 'highlighter' | 'eraser'>('pen');
@@ -63,7 +64,7 @@ export default function PDFDrawingEditor({ pdfUri, onSave }: PDFDrawingEditorPro
 
   // Références pour le dessin
   const pathRef = useRef('');
-  const isDrawingRef = useRef(false);
+  const isDrawing = useSharedValue(false); // Utiliser useSharedValue au lieu de useRef
 
   // Couleurs et tailles disponibles
   const colors = [
@@ -87,33 +88,37 @@ export default function PDFDrawingEditor({ pdfUri, onSave }: PDFDrawingEditorPro
 
   const startDrawing = (x: number, y: number) => {
     if (currentMode !== 'draw') return;
-    isDrawingRef.current = true;
-    setIsDrawing(true);
+    isDrawing.value = true;
     pathRef.current = `M${x},${y}`;
     setCurrentStroke(pathRef.current);
   };
 
   const continueDrawing = (x: number, y: number) => {
-    if (currentMode !== 'draw' || !isDrawingRef.current) return;
+    if (currentMode !== 'draw' || !isDrawing.value) return;
     pathRef.current += ` L${x},${y}`;
     setCurrentStroke(pathRef.current);
   };
 
   const endDrawing = () => {
-    if (currentMode !== 'draw' || !isDrawingRef.current) return;
+    if (currentMode !== 'draw' || !isDrawing.value) return;
     if (pathRef.current) {
       runOnJS(addStroke)(pathRef.current);
     }
-    isDrawingRef.current = false;
-    setIsDrawing(false);
+    isDrawing.value = false;
     setCurrentStroke('');
     pathRef.current = '';
   };
 
   // Gestionnaire de dessin avec PanResponder
   const drawingPanResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => currentMode === 'draw',
-    onMoveShouldSetPanResponder: () => currentMode === 'draw',
+    onStartShouldSetPanResponder: (evt) => {
+      // Seulement si en mode dessin et un seul doigt
+      return currentMode === 'draw' && evt.nativeEvent.touches.length === 1;
+    },
+    onMoveShouldSetPanResponder: (evt) => {
+      // Seulement si en mode dessin et déjà en train de dessiner
+      return currentMode === 'draw' && isDrawing.value && evt.nativeEvent.touches.length === 1;
+    },
     
     onPanResponderGrant: (evt) => {
       // Vérifier si c'est un seul touch (stylet/doigt) et en mode dessin
@@ -124,8 +129,8 @@ export default function PDFDrawingEditor({ pdfUri, onSave }: PDFDrawingEditorPro
     },
     
     onPanResponderMove: (evt) => {
-      // Continuer le dessin seulement si c'est un seul touch
-      if (currentMode === 'draw' && evt.nativeEvent.touches.length === 1 && isDrawingRef.current) {
+      // Continuer le dessin seulement si c'est un seul touch et en cours de dessin
+      if (currentMode === 'draw' && evt.nativeEvent.touches.length === 1 && isDrawing.value) {
         const { locationX, locationY } = evt.nativeEvent;
         continueDrawing(locationX, locationY);
       }
@@ -133,12 +138,13 @@ export default function PDFDrawingEditor({ pdfUri, onSave }: PDFDrawingEditorPro
     
     onPanResponderRelease: (evt) => {
       // Terminer le dessin
-      if (currentMode === 'draw' && isDrawingRef.current) {
+      if (currentMode === 'draw' && isDrawing.value) {
         endDrawing();
       }
     },
     
-    onPanResponderTerminationRequest: () => false, // Ne pas interrompre le dessin
+    onPanResponderTerminationRequest: () => false, // Ne jamais interrompre le dessin
+    onShouldBlockNativeResponder: () => true, // Bloquer les gestes natifs pendant le dessin
   });
 
   // Fonction pour contraindre la position dans les limites du PDF
@@ -170,14 +176,14 @@ export default function PDFDrawingEditor({ pdfUri, onSave }: PDFDrawingEditorPro
     .enabled(currentMode === 'pan')
     .onStart(() => {
       // Ne pas commencer le pan si on est en train de dessiner
-      if (isDrawingRef.current) return;
+      if (isDrawing.value) return;
       
       savedTranslateX.value = translateX.value;
       savedTranslateY.value = translateY.value;
     })
     .onUpdate((event) => {
       // Ne pas faire de pan si on est en train de dessiner
-      if (isDrawingRef.current) return;
+      if (isDrawing.value) return;
       
       const newX = savedTranslateX.value + event.translationX;
       const newY = savedTranslateY.value + event.translationY;
@@ -189,7 +195,7 @@ export default function PDFDrawingEditor({ pdfUri, onSave }: PDFDrawingEditorPro
     })
     .onEnd(() => {
       // Ne pas terminer le pan si on était en train de dessiner
-      if (isDrawingRef.current) return;
+      if (isDrawing.value) return;
       
       savedTranslateX.value = translateX.value;
       savedTranslateY.value = translateY.value;
@@ -199,7 +205,7 @@ export default function PDFDrawingEditor({ pdfUri, onSave }: PDFDrawingEditorPro
     .enabled(true) // Toujours actif
     .onStart(() => {
       // Ne pas commencer le zoom si on est en train de dessiner
-      if (isDrawingRef.current) return;
+      if (isDrawing.value) return;
       
       savedScale.value = scale.value;
       savedTranslateX.value = translateX.value;
@@ -207,7 +213,7 @@ export default function PDFDrawingEditor({ pdfUri, onSave }: PDFDrawingEditorPro
     })
     .onUpdate((event: any) => {
       // Ne pas zoomer si on est en train de dessiner
-      if (isDrawingRef.current) return;
+      if (isDrawing.value) return;
       
       const newScale = Math.max(0.5, Math.min(5, savedScale.value * event.scale)); // Limites plus raisonnables
       scale.value = newScale;
@@ -225,7 +231,7 @@ export default function PDFDrawingEditor({ pdfUri, onSave }: PDFDrawingEditorPro
     })
     .onEnd(() => {
       // Ne pas terminer le zoom si on était en train de dessiner
-      if (isDrawingRef.current) return;
+      if (isDrawing.value) return;
       
       savedScale.value = scale.value;
       savedTranslateX.value = translateX.value;
@@ -247,14 +253,14 @@ export default function PDFDrawingEditor({ pdfUri, onSave }: PDFDrawingEditorPro
     .enabled(true) // Toujours actif
     .onStart(() => {
       // Ne pas commencer le pan si on est en train de dessiner
-      if (isDrawingRef.current) return;
+      if (isDrawing.value) return;
       
       savedTranslateX.value = translateX.value;
       savedTranslateY.value = translateY.value;
     })
     .onUpdate((event: any) => {
       // Ne pas faire de pan si on est en train de dessiner
-      if (isDrawingRef.current) return;
+      if (isDrawing.value) return;
       
       const newX = savedTranslateX.value + event.translationX;
       const newY = savedTranslateY.value + event.translationY;
@@ -266,14 +272,18 @@ export default function PDFDrawingEditor({ pdfUri, onSave }: PDFDrawingEditorPro
     })
     .onEnd(() => {
       // Ne pas terminer le pan si on était en train de dessiner
-      if (isDrawingRef.current) return;
+      if (isDrawing.value) return;
       
       savedTranslateX.value = translateX.value;
       savedTranslateY.value = translateY.value;
     });
 
-  // Geste combiné - pinch, double-tap et pan 2 doigts toujours actifs, pan 1 doigt selon le mode
-  const navigationGestures = Gesture.Race(doubleTapGesture, pinchGesture, twFingerPanGesture, panGesture);
+  // Gestes de navigation (conditionnels selon le mode)
+  const drawingModeGestures = Gesture.Race(doubleTapGesture, pinchGesture, twFingerPanGesture);
+  const navigationModeGestures = Gesture.Race(doubleTapGesture, pinchGesture, twFingerPanGesture, panGesture);
+  
+  // Choisir les gestes selon le mode
+  const activeGestures = currentMode === 'draw' ? drawingModeGestures : navigationModeGestures;
 
   // Style animé
   const animatedStyle = useAnimatedStyle(() => ({
@@ -466,7 +476,7 @@ export default function PDFDrawingEditor({ pdfUri, onSave }: PDFDrawingEditorPro
       )}
 
       {/* Zone de dessin avec gestes */}
-      <GestureDetector gesture={navigationGestures}>
+      <GestureDetector gesture={activeGestures}>
         <Animated.View style={[styles.drawingArea, animatedStyle]}>
           <View 
             style={styles.pdfContainer}
@@ -538,11 +548,53 @@ export default function PDFDrawingEditor({ pdfUri, onSave }: PDFDrawingEditorPro
         <TouchableOpacity style={styles.actionButton} onPress={clearAll}>
           <Text style={styles.actionButtonText}>🗑️</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.actionButton} onPress={() => onSave(strokes)}>
-          <Text style={styles.actionButtonText}>💾</Text>
-        </TouchableOpacity>
       </View>
+
+      {/* Barre de sauvegarde élégante en bas */}
+      {(onSaveDraft || onPublish || (!onSaveDraft && !onPublish)) && (
+        <View style={styles.saveToolbar}>
+          <View style={styles.saveToolbarContainer}>
+            {/* Bouton Brouillon */}
+            {onSaveDraft && (
+              <TouchableOpacity 
+                style={styles.saveButton} 
+                onPress={() => onSaveDraft(strokes)}
+              >
+                <View style={styles.saveButtonContent}>
+                  <Text style={styles.saveButtonIcon}>📝</Text>
+                  <Text style={styles.saveButtonText}>Brouillon</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+            
+            {/* Bouton Publier */}
+            {onPublish && (
+              <TouchableOpacity 
+                style={[styles.saveButton, styles.publishButtonNew]} 
+                onPress={() => onPublish(strokes)}
+              >
+                <View style={styles.saveButtonContent}>
+                  <Text style={styles.saveButtonIcon}>🚀</Text>
+                  <Text style={[styles.saveButtonText, styles.publishButtonTextNew]}>Publier</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+            
+            {/* Bouton générique */}
+            {!onSaveDraft && !onPublish && (
+              <TouchableOpacity 
+                style={styles.saveButton} 
+                onPress={() => onSave(strokes)}
+              >
+                <View style={styles.saveButtonContent}>
+                  <Text style={styles.saveButtonIcon}>💾</Text>
+                  <Text style={styles.saveButtonText}>Sauvegarder</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
     </GestureHandlerRootView>
   );
 }
@@ -551,6 +603,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#181818',
+    width: screenWidth,
+    height: screenHeight,
+    position: 'absolute',
+    top: 0,
+    left: 0,
   },
   toolbar: {
     backgroundColor: '#232323',
@@ -648,12 +705,15 @@ const styles = StyleSheet.create({
   },
   drawingArea: {
     flex: 1,
+    overflow: 'hidden',
   },
   pdfContainer: {
     flex: 1,
     position: 'relative',
     backgroundColor: '#181818', // Même couleur que le fond pour éviter les contours
     overflow: 'hidden', // Cacher tout débordement
+    width: '100%',
+    height: '100%',
   },
   pdfImage: {
     width: '100%',
@@ -693,6 +753,57 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     fontSize: 18,
+    color: '#fff',
+  },
+  // Nouvelle barre de sauvegarde élégante
+  saveToolbar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(35, 35, 35, 0.95)',
+    borderTopWidth: 1,
+    borderTopColor: '#444',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backdropFilter: 'blur(10px)',
+  },
+  saveToolbarContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    gap: 12,
+  },
+  saveButton: {
+    flex: 1,
+    backgroundColor: '#FF9500',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  publishButtonNew: {
+    backgroundColor: '#34C759',
+  },
+  saveButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  saveButtonIcon: {
+    fontSize: 20,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  publishButtonTextNew: {
     color: '#fff',
   },
 });
