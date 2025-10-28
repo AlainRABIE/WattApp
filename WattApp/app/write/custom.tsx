@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,10 @@ import { db } from '../../constants/firebaseConfig';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import PDFDrawingEditorComplete from '../components/PDFDrawingEditorComplete';
+import { captureRef } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
+import * as Print from 'expo-print';
+import { ActionSheetIOS } from 'react-native';
 
 // Interface pour les traits de dessin PDF
 interface Stroke {
@@ -50,6 +54,14 @@ export default function CustomTemplateEditor() {
   const [modalTitle, setModalTitle] = useState('');
   const [modalCoverImage, setModalCoverImage] = useState<string | null>(null);
 
+  // États pour le partage
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareType, setShareType] = useState<'free' | 'paid'>('free');
+  const [sharePrice, setSharePrice] = useState('');
+
+  // Référence pour la vue à exporter
+  const exportViewRef = useRef(null);
+
   useEffect(() => {
     if (templateData) {
       try {
@@ -75,6 +87,22 @@ export default function CustomTemplateEditor() {
       }
     }
   }, [templateData]);
+
+  // Ajout automatique du template importé à la base de données
+  useEffect(() => {
+    if (template && templateData) {
+      // Ici, tu peux récupérer l'ID utilisateur si besoin (remplace 'userId')
+      addDoc(collection(db, 'templates'), {
+        nom: template.title || 'Template importé',
+        ownerId: 'userId', // Remplace par l'ID utilisateur réel si tu l'as
+        createdAt: serverTimestamp(),
+        data: template,
+        type: 'imported',
+      }).catch((error) => {
+        console.error('Erreur lors de l\'import du template:', error);
+      });
+    }
+  }, [template]);
 
   const pickCoverImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -224,6 +252,102 @@ export default function CustomTemplateEditor() {
     }
   };
 
+  // Fonction pour enregistrer un template dans Firestore
+  const saveTemplate = async () => {
+    if (!title.trim()) {
+      Alert.alert('Attention', 'Veuillez donner un nom à votre template.');
+      return;
+    }
+    try {
+      await addDoc(collection(db, 'templates'), {
+        nom: title.trim(),
+        ownerId: 'userId', // Remplace par l'ID utilisateur réel si tu l'as
+        createdAt: serverTimestamp(),
+        data: {
+          content,
+          coverImage,
+          templateId: template?.id || null,
+          templateName: template?.name || null,
+          templateBackgroundImage: template?.backgroundImage || null,
+        },
+        type: 'custom',
+      });
+      Alert.alert('Succès', 'Template enregistré dans Firestore !');
+    } catch (error) {
+      console.error('Erreur lors de l\'enregistrement du template:', error);
+      Alert.alert('Erreur', 'Impossible d\'enregistrer le template.');
+    }
+  };
+
+  // Fonction d'export
+  const handleExport = () => {
+    const showSheet = (options: string[], callback: (i: number) => void) => {
+      if (Platform.OS === 'ios') {
+        ActionSheetIOS.showActionSheetWithOptions({
+          options: [...options, 'Annuler'],
+          cancelButtonIndex: options.length,
+        }, (buttonIndex) => {
+          if (buttonIndex < options.length) callback(buttonIndex);
+        });
+      } else {
+        // Android fallback simple
+        Alert.alert('Exporter', 'Choisissez un format', [
+          ...options.map((opt, i) => ({ text: opt, onPress: () => callback(i) })),
+          { text: 'Annuler', style: 'cancel' },
+        ]);
+      }
+    };
+
+    showSheet(['PDF', 'PNG', 'JPEG'], async (i) => {
+      if (i === 0) {
+        // Export PDF
+        const html = `<html><body><pre>${content}</pre></body></html>`;
+        try {
+          const { uri } = await Print.printToFileAsync({ html });
+          await Sharing.shareAsync(uri);
+        } catch (e) {
+          Alert.alert('Erreur', 'Impossible d’exporter le PDF');
+        }
+      } else if (i === 1 || i === 2) {
+        // Export PNG/JPEG
+        try {
+          const format = i === 1 ? 'png' : 'jpg';
+          const uri = await captureRef(exportViewRef, { format, quality: 1 });
+          await Sharing.shareAsync(uri);
+        } catch (e) {
+          Alert.alert('Erreur', 'Impossible d’exporter l’image');
+        }
+      }
+    });
+  };
+
+  const handleShare = () => {
+    setShowShareModal(true);
+  };
+
+  const handleConfirmShare = async () => {
+    // Enregistre le partage dans Firestore (exemple sur la collection 'books')
+    try {
+      await addDoc(collection(db, 'sharedBooks'), {
+        title: title.trim(),
+        content,
+        coverImage,
+        templateId: template?.id || 'custom',
+        templateName: template?.name || 'Livre partagé',
+        templateBackgroundImage: template?.backgroundImage || null,
+        isShared: true,
+        isFree: shareType === 'free',
+        price: shareType === 'paid' ? parseFloat(sharePrice) : 0,
+        commission: shareType === 'paid' ? parseFloat(sharePrice) * 0.1 : 0,
+        createdAt: serverTimestamp(),
+      });
+      setShowShareModal(false);
+      Alert.alert('Succès', 'Livre partagé !');
+    } catch (e) {
+      Alert.alert('Erreur', 'Impossible de partager le livre.');
+    }
+  };
+
   if (!template) {
     return (
       <SafeAreaView style={styles.container}>
@@ -274,12 +398,29 @@ export default function CustomTemplateEditor() {
           >
             <Text style={styles.notesHeaderButtonText}>Brouillon</Text>
           </TouchableOpacity>
-          
           <TouchableOpacity 
             style={[styles.notesHeaderButton, styles.notesPublishHeaderButton]}
             onPress={template.isPDF ? handlePDFPublish : publishBook}
           >
             <Text style={styles.notesHeaderButtonText}>Publier</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.notesHeaderButton, { backgroundColor: '#0a7ea4' }]}
+            onPress={saveTemplate}
+          >
+            <Text style={styles.notesHeaderButtonText}>Enregistrer comme template</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.notesHeaderButton, { backgroundColor: '#6c47ff' }]}
+            onPress={handleExport}
+          >
+            <Text style={styles.notesHeaderButtonText}>Exporter</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.notesHeaderButton, { backgroundColor: '#34b6e4' }]}
+            onPress={handleShare}
+          >
+            <Text style={styles.notesHeaderButtonText}>Partager</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -453,6 +594,10 @@ export default function CustomTemplateEditor() {
           />
         )}
 
+        {/* Le contenu à exporter doit être wrappé dans une View avec la ref */}
+        <View ref={exportViewRef} collapsable={false}>
+          {/* ...le contenu à exporter, par exemple le ScrollView ou la note... */}
+        </View>
 
       </ScrollView>
 
@@ -508,6 +653,57 @@ export default function CustomTemplateEditor() {
         </View>
       )}
 
+      {/* Modal de partage */}
+      {showShareModal && (
+        <View style={{
+          position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', zIndex: 1000
+        }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, width: 320, maxWidth: '90%' }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 18, marginBottom: 16 }}>Partager ce livre</Text>
+            <TouchableOpacity
+              style={{ marginBottom: 12, flexDirection: 'row', alignItems: 'center' }}
+              onPress={() => setShareType('free')}
+            >
+              <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#34b6e4', marginRight: 8, backgroundColor: shareType === 'free' ? '#34b6e4' : '#fff' }} />
+              <Text>Gratuit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ marginBottom: 12, flexDirection: 'row', alignItems: 'center' }}
+              onPress={() => setShareType('paid')}
+            >
+              <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#34b6e4', marginRight: 8, backgroundColor: shareType === 'paid' ? '#34b6e4' : '#fff' }} />
+              <Text>Payant</Text>
+            </TouchableOpacity>
+            {shareType === 'paid' && (
+              <View style={{ marginBottom: 12 }}>
+                <Text>Prix (€)</Text>
+                <TextInput
+                  style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginTop: 4 }}
+                  keyboardType="decimal-pad"
+                  value={sharePrice}
+                  onChangeText={setSharePrice}
+                  placeholder="Ex: 5.00"
+                />
+                <Text style={{ color: '#888', fontSize: 12, marginTop: 4 }}>
+                  Frais de service : {sharePrice && !isNaN(Number(sharePrice)) ? (Number(sharePrice) * 0.1).toFixed(2) : '0.00'} € (10%)
+                </Text>
+                <Text style={{ color: '#1a9c3c', fontWeight: 'bold', fontSize: 14, marginTop: 2 }}>
+                  Vous recevrez : {sharePrice && !isNaN(Number(sharePrice)) ? (Number(sharePrice) * 0.9).toFixed(2) : '0.00'} €
+                </Text>
+              </View>
+            )}
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12 }}>
+              <TouchableOpacity onPress={() => setShowShareModal(false)}>
+                <Text style={{ color: '#888', fontSize: 16 }}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleConfirmShare} disabled={shareType === 'paid' && (!sharePrice || isNaN(Number(sharePrice)))}>
+                <Text style={{ color: '#34b6e4', fontWeight: 'bold', fontSize: 16 }}>Partager</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
 
     </SafeAreaView>
   );
