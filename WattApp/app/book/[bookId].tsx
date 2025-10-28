@@ -270,6 +270,8 @@ const BookEditor: React.FC = () => {
           onPress: async () => {
             try {
               setSaving(true);
+              const auth = getAuth(app);
+              const user = auth.currentUser;
               const docRef = doc(db, 'books', book.id);
               await updateDoc(docRef, {
                 title: title.trim() || '(Sans titre)',
@@ -278,6 +280,7 @@ const BookEditor: React.FC = () => {
                 status: 'published',
                 publishedAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
+                author: user?.displayName || user?.email || 'Auteur inconnu',
               });
 
               Alert.alert(
@@ -458,10 +461,10 @@ const BookEditor: React.FC = () => {
         )}
         {/* Titre modernisé */}
         <Text style={{ color: '#fff', fontSize: 32, fontWeight: 'bold', textAlign: 'center', marginBottom: 4, letterSpacing: 0.5, textShadowColor: '#0008', textShadowOffset: {width: 0, height: 2}, textShadowRadius: 6, lineHeight: 38, maxWidth: 340 }} numberOfLines={2} ellipsizeMode="tail">{title}</Text>
-        {/* Auteur */}
-        {book?.author && (
-          <Text style={{ color: '#FFA94D', fontSize: 18, fontWeight: '600', marginBottom: 20, textAlign: 'center', letterSpacing: 0.1, textShadowColor: '#0006', textShadowOffset: {width: 0, height: 1}, textShadowRadius: 3 }}>par {book.author}</Text>
-        )}
+        {/* Auteur affiché systématiquement */}
+        <Text style={{ color: '#FFA94D', fontSize: 18, fontWeight: '600', marginBottom: 20, textAlign: 'center', letterSpacing: 0.1, textShadowColor: '#0006', textShadowOffset: {width: 0, height: 1}, textShadowRadius: 3 }}>
+          par {book?.author ? book.author : 'Auteur inconnu'}
+        </Text>
 
         {/* Bouton principal très visible avec LinearGradient */}
         <TouchableOpacity
