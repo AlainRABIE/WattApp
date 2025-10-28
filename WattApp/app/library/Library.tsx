@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -18,6 +17,7 @@ import { Alert } from 'react-native';
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { getWishlistBooks } from './wishlistUtils';
 
 // Types
 type BookType = {
@@ -62,6 +62,7 @@ const Library: React.FC = () => {
   const [drafts, setDrafts] = useState<BookType[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>('');
+  const [wishlist, setWishlist] = useState<BookType[]>([]);
 
   // Ajout d'un dossier
   const handleAddFolder = () => {
@@ -96,6 +97,7 @@ const Library: React.FC = () => {
           if (mounted) {
             setBooks([]);
             setDrafts([]);
+            setWishlist([]);
           }
           return;
         }
@@ -105,6 +107,10 @@ const Library: React.FC = () => {
         // Charger les brouillons avec authorUid (créés par l'utilisateur)
         const qDrafts = query(collection(db, 'books'), where('authorUid', '==', user.uid));
         const snapDrafts = await getDocs(qDrafts);
+        // Charger la wishlist
+        let wishlistBooks = await getWishlistBooks();
+        // Filtrer pour ne pas afficher les livres dont l'ownerUid est l'utilisateur
+        wishlistBooks = wishlistBooks.filter((b: any) => b.ownerUid !== user.uid);
         if (mounted) {
           // Livres de la bibliothèque
           if (snapBooks.empty) {
@@ -128,12 +134,14 @@ const Library: React.FC = () => {
           } else {
             setDrafts([]);
           }
+          setWishlist(wishlistBooks);
         }
       } catch (err) {
         console.warn('Failed to load library books', err);
         if (mounted) {
           setBooks([]);
           setDrafts([]);
+          setWishlist([]);
         }
       } finally {
         if (mounted) setLoading(false);
@@ -196,6 +204,38 @@ const Library: React.FC = () => {
           contentContainerStyle={[styles.list, isTablet && styles.listTablet]}
           showsVerticalScrollIndicator={false}
         >
+          {/* Section : Liste d'envie */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>💛 Liste d'envie</Text>
+              <Text style={styles.sectionCount}>{wishlist.length}</Text>
+            </View>
+            {wishlist.length === 0 ? (
+              <View style={styles.emptySection}>
+                <Text style={styles.emptySectionText}>Aucun livre dans la liste d'envie</Text>
+              </View>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+                {wishlist.map((book: BookType) => (
+                  <View key={book.id} style={styles.horizontalCard}>
+                    <TouchableOpacity
+                      onPress={() => Alert.alert(book.titre || book.title || 'Titre inconnu', `${book.auteur || book.author || 'Auteur inconnu'}\n\nTags: ${(book.tags || []).join(', ')}`)}
+                    >
+                      <Image
+                        source={{ uri: book.couverture || book.coverImage || 'https://via.placeholder.com/120x180.png?text=Cover' }}
+                        style={styles.horizontalCover}
+                      />
+                      <View style={styles.horizontalCardContent}>
+                        <Text style={styles.horizontalBookTitle} numberOfLines={2}>{book.titre || book.title || 'Titre inconnu'}</Text>
+                        <Text style={styles.horizontalBookAuthor} numberOfLines={1}>par {book.auteur || book.author || 'Auteur inconnu'}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+
           {filtered.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>📚</Text>
@@ -246,10 +286,6 @@ const Library: React.FC = () => {
                   })}
                 </ScrollView>
               </View>
-
-
-
-             
 
               {/* Section: Mes brouillons - Carousel horizontal */}
               <View style={styles.section}>
