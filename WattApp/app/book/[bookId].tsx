@@ -663,9 +663,35 @@ const BookEditor: React.FC = () => {
             const isInLibrary = book && user && book.ownerUid === user.uid;
             if (isInLibrary) {
               return (
-                <View style={{ backgroundColor: '#23232a', borderRadius: 32, padding: 18, marginLeft: 8, borderWidth: 2, borderColor: '#FFA94D', alignItems: 'center', justifyContent: 'center' }}>
+                <TouchableOpacity
+                  style={{ backgroundColor: '#23232a', borderRadius: 32, padding: 18, marginLeft: 8, borderWidth: 2, borderColor: '#FFA94D', alignItems: 'center', justifyContent: 'center' }}
+                  onPress={async () => {
+                    Alert.alert(
+                      'Supprimer ce livre',
+                      `Voulez-vous vraiment supprimer "${book.title || book.titre}" de votre bibliothèque ?`,
+                      [
+                        { text: 'Annuler', style: 'cancel' },
+                        {
+                          text: 'Supprimer', style: 'destructive',
+                          onPress: async () => {
+                            try {
+                              const { doc, deleteDoc } = await import('firebase/firestore');
+                              const bookRef = doc(db, 'books', book.id);
+                              await deleteDoc(bookRef);
+                              setBook((prev: any) => prev ? { ...prev, ownerUid: undefined } : prev);
+                              Alert.alert('Supprimé', 'Le livre a été retiré de votre bibliothèque.');
+                            } catch (e) {
+                              Alert.alert('Erreur', 'Impossible de supprimer le livre.');
+                            }
+                          }
+                        }
+                      ]
+                    );
+                  }}
+                  activeOpacity={0.85}
+                >
                   <Ionicons name="checkmark" size={28} color="#FFA94D" />
-                </View>
+                </TouchableOpacity>
               );
             } else {
               return (

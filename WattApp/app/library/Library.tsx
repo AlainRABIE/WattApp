@@ -22,16 +22,20 @@ import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 // Types
 type BookType = {
   id: string;
-  titre: string;
-  auteur: string;
+  // Champs français
+  titre?: string;
+  auteur?: string;
   couverture?: string;
+  // Champs anglais (compatibilité)
+  title?: string;
+  author?: string;
+  coverImage?: string;
   tags?: string[];
   views?: number;
   status?: string;
   createdAt?: any;
   updatedAt?: any;
   templateId?: string;
-  coverImage?: string;
 };
 
 type FolderType = {
@@ -209,94 +213,24 @@ const Library: React.FC = () => {
                   {readBooks.map((book: BookType) => (
                     <View key={book.id} style={styles.horizontalCard}>
                       <TouchableOpacity
-                        onPress={() => Alert.alert(book.titre, `${book.auteur}\n\nTags: ${(book.tags || []).join(', ')}`)}
+                        onPress={() => Alert.alert(book.titre || book.title || 'Titre inconnu', `${book.auteur || book.author || 'Auteur inconnu'}\n\nTags: ${(book.tags || []).join(', ')}`)}
                       >
                         <Image
-                          source={{ uri: book.couverture || 'https://via.placeholder.com/120x180.png?text=Cover' }}
+                          source={{ uri: book.couverture || book.coverImage || 'https://via.placeholder.com/120x180.png?text=Cover' }}
                           style={styles.horizontalCover}
                         />
                         <View style={styles.horizontalCardContent}>
-                          <Text style={styles.horizontalBookTitle} numberOfLines={2}>{book.titre}</Text>
-                          <Text style={styles.horizontalBookAuthor} numberOfLines={1}>par {book.auteur}</Text>
+                          <Text style={styles.horizontalBookTitle} numberOfLines={2}>{book.titre || book.title || 'Titre inconnu'}</Text>
+                          <Text style={styles.horizontalBookAuthor} numberOfLines={1}>par {book.auteur || book.author || 'Auteur inconnu'}</Text>
                         </View>
                       </TouchableOpacity>
-                      {/* Bouton Ajouter à la bibliothèque */}
-                      <TouchableOpacity
-                        style={{
-                          marginTop: 8,
-                          backgroundColor: '#FFA94D',
-                          borderRadius: 8,
-                          paddingVertical: 6,
-                          paddingHorizontal: 12,
-                          alignSelf: 'center',
-                        }}
-                        onPress={async () => {
-                          try {
-                            const auth = getAuth(app);
-                            const user = auth.currentUser;
-                            if (!user) {
-                              Alert.alert('Erreur', 'Vous devez être connecté pour ajouter un livre.');
-                              return;
-                            }
-                            // Ajouter le livre à la collection de l'utilisateur (copie minimale)
-                            const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
-                            const bookRef = doc(db, 'books', book.id);
-                            await setDoc(bookRef, {
-                              ...book,
-                              ownerUid: user.uid,
-                              status: 'published',
-                              addedAt: serverTimestamp(),
-                            }, { merge: true });
-                            Alert.alert('Ajouté', `Le livre "${book.titre}" a été ajouté à votre bibliothèque !`);
-                            // Recharger la liste
-                            if (loadBooksRef.current) await loadBooksRef.current();
-                          } catch (e) {
-                            Alert.alert('Erreur', 'Impossible d\'ajouter le livre.');
-                          }
-                        }}
-                      >
-                        <Text style={{ color: '#18191c', fontWeight: 'bold', fontSize: 13 }}>Ajouter à la bibliothèque</Text>
-                      </TouchableOpacity>
+
                     </View>
                   ))}
                 </ScrollView>
               </View>
 
-              {/* Section: Mes dossiers (playlists) */}
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>📁 Mes dossiers</Text>
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                  <TextInput
-                    value={newFolderName}
-                    onChangeText={setNewFolderName}
-                    placeholder="Nouveau dossier..."
-                    placeholderTextColor="#888"
-                    style={{ backgroundColor: '#232323', color: '#fff', borderRadius: 8, padding: 8, flex: 1, marginRight: 8 }}
-                  />
-                  <TouchableOpacity onPress={handleAddFolder} style={{ backgroundColor: '#FFA94D', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 14 }}>
-                    <Text style={{ color: '#18191c', fontWeight: 'bold', fontSize: 15 }}>Créer</Text>
-                  </TouchableOpacity>
-                </View>
-                {folders.length === 0 ? (
-                  <Text style={{ color: '#888', fontStyle: 'italic', marginBottom: 8 }}>Aucun dossier créé</Text>
-                ) : (
-                  folders.map(folder => (
-                    <View key={folder.id} style={{ marginBottom: 14, backgroundColor: '#23232a', borderRadius: 12, padding: 12 }}>
-                      <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 16, marginBottom: 6 }}>{folder.name}</Text>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        {(folder.bookIds.map(id => books.find((b: BookType) => b.id === id)).filter(Boolean) as BookType[]).map(book => (
-                          <View key={book.id} style={{ marginRight: 12, alignItems: 'center' }}>
-                            <Image source={{ uri: book.couverture || 'https://via.placeholder.com/120x180.png?text=Cover' }} style={{ width: 60, height: 90, borderRadius: 8, marginBottom: 4 }} />
-                            <Text style={{ color: '#fff', fontSize: 12, maxWidth: 60 }} numberOfLines={2}>{book.titre}</Text>
-                          </View>
-                        ))}
-                      </ScrollView>
-                    </View>
-                  ))
-                )}
-              </View>
+
 
               {/* Section: Mes créations - Carousel horizontal */}
               <View style={styles.section}>
@@ -313,15 +247,15 @@ const Library: React.FC = () => {
                     <View key={book.id} style={{ flexDirection: 'column', alignItems: 'center', marginRight: 16 }}>
                       <TouchableOpacity 
                         style={styles.creationCard} 
-                        onPress={() => Alert.alert(book.titre, `${book.auteur} • ${book.views ?? 0} vues\n\nTags: ${(book.tags || []).join(', ')}`)}
+                        onPress={() => Alert.alert(book.titre || book.title || 'Titre inconnu', `${book.auteur || book.author || 'Auteur inconnu'} • ${book.views ?? 0} vues\n\nTags: ${(book.tags || []).join(', ')}`)}
                       >
                         <Image 
-                          source={{ uri: book.couverture || 'https://via.placeholder.com/120x180.png?text=Cover' }} 
+                          source={{ uri: book.couverture || book.coverImage || 'https://via.placeholder.com/120x180.png?text=Cover' }} 
                           style={styles.creationCover} 
                         />
                         <View style={styles.creationCardContent}>
-                          <Text style={styles.creationBookTitle} numberOfLines={2}>{book.titre}</Text>
-                          <Text style={styles.creationBookAuthor} numberOfLines={1}>par {book.auteur}</Text>
+                          <Text style={styles.creationBookTitle} numberOfLines={2}>{book.titre || book.title || 'Titre inconnu'}</Text>
+                          <Text style={styles.creationBookAuthor} numberOfLines={1}>par {book.auteur || book.author || 'Auteur inconnu'}</Text>
                           <View style={styles.statsRow}>
                             <Text style={styles.viewsText}>👁 {book.views ?? 0} vues</Text>
                           </View>
