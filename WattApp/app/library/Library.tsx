@@ -295,21 +295,19 @@ const Library: React.FC = () => {
                     contentContainerStyle={styles.horizontalList}
                   >
                     {drafts.map((draft: any) => (
-                      <TouchableOpacity 
-                        key={draft.id} 
-                        style={styles.draftCard} 
-                        onPress={() => (router as any).push(`/book/${draft.id}`)}
-                      >
-                        <View style={styles.draftCover}>
-                          {draft.coverImage ? (
-                            <Image 
-                              source={{ uri: draft.coverImage }} 
-                              style={styles.draftCoverImage}
-                            />
-                          ) : (
-                            <Text style={styles.draftIcon}>📄</Text>
-                          )}
-                        </View>
+                      <View key={draft.id} style={styles.draftCard}>
+                        <TouchableOpacity onPress={() => (router as any).push(`/book/${draft.id}`)}>
+                          <View style={styles.draftCover}>
+                            {draft.coverImage ? (
+                              <Image 
+                                source={{ uri: draft.coverImage }} 
+                                style={styles.draftCoverImage}
+                              />
+                            ) : (
+                              <Text style={styles.draftIcon}>📄</Text>
+                            )}
+                          </View>
+                        </TouchableOpacity>
                         <View style={styles.draftCardContent}>
                           <Text style={styles.draftTitle} numberOfLines={2}>
                             {draft.title || '(Sans titre)'}
@@ -331,8 +329,15 @@ const Library: React.FC = () => {
                               }) || 'Date inconnue'}
                             </Text>
                           )}
+                          <TouchableOpacity
+                            style={{ backgroundColor: '#FFA94D', borderRadius: 18, paddingVertical: 7, paddingHorizontal: 18, alignSelf: 'flex-end', marginTop: 8, flexDirection: 'row', alignItems: 'center' }}
+                            onPress={() => (router as any).push(`/book/${draft.id}/read`)}
+                            activeOpacity={0.85}
+                          >
+                            <Text style={{ color: '#18191c', fontWeight: 'bold', fontSize: 15 }}>Aperçu</Text>
+                          </TouchableOpacity>
                         </View>
-                      </TouchableOpacity>
+                      </View>
                     ))}
                   </ScrollView>
                 )}

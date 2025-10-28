@@ -138,11 +138,6 @@ const BookReadScreen: React.FC<any> = () => {
     <View style={{ flex: 1, backgroundColor: '#181818' }}>
       <StatusBar barStyle="light-content" />
       {/* Affichage notation et stats */}
-      <View style={{ alignItems: 'center', marginTop: 12, marginBottom: 2 }}>
-        <StarRating rating={userRating} maxStars={5} size={32} onRate={handleRate} />
-        <Text style={{ color: '#FFA94D', marginTop: 2, fontSize: 15 }}>Note moyenne : {avgRating.toFixed(1)} / 5 ({ratingCount} votes)</Text>
-        <Text style={{ color: '#888', fontSize: 13, marginTop: 2 }}>Vues : {book?.reads ?? 1}</Text>
-      </View>
       <TouchableOpacity activeOpacity={1} style={{ flex: 1 }} onPress={handleToggleBack}>
         {/* Titre en haut, gris, centré */}
         <View style={{ width: '100%', alignItems: 'center', marginTop: 32, marginBottom: 8, position: 'absolute', top: 0, left: 0, zIndex: 20 }} pointerEvents="none">

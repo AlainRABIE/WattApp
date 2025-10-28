@@ -161,6 +161,9 @@ const BookEditor: React.FC = () => {
   const [title, setTitle] = useState<string>('');
   const [body, setBody] = useState<string>('');
   const [coverImage, setCoverImage] = useState<string | null>(null);
+  const [synopsis, setSynopsis] = useState<string>('');
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
 
@@ -199,9 +202,11 @@ const BookEditor: React.FC = () => {
 
 
       setBook(bookData);
-      setTitle(bookData.title || '');
-      setBody(bookData.body || '');
-      setCoverImage(bookData.coverImage || null);
+  setTitle(bookData.title || '');
+  setBody(bookData.body || '');
+  setCoverImage(bookData.coverImage || null);
+  setSynopsis(bookData.synopsis || '');
+  setTags(Array.isArray(bookData.tags) ? bookData.tags : []);
 
       // Charger le template si disponible
       if (bookData.templateId) {
@@ -236,6 +241,8 @@ const BookEditor: React.FC = () => {
         title: title.trim() || '(Sans titre)',
         body: body.trim(),
         coverImage: coverImage,
+        synopsis: synopsis.trim(),
+        tags: tags,
         updatedAt: serverTimestamp(),
       });
 
@@ -260,6 +267,15 @@ const BookEditor: React.FC = () => {
   const publishBook = async () => {
     if (!book) return;
 
+    if (!synopsis.trim()) {
+      Alert.alert('Synopsis requis', 'Veuillez saisir un synopsis avant de publier.');
+      return;
+    }
+    if (!tags.length) {
+      Alert.alert('Tags requis', 'Veuillez ajouter au moins un tag avant de publier.');
+      return;
+    }
+
     Alert.alert(
       'Publier le livre',
       'Êtes-vous sûr de vouloir publier ce livre ? Il ne sera plus modifiable.',
@@ -278,6 +294,8 @@ const BookEditor: React.FC = () => {
                 title: title.trim() || '(Sans titre)',
                 body: body.trim(),
                 coverImage: coverImage,
+                synopsis: synopsis.trim(),
+                tags: tags,
                 status: 'published',
                 publishedAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
@@ -557,6 +575,61 @@ const BookEditor: React.FC = () => {
         )}
 
         {/* Note moyenne modernisée supprimée, déplacée dans la ligne des stats */}
+
+        {/* Champs synopsis et tags pour l'auteur (édition/publication) */}
+        {isAuthor && (
+          <View style={{ width: '92%', backgroundColor: '#23232a', borderRadius: 16, padding: 18, marginBottom: 18, alignSelf: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, elevation: 1 }}>
+            <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 18, marginBottom: 8 }}>Synopsis</Text>
+            <TextInput
+              value={synopsis}
+              onChangeText={setSynopsis}
+              placeholder="Écrivez le synopsis de votre livre..."
+              placeholderTextColor="#888"
+              style={{ color: '#fff', fontSize: 15, fontStyle: 'italic', lineHeight: 22, backgroundColor: '#18191c', borderRadius: 8, padding: 10, marginBottom: 12 }}
+              multiline
+              numberOfLines={3}
+              maxLength={800}
+            />
+            <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 16, marginBottom: 6 }}>Tags</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <TextInput
+                value={tagInput}
+                onChangeText={setTagInput}
+                placeholder="Ajouter un tag..."
+                placeholderTextColor="#888"
+                style={{ color: '#fff', fontSize: 14, backgroundColor: '#18191c', borderRadius: 8, padding: 8, minWidth: 100, flex: 1, marginRight: 8 }}
+                onSubmitEditing={() => {
+                  if (tagInput.trim() && !tags.includes(tagInput.trim())) {
+                    setTags([...tags, tagInput.trim()]);
+                    setTagInput('');
+                  }
+                }}
+                returnKeyType="done"
+              />
+              <TouchableOpacity
+                onPress={() => {
+                  if (tagInput.trim() && !tags.includes(tagInput.trim())) {
+                    setTags([...tags, tagInput.trim()]);
+                    setTagInput('');
+                  }
+                }}
+                style={{ backgroundColor: '#FFA94D', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 14 }}
+              >
+                <Text style={{ color: '#18191c', fontWeight: 'bold', fontSize: 15 }}>Ajouter</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 4 }}>
+              {tags.map((tag, idx) => (
+                <View key={idx} style={{ backgroundColor: '#18191c', borderRadius: 8, paddingVertical: 3, paddingHorizontal: 10, marginRight: 6, marginBottom: 6, minHeight: 22, flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: '500', letterSpacing: 0.1 }}>{tag}</Text>
+                  <TouchableOpacity onPress={() => setTags(tags.filter((t, i) => i !== idx))} style={{ marginLeft: 6 }}>
+                    <Ionicons name="close-circle" size={16} color="#FFA94D" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Bouton principal modernisé */}
         <TouchableOpacity
