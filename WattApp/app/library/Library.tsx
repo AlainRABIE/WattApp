@@ -36,6 +36,9 @@ type BookType = {
   createdAt?: any;
   updatedAt?: any;
   templateId?: string;
+  // Pourcentage de lecture
+  pagesRead?: number;
+  totalPages?: number;
 };
 
 type FolderType = {
@@ -147,9 +150,11 @@ const Library: React.FC = () => {
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return (
-      b.titre.toLowerCase().includes(q) ||
-      b.auteur.toLowerCase().includes(q) ||
-  (b.tags || []).some((t: string) => t.toLowerCase().includes(q))
+      (b.titre && b.titre.toLowerCase().includes(q)) ||
+      (b.auteur && b.auteur.toLowerCase().includes(q)) ||
+      (b.title && b.title.toLowerCase().includes(q)) ||
+      (b.author && b.author.toLowerCase().includes(q)) ||
+      (b.tags || []).some((t: string) => t.toLowerCase().includes(q))
     );
   });
 
@@ -210,23 +215,35 @@ const Library: React.FC = () => {
                   showsHorizontalScrollIndicator={false} 
                   contentContainerStyle={styles.horizontalList}
                 >
-                  {readBooks.map((book: BookType) => (
-                    <View key={book.id} style={styles.horizontalCard}>
-                      <TouchableOpacity
-                        onPress={() => Alert.alert(book.titre || book.title || 'Titre inconnu', `${book.auteur || book.author || 'Auteur inconnu'}\n\nTags: ${(book.tags || []).join(', ')}`)}
-                      >
-                        <Image
-                          source={{ uri: book.couverture || book.coverImage || 'https://via.placeholder.com/120x180.png?text=Cover' }}
-                          style={styles.horizontalCover}
-                        />
-                        <View style={styles.horizontalCardContent}>
-                          <Text style={styles.horizontalBookTitle} numberOfLines={2}>{book.titre || book.title || 'Titre inconnu'}</Text>
-                          <Text style={styles.horizontalBookAuthor} numberOfLines={1}>par {book.auteur || book.author || 'Auteur inconnu'}</Text>
+                  {readBooks.map((book: BookType) => {
+                    // Pourcentage d'avancement : pagesRead / totalPages
+                    let percent = 0;
+                    if (book.pagesRead && book.totalPages && book.totalPages > 0) {
+                      percent = Math.floor((book.pagesRead / book.totalPages) * 100);
+                    }
+                    return (
+                      <View key={book.id} style={styles.horizontalCard}>
+                        <TouchableOpacity
+                          onPress={() => Alert.alert(book.titre || book.title || 'Titre inconnu', `${book.auteur || book.author || 'Auteur inconnu'}\n\nTags: ${(book.tags || []).join(', ')}`)}
+                        >
+                          <Image
+                            source={{ uri: book.couverture || book.coverImage || 'https://via.placeholder.com/120x180.png?text=Cover' }}
+                            style={styles.horizontalCover}
+                          />
+                          <View style={styles.horizontalCardContent}>
+                            <Text style={styles.horizontalBookTitle} numberOfLines={2}>{book.titre || book.title || 'Titre inconnu'}</Text>
+                            <Text style={styles.horizontalBookAuthor} numberOfLines={1}>par {book.auteur || book.author || 'Auteur inconnu'}</Text>
+                          </View>
+                        </TouchableOpacity>
+                        {/* Affichage du pourcentage d'avancement */}
+                        <View style={{ alignItems: 'center', marginTop: 6 }}>
+                          <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 13 }}>
+                            {percent}% lu
+                          </Text>
                         </View>
-                      </TouchableOpacity>
-
-                    </View>
-                  ))}
+                      </View>
+                    );
+                  })}
                 </ScrollView>
               </View>
 
