@@ -1,3 +1,4 @@
+
 import { Modal, FlatList, Pressable, Animated, Easing, Dimensions } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,9 +11,9 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-  StatusBar,
   Platform,
   Image,
+  StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -382,12 +383,6 @@ const BookEditor: React.FC = () => {
   return (
     <View style={{ flex: 1, backgroundColor: '#18191c' }}>
       <StatusBar barStyle="light-content" />
-      <LinearGradient
-        colors={["#23272f", "#18191c"]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, zIndex: 0 }}
-      />
       {/* Chip Chapitres en haut à droite, ouvre la sidebar chapitres */}
       <View style={{ width: '100%', alignItems: 'flex-end', marginTop: 18, marginBottom: -18, paddingRight: 18, zIndex: 10 }}>
         <TouchableOpacity
@@ -401,7 +396,8 @@ const BookEditor: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Modal/Sidebar chapitres */}
+
+  {/* Modal/Sidebar chapitres */}
       <Modal
         visible={showChapters}
         transparent
@@ -449,14 +445,11 @@ const BookEditor: React.FC = () => {
         </Pressable>
       </Modal>
 
-      <ScrollView contentContainerStyle={{ alignItems: 'center', paddingBottom: 60 }}>
+  <ScrollView contentContainerStyle={{ alignItems: 'center', paddingBottom: 60 }}>
+        {/* ...existing code... */}
         {coverImage && (
-          <View style={{ alignItems: 'center', width: '100%', marginTop: 36, marginBottom: 18, borderRadius: 28, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 12, elevation: 6, backgroundColor: 'rgba(35,39,47,0.7)' }}>
-            <LinearGradient
-              colors={["#FFA94D55", "#23272f00"]}
-              style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 120, zIndex: 1, borderTopLeftRadius: 28, borderTopRightRadius: 28 }}
-            />
-            <Image source={{ uri: coverImage }} style={{ width: 180, height: 260, borderRadius: 22, zIndex: 2 }} />
+          <View style={{ alignItems: 'center', width: '100%', marginTop: 36, marginBottom: 18, borderRadius: 28, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 12, elevation: 6 }}>
+            <Image source={{ uri: coverImage }} style={{ width: 180, height: 260, borderRadius: 22 }} />
           </View>
         )}
         {/* Titre modernisé */}
@@ -466,100 +459,66 @@ const BookEditor: React.FC = () => {
           par {book?.author ? book.author : 'Auteur inconnu'}
         </Text>
 
-        {/* Bouton principal très visible avec LinearGradient */}
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => router.push(`/book/${bookId}/read`)}
-          style={{
-            borderRadius: 36,
-            marginBottom: 38,
-            marginTop: 16,
-            alignSelf: 'center',
-            minWidth: 260,
-            maxWidth: 360,
-            shadowColor: '#FFA94D',
-            shadowOpacity: 0.35,
-            shadowRadius: 18,
-            elevation: 8,
-            borderWidth: 2,
-            borderColor: '#fff',
-          }}
-        >
-          <LinearGradient
-            colors={["#FF9900", "#FFA94D", "#FF6F3C"]}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={{
-              borderRadius: 36,
-              paddingVertical: 20,
-              paddingHorizontal: 48,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Ionicons name="book-outline" size={28} color="#fff" style={{ marginRight: 16 }} />
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 23, letterSpacing: 0.5, textShadowColor: '#0008', textShadowOffset: {width: 0, height: 2}, textShadowRadius: 6 }}>
-              Commencer la lecture
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
-        {/* Stats glassmorphism */}
-        <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 30, gap: 18 }}>
-          <View style={{ alignItems: 'center', backgroundColor: 'rgba(35,39,47,0.65)', borderRadius: 18, padding: 18, minWidth: 90, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 8, elevation: 2, backdropFilter: 'blur(8px)' }}>
-            <Ionicons name="eye-outline" size={24} color="#FFA94D" />
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 17, marginTop: 2 }}>{book?.reads ?? '—'}</Text>
-            <Text style={{ color: '#888', fontSize: 13 }}>Lectures</Text>
+        {/* Synopsis */}
+        {book?.synopsis && (
+          <Text style={{ color: '#ccc', fontSize: 15, fontStyle: 'italic', textAlign: 'center', marginBottom: 10, marginHorizontal: 10 }}>
+            {book.synopsis}
+          </Text>
+        )}
+
+        {/* Tags sous les stats */}
+        {/* Stats modernisées */}
+        <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 24, gap: 18 }}>
+          <View style={{ alignItems: 'center', flexDirection: 'row', backgroundColor: '#23232a', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 18, marginHorizontal: 4 }}>
+            <Ionicons name="eye-outline" size={20} color="#FFA94D" style={{ marginRight: 6 }} />
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{book?.reads ?? '—'}</Text>
+            <Text style={{ color: '#888', fontSize: 13, marginLeft: 4 }}>vues</Text>
           </View>
-          <View style={{ alignItems: 'center', backgroundColor: 'rgba(35,39,47,0.65)', borderRadius: 18, padding: 18, minWidth: 90, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 8, elevation: 2, backdropFilter: 'blur(8px)' }}>
-            <Ionicons name="star-outline" size={24} color="#FFA94D" />
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 17, marginTop: 2 }}>{ratingCount}</Text>
-            <Text style={{ color: '#888', fontSize: 13 }}>Votes</Text>
+          <View style={{ alignItems: 'center', flexDirection: 'row', backgroundColor: '#23232a', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 18, marginHorizontal: 4 }}>
+            <Ionicons name="star-outline" size={20} color="#FFA94D" style={{ marginRight: 6 }} />
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{ratingCount}</Text>
+            <Text style={{ color: '#888', fontSize: 13, marginLeft: 4 }}>votes</Text>
           </View>
-          <View style={{ alignItems: 'center', backgroundColor: 'rgba(35,39,47,0.65)', borderRadius: 18, padding: 18, minWidth: 90, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 8, elevation: 2, backdropFilter: 'blur(8px)' }}>
-            <Ionicons name="list-outline" size={24} color="#FFA94D" />
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 17, marginTop: 2 }}>{book?.chapters ?? '—'}</Text>
-            <Text style={{ color: '#888', fontSize: 13 }}>Chapitres</Text>
+          <View style={{ alignItems: 'center', flexDirection: 'row', backgroundColor: '#23232a', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 18, marginHorizontal: 4 }}>
+            <Ionicons name="list-outline" size={20} color="#FFA94D" style={{ marginRight: 6 }} />
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{book?.chapters ?? '—'}</Text>
+            <Text style={{ color: '#888', fontSize: 13, marginLeft: 4 }}>chapitres</Text>
           </View>
         </View>
+        {book?.tags && Array.isArray(book.tags) && book.tags.length > 0 && (
+          <View style={{
+            flexDirection: 'row', flexWrap: 'wrap',
+            alignSelf: 'flex-start',
+            marginLeft: 10,
+            marginBottom: 20,
+            maxWidth: '98%',
+          }}>
+            {book.tags.map((tag: string, idx: number) => (
+              <View
+                key={idx}
+                style={{
+                  backgroundColor: '#23232a',
+                  borderRadius: 8,
+                  paddingVertical: 3,
+                  paddingHorizontal: 10,
+                  marginRight: 6,
+                  marginBottom: 6,
+                  minHeight: 24,
+                }}
+              >
+                <Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: '500', letterSpacing: 0.1 }}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* Note moyenne modernisée */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 22, backgroundColor: 'rgba(35,39,47,0.65)', borderRadius: 16, paddingVertical: 12, paddingHorizontal: 28, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, elevation: 1, backdropFilter: 'blur(8px)' }}>
           <StarRating rating={avgRating} maxStars={5} size={30} disabled />
           <Text style={{ color: '#FFA94D', marginLeft: 12, fontSize: 18, fontWeight: 'bold' }}>{avgRating.toFixed(1)} / 5</Text>
           <Text style={{ color: '#888', marginLeft: 12, fontSize: 16 }}>({ratingCount} votes)</Text>
         </View>
-        {/* Notation utilisateur modernisée */}
-        {!isAuthor && (
-          <View style={{ marginBottom: 32, width: '90%', alignItems: 'center', backgroundColor: '#20232a', borderRadius: 18, padding: 22, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4 }}>
-            <Text style={{ color: '#FFA94D', marginBottom: 8, fontSize: 17, fontWeight: 'bold', alignSelf: 'flex-start' }}>Votre avis</Text>
-            <StarRating
-              rating={userRating}
-              maxStars={5}
-              size={34}
-              onRate={setUserRating}
-              disabled={false}
-            />
-            <TextInput
-              style={{
-                backgroundColor: '#23272f', color: '#fff', borderRadius: 12, padding: 14, fontSize: 16, marginTop: 14, width: '100%', minHeight: 70, textAlignVertical: 'top', borderWidth: 1, borderColor: '#333', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4,
-              }}
-              placeholder="Écrivez un commentaire..."
-              placeholderTextColor="#888"
-              value={userComment}
-              onChangeText={setUserComment}
-              multiline
-              maxLength={400}
-              editable={!submitting}
-            />
-            <TouchableOpacity
-              style={{ backgroundColor: '#FFA94D', borderRadius: 22, paddingVertical: 13, paddingHorizontal: 38, marginTop: 18, opacity: submitting ? 0.7 : 1, shadowColor: '#FFA94D', shadowOpacity: 0.18, shadowRadius: 6, elevation: 2 }}
-              onPress={handleSubmitRating}
-              disabled={submitting}
-            >
-              <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 17, letterSpacing: 0.5 }}>Envoyer</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+
         {/* Bouton principal modernisé */}
         <TouchableOpacity
           style={{ backgroundColor: '#FFA94D', borderRadius: 32, paddingVertical: 20, paddingHorizontal: 54, marginBottom: 40, marginTop: 12, shadowColor: '#FFA94D', shadowOpacity: 0.22, shadowRadius: 12, elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 10 }}
@@ -573,7 +532,7 @@ const BookEditor: React.FC = () => {
         <View style={{ width: '92%', marginTop: 8, marginBottom: 32 }}>
           <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 19, marginBottom: 14, letterSpacing: 0.2 }}>Avis & Commentaires</Text>
           {comments.length === 0 ? (
-            <View style={{ backgroundColor: '#232323', borderRadius: 12, padding: 18, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4 }}>
+            <View style={{ backgroundColor: '#232323', borderRadius: 10, padding: 16, alignItems: 'center' }}>
               <Text style={{ color: '#fff', fontStyle: 'italic', fontSize: 15 }}>
                 Aucun avis pour l'instant. Soyez le premier à commenter !
               </Text>
@@ -585,26 +544,23 @@ const BookEditor: React.FC = () => {
               ratingDocId = String(ratingDocId);
               return (
                 <View key={idx} style={{
-                  backgroundColor: 'rgba(35,39,47,0.85)', borderRadius: 22, padding: 20, marginBottom: 22, shadowColor: '#000', shadowOpacity: 0.13, shadowRadius: 12, elevation: 4, borderWidth: 1, borderColor: '#23272f',
+                  backgroundColor: '#20222a', borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: '#23272f',
                 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                     {/* Avatar/Initiale */}
-                    <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFA94D33', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                      <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 18 }}>{(c.user || '?').charAt(0).toUpperCase()}</Text>
+                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#FFA94D33', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                      <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 14 }}>{(c.user || '?').charAt(0).toUpperCase()}</Text>
                     </View>
                     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 15 }}>{c.user}</Text>
-                      <Text style={{ color: '#888', fontSize: 12, marginLeft: 8 }}>{c.createdAt ? `${new Date(c.createdAt).toLocaleDateString()} à ${new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}</Text>
+                      <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 14 }}>{c.user}</Text>
+                      <Text style={{ color: '#888', fontSize: 11, marginLeft: 8 }}>{c.createdAt ? `${new Date(c.createdAt).toLocaleDateString()} à ${new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}</Text>
                     </View>
                   </View>
-                  <Text style={{ color: '#fff', fontSize: 17, lineHeight: 24, marginBottom: 10, marginLeft: 2 }}>{c.comment}</Text>
-                  {/* Barre d’actions façon Instagram */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 16, paddingVertical: 10, paddingHorizontal: 18, marginTop: 6, marginBottom: 2, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4 }}>
-                    <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14, marginRight: 18, minWidth: 48 }}>
-                      {likes[String(ratingDocId)]?.count > 0 ? `${likes[String(ratingDocId)]?.count} j'aime` : ''}
-                    </Text>
+                  <Text style={{ color: '#fff', fontSize: 15, lineHeight: 21, marginBottom: 8, marginLeft: 2 }}>{c.comment}</Text>
+                  {/* Barre d’actions */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
                     <TouchableOpacity
-                      style={{ flexDirection: 'row', alignItems: 'center', marginRight: 18 }}
+                      style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16 }}
                       onPress={async () => {
                         const auth = getAuth(app);
                         const user = auth.currentUser;
@@ -620,19 +576,21 @@ const BookEditor: React.FC = () => {
                       }}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name={likes[String(ratingDocId)]?.liked ? 'heart' : 'heart-outline'} size={22} color={likes[String(ratingDocId)]?.liked ? '#FF4D6D' : '#888'} style={{ marginRight: 7 }} />
+                      <Ionicons name={likes[String(ratingDocId)]?.liked ? 'heart' : 'heart-outline'} size={18} color={likes[String(ratingDocId)]?.liked ? '#FF4D6D' : '#888'} style={{ marginRight: 5 }} />
+                      <Text style={{ color: '#888', fontSize: 13 }}>
+                        {likes[String(ratingDocId)]?.count > 0 ? `${likes[String(ratingDocId)]?.count}` : ''}
+                      </Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => setReplyingTo(ratingDocId)} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Ionicons name="chatbubble-ellipses-outline" size={21} color="#4FC3F7" style={{ marginRight: 6 }} />
-                      <Text style={{ color: '#4FC3F7', fontWeight: 'bold', fontSize: 15 }}>Commenter</Text>
+                      <Ionicons name="chatbubble-ellipses-outline" size={17} color="#4FC3F7" style={{ marginRight: 4 }} />
+                      <Text style={{ color: '#4FC3F7', fontWeight: 'bold', fontSize: 13 }}>Commenter</Text>
                     </TouchableOpacity>
                   </View>
-                  <View style={{ height: 1, backgroundColor: '#23272f', marginTop: 10, marginBottom: 2, borderRadius: 1, opacity: 0.5 }} />
                   {/* Zone de réponse */}
                   {replyingTo === ratingDocId && (
-                    <View style={{ marginBottom: 8, marginLeft: 38 }}>
+                    <View style={{ marginBottom: 6, marginLeft: 28 }}>
                       <TextInput
-                        style={{ backgroundColor: '#232323', color: '#fff', borderRadius: 8, padding: 10, fontSize: 15, borderWidth: 1, borderColor: '#333', marginBottom: 6 }}
+                        style={{ backgroundColor: '#232323', color: '#fff', borderRadius: 8, padding: 8, fontSize: 13, borderWidth: 1, borderColor: '#333', marginBottom: 4 }}
                         placeholder="Votre réponse..."
                         placeholderTextColor="#888"
                         value={replyText}
@@ -640,9 +598,9 @@ const BookEditor: React.FC = () => {
                         multiline
                         maxLength={300}
                       />
-                      <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
                         <TouchableOpacity
-                          style={{ backgroundColor: '#FFA94D', borderRadius: 16, paddingVertical: 7, paddingHorizontal: 18, marginRight: 8 }}
+                          style={{ backgroundColor: '#FFA94D', borderRadius: 12, paddingVertical: 6, paddingHorizontal: 14, marginRight: 6 }}
                           onPress={async () => {
                             if (!replyText.trim()) return;
                             const auth = getAuth(app);
@@ -661,43 +619,75 @@ const BookEditor: React.FC = () => {
                             setReplyingTo(null);
                           }}
                         >
-                          <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 14 }}>Envoyer</Text>
+                          <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 12 }}>Envoyer</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                          style={{ backgroundColor: '#232323', borderRadius: 16, paddingVertical: 7, paddingHorizontal: 18, borderWidth: 1, borderColor: '#444' }}
+                          style={{ backgroundColor: '#232323', borderRadius: 12, paddingVertical: 6, paddingHorizontal: 14, borderWidth: 1, borderColor: '#444' }}
                           onPress={() => { setReplyingTo(null); setReplyText(''); }}
                         >
-                          <Text style={{ color: '#888', fontWeight: 'bold', fontSize: 14 }}>Annuler</Text>
+                          <Text style={{ color: '#888', fontWeight: 'bold', fontSize: 12 }}>Annuler</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
                   )}
                   {/* Affichage des réponses */}
                   {replies[ratingDocId] && replies[ratingDocId].length > 0 && (
-                    <View style={{ marginTop: 6, marginLeft: 50 }}>
+                    <View style={{ marginTop: 4, marginLeft: 36 }}>
                       {replies[ratingDocId].map((r, ridx) => (
-                        <View key={ridx} style={{ backgroundColor: '#23272f', borderRadius: 12, padding: 12, marginBottom: 6, borderLeftWidth: 3, borderLeftColor: '#4FC3F7', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
-                            <Text style={{ color: '#4FC3F7', fontWeight: 'bold', fontSize: 13 }}>{r.user}</Text>
+                        <View key={ridx} style={{ backgroundColor: '#23272f', borderRadius: 8, padding: 8, marginBottom: 4, borderLeftWidth: 2, borderLeftColor: '#4FC3F7' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 1 }}>
+                            <Text style={{ color: '#4FC3F7', fontWeight: 'bold', fontSize: 12 }}>{r.user}</Text>
                             {r.createdAt && (
-                              <Text style={{ color: '#888', marginLeft: 8, fontSize: 11 }}>
+                              <Text style={{ color: '#888', marginLeft: 6, fontSize: 10 }}>
                                 {new Date(r.createdAt).toLocaleDateString()} {new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </Text>
                             )}
                           </View>
-                          <Text style={{ color: '#fff', fontSize: 15 }}>{r.text}</Text>
+                          <Text style={{ color: '#fff', fontSize: 13 }}>{r.text}</Text>
                         </View>
                       ))}
                     </View>
                   )}
                   {idx < comments.length - 1 && (
-                    <View style={{ height: 1, backgroundColor: '#222', marginTop: 18, borderRadius: 1 }} />
+                    <View style={{ height: 1, backgroundColor: '#222', marginTop: 12, borderRadius: 1 }} />
                   )}
                 </View>
               );
             })
           )}
   </View>
+        {/* Section Votre avis modernisée (en bas) */}
+        {!isAuthor && (
+          <View style={{ marginBottom: 32, width: '92%', alignItems: 'center', backgroundColor: '#20222a', borderRadius: 10, padding: 14, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, elevation: 1 }}>
+            <Text style={{ color: '#FFA94D', marginBottom: 6, fontSize: 15, fontWeight: 'bold', alignSelf: 'flex-start' }}>Votre avis</Text>
+            <StarRating
+              rating={userRating}
+              maxStars={5}
+              size={22}
+              onRate={setUserRating}
+              disabled={false}
+            />
+            <TextInput
+              style={{
+                backgroundColor: '#23232a', color: '#fff', borderRadius: 8, padding: 8, fontSize: 13, marginTop: 8, width: '100%', minHeight: 36, textAlignVertical: 'top', borderWidth: 1, borderColor: '#333',
+              }}
+              placeholder="Écrivez un commentaire..."
+              placeholderTextColor="#888"
+              value={userComment}
+              onChangeText={setUserComment}
+              multiline
+              maxLength={400}
+              editable={!submitting}
+            />
+            <TouchableOpacity
+              style={{ backgroundColor: '#FFA94D', borderRadius: 10, paddingVertical: 7, paddingHorizontal: 22, marginTop: 10, opacity: submitting ? 0.7 : 1, alignSelf: 'flex-end' }}
+              onPress={handleSubmitRating}
+              disabled={submitting}
+            >
+              <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 14 }}>Envoyer</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
