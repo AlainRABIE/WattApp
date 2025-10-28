@@ -210,7 +210,7 @@ const Profile: React.FC = () => {
         </View>
 
         <View style={styles.actionColumnSingle}>
-          <TouchableOpacity style={styles.primaryButtonSingle} onPress={() => router.push('../profile/edit')}>
+          <TouchableOpacity style={styles.primaryButtonSingle} onPress={() => router.push('/EditProfile')}>
             <Text style={styles.primaryText}>Éditer le profil</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryButtonSmall} onPress={() => router.push('/write')}>
