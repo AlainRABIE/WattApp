@@ -190,7 +190,11 @@ const Profile: React.FC = () => {
       </View>
 
       {/* bio */}
-      {bio ? <Text style={styles.bio}>{bio}</Text> : null}
+      {bio ? (
+        <View style={styles.bioBubble}>
+          <Text style={styles.bioBubbleText}>{bio}</Text>
+        </View>
+      ) : null}
 
       {/* Stats + actions */}
       <View style={styles.rowBetween}>
@@ -312,6 +316,28 @@ const styles = StyleSheet.create({
   nameLarge: { color: '#FFA94D', fontSize: 20, fontWeight: '700' },
   email: { color: '#fff', fontSize: 13, marginTop: 4 },
   bio: { color: '#fff', paddingHorizontal: 20, marginTop: 12, lineHeight: 20 },
+  bioBubble: {
+    backgroundColor: 'rgba(40, 40, 40, 0.85)',
+    borderRadius: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    marginTop: 12,
+    marginBottom: 2,
+    alignSelf: 'stretch',
+    minHeight: 38,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  bioBubbleText: {
+    color: '#FFA94D',
+    fontSize: 15,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
   rowBetween: { width: '100%', paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
   statsRowSmall: { flexDirection: 'row', alignItems: 'center' },
   statBoxSmall: { alignItems: 'center', marginRight: 18 },
