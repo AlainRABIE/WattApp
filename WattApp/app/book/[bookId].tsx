@@ -458,8 +458,42 @@ const BookEditor: React.FC = () => {
   <ScrollView contentContainerStyle={{ alignItems: 'center', paddingBottom: 60 }}>
         {/* ...existing code... */}
         {coverImage && (
-          <View style={{ alignItems: 'center', width: '100%', marginTop: 36, marginBottom: 18, borderRadius: 28, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 12, elevation: 6 }}>
-            <Image source={{ uri: coverImage }} style={{ width: 180, height: 260, borderRadius: 22 }} />
+          <View style={{ alignItems: 'center', width: '100%', marginTop: 28, marginBottom: 38, borderRadius: 32, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 16, elevation: 8 }}>
+            <Image source={{ uri: coverImage }} style={{ width: 240, height: 340, borderRadius: 28 }} />
+          </View>
+        )}
+
+        {/* Section Synopsis modernisée */}
+        {book?.synopsis && (
+          <View style={{ width: '92%', flexDirection: 'row', backgroundColor: '#23232a', borderRadius: 16, padding: 18, marginBottom: 18, alignSelf: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, elevation: 1, alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 18, marginBottom: 8 }}>Synopsis</Text>
+              <Text style={{ color: '#ccc', fontSize: 15, fontStyle: 'italic', lineHeight: 22 }}>{book.synopsis}</Text>
+            </View>
+            {book?.tags && Array.isArray(book.tags) && book.tags.length > 0 && (
+              <View style={{ flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0, maxWidth: 120 }}>
+                <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 14, marginBottom: 6, alignSelf: 'flex-end' }}>Tags</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {book.tags.map((tag: string, idx: number) => (
+                    <View
+                      key={idx}
+                      style={{
+                        backgroundColor: '#18191c',
+                        borderRadius: 8,
+                        paddingVertical: 3,
+                        paddingHorizontal: 10,
+                        marginLeft: 4,
+                        marginBottom: 6,
+                        minHeight: 22,
+                        alignSelf: 'flex-end',
+                      }}
+                    >
+                      <Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: '500', letterSpacing: 0.1 }}>{tag}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
           </View>
         )}
         {/* Titre modernisé */}
@@ -489,6 +523,11 @@ const BookEditor: React.FC = () => {
             <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{ratingCount}</Text>
             <Text style={{ color: '#888', fontSize: 13, marginLeft: 4 }}>votes</Text>
           </View>
+          <View style={{ alignItems: 'center', flexDirection: 'row', backgroundColor: '#23232a', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 18, marginHorizontal: 4 }}>
+            <Ionicons name="star" size={20} color="#FFA94D" style={{ marginRight: 6 }} />
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{avgRating.toFixed(1)}</Text>
+            <Text style={{ color: '#888', fontSize: 13, marginLeft: 4 }}>/ 5</Text>
+          </View>
         </View>
         {book?.tags && Array.isArray(book.tags) && book.tags.length > 0 && (
           <View style={{
@@ -517,12 +556,7 @@ const BookEditor: React.FC = () => {
           </View>
         )}
 
-        {/* Note moyenne modernisée */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 22, backgroundColor: 'rgba(35,39,47,0.65)', borderRadius: 16, paddingVertical: 12, paddingHorizontal: 28, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, elevation: 1, backdropFilter: 'blur(8px)' }}>
-          <StarRating rating={avgRating} maxStars={5} size={30} disabled />
-          <Text style={{ color: '#FFA94D', marginLeft: 12, fontSize: 18, fontWeight: 'bold' }}>{avgRating.toFixed(1)} / 5</Text>
-          <Text style={{ color: '#888', marginLeft: 12, fontSize: 16 }}>({ratingCount} votes)</Text>
-        </View>
+        {/* Note moyenne modernisée supprimée, déplacée dans la ligne des stats */}
 
         {/* Bouton principal modernisé */}
         <TouchableOpacity
