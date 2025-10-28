@@ -125,15 +125,21 @@ export default function BottomNav() {
                     {isActive ? (
                       <BlurView intensity={60} tint="light" style={styles.activeBubble}>
                         <View style={styles.bubbleContent}>
-                          <Ionicons name="person-outline" size={26} color={'#181818'} />
+                          <Ionicons name={
+                            tab.id === 'profile' ? 'person-outline' :
+                            tab.id === 'home' ? 'home-outline' :
+                            tab.id === 'library' ? 'book-outline' :
+                            (tab.icon as any)
+                          } size={26} color={'#181818'} />
                         </View>
                       </BlurView>
                     ) : (
-                      tab.id === 'profile' ? (
-                        <Ionicons name="person-outline" size={26} color={'#F5E9DA'} />
-                      ) : (
-                        <Ionicons name={tab.id === 'library' ? 'book-outline' : (tab.icon as any)} size={26} color={'#F5E9DA'} />
-                      )
+                      <Ionicons name={
+                        tab.id === 'profile' ? 'person-outline' :
+                        tab.id === 'home' ? 'home-outline' :
+                        tab.id === 'library' ? 'book-outline' :
+                        (tab.icon as any)
+                      } size={26} color={'#F5E9DA'} />
                     )}
                   </View>
                 </Animated.View>
