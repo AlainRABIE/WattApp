@@ -15,6 +15,8 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../constants/firebaseConfig';
+import app from '../../constants/firebaseConfig';
+import { getAuth } from 'firebase/auth';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import PDFDrawingEditorComplete from '../components/PDFDrawingEditorComplete';
@@ -147,6 +149,8 @@ export default function CustomTemplateEditor() {
     }
 
     try {
+      const auth = getAuth(app);
+      const user = auth.currentUser;
       await addDoc(collection(db, 'books'), {
         title: title.trim(),
         content,
@@ -155,6 +159,7 @@ export default function CustomTemplateEditor() {
         templateName: template?.name || 'Template personnalisé',
         templateBackgroundImage: template?.backgroundImage || null,
         isPublished: false,
+        authorUid: user?.uid || null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -185,6 +190,8 @@ export default function CustomTemplateEditor() {
     }
 
     try {
+      const auth = getAuth(app);
+      const user = auth.currentUser;
       await addDoc(collection(db, 'books'), {
         title: title.trim(),
         content,
@@ -193,6 +200,7 @@ export default function CustomTemplateEditor() {
         templateName: template?.name || 'Template personnalisé',
         templateBackgroundImage: template?.backgroundImage || null,
         isPublished: true,
+        authorUid: user?.uid || null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -228,6 +236,8 @@ export default function CustomTemplateEditor() {
     }
 
     try {
+      const auth = getAuth(app);
+      const user = auth.currentUser;
       await addDoc(collection(db, 'books'), {
         title: modalTitle.trim(),
         content,
@@ -237,6 +247,7 @@ export default function CustomTemplateEditor() {
         templateBackgroundImage: template?.backgroundImage || null,
         isPublished: saveType === 'publish',
         isPDFAnnotation: true,
+        authorUid: user?.uid || null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });

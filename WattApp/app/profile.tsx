@@ -20,21 +20,11 @@ const Profile: React.FC = () => {
   const [followersCount, setFollowersCount] = useState<number | null>(null);
   const [friendsCount, setFriendsCount] = useState<number | null>(null);
   const [bio, setBio] = useState<string | null>(null);
+  const [bannerURL, setBannerURL] = useState<string | null>(null);
   const [works, setWorks] = useState<any[]>([]);
   const [recentReads, setRecentReads] = useState<any[]>([]);
   const [uploading, setUploading] = useState<boolean>(false);
   // Exemples en dur pour preview
-  const sampleWorks = [
-    { id: 's1', titre: 'Le Voyageur des Étoiles', couverture: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=400&q=80' },
-    { id: 's2', titre: 'La Forêt des Secrets', couverture: 'https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80' },
-    { id: 's3', titre: 'Manga: Légende du Vent', couverture: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80' },
-    { id: 's4', titre: 'La Valse des Maudits', couverture: 'https://images.unsplash.com/photo-1465101178521-c1a4c8a16d78?auto=format&fit=crop&w=400&q=80' },
-  ];
-  const sampleReads = [
-    { id: 'r1', titre: 'Pretty Boy', couverture: 'https://images.unsplash.com/photo-1503676382389-4809596d5290?auto=format&fit=crop&w=400&q=80' },
-    { id: 'r2', titre: 'La Protégée du Diable', couverture: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80' },
-    { id: 'r3', titre: 'L’Histoire de Soumaya', couverture: 'https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80' },
-  ];
 
   useEffect(() => {
     // refactored: loadProfile called on mount and on focus
@@ -59,11 +49,13 @@ const Profile: React.FC = () => {
       setPhotoURL(user.photoURL || null);
 
       // Compter les oeuvres (ex: collection 'books' with field authorUid)
-      const qWorks = query(collection(db, 'books'), where('authorUid', '==', user.uid));
-      const snapWorks = await getDocs(qWorks);
-      setWorksCount(snapWorks.size);
-      // charge les oeuvres récentes (max 8)
-      setWorks(snapWorks.docs.slice(0, 8).map(d => ({ id: d.id, ...d.data() })));
+    const qWorks = query(collection(db, 'books'), where('authorUid', '==', user.uid));
+    const snapWorks = await getDocs(qWorks);
+    // Récupère toutes les œuvres et filtre les doublons par id
+    const worksArr = snapWorks.docs.map(d => ({ id: d.id, ...d.data() }));
+    const uniqueWorks = worksArr.filter((w, idx, arr) => arr.findIndex(x => x.id === w.id) === idx);
+    setWorks(uniqueWorks);
+    setWorksCount(uniqueWorks.length);
 
       // Compter les followers/friends
       const qFollowers = query(collection(db, 'followers'), where('toUid', '==', user.uid));
@@ -81,6 +73,7 @@ const Profile: React.FC = () => {
         const d = snapUser.docs[0].data();
         if (d.bio) setBio(d.bio);
         if (d.photoURL) setPhotoURL(d.photoURL);
+        if (d.bannerURL) setBannerURL(d.bannerURL);
       }
 
       // Récupère les lectures récentes (collection 'reads' attendu)
@@ -98,15 +91,85 @@ const Profile: React.FC = () => {
 
   const renderWork = ({ item }: { item: any }) => (
     <TouchableOpacity style={styles.workCard} key={item.id} onPress={() => router.push(`../book/${item.id}`)}>
-      <Image source={{ uri: item.couverture || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80' }} style={styles.workCover} />
-      <Text style={styles.workTitle} numberOfLines={2}>{item.titre || 'Titre'}</Text>
+      {item.coverImage ? (
+        <Image source={{ uri: item.coverImage }} style={styles.workCover} />
+      ) : (
+        <View style={[styles.workCover, { backgroundColor: '#222', justifyContent: 'center', alignItems: 'center' }]}> 
+          <Text style={{ color: '#888', fontSize: 12 }}>Pas d'image</Text>
+        </View>
+      )}
+      <Text style={styles.workTitle} numberOfLines={2}>{item.title ? item.title : 'Sans titre'}</Text>
     </TouchableOpacity>
   );
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {/* Banner */}
-      <Image source={{ uri: 'https://images.unsplash.com/photo-1503264116251-35a269479413?auto=format&fit=crop&w=1200&q=60' }} style={styles.banner} />
+      {/* Banner avec bouton de modification */}
+      <View style={styles.bannerContainer}>
+        <Image source={{ uri: bannerURL || 'https://images.unsplash.com/photo-1503264116251-35a269479413?auto=format&fit=crop&w=1200&q=60' }} style={styles.banner} />
+        <TouchableOpacity style={styles.bannerEditBtn} onPress={async () => {
+          try {
+            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!(permission.granted || permission.status === 'granted')) {
+              Alert.alert('Permission requise', 'Autorisez l\'accès à la galerie pour changer la bannière.');
+              return;
+            }
+            // Forcer un ratio paysage large pour la bannière (recadrage horizontal)
+            const res = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              quality: 0.9,
+              allowsEditing: true,
+              aspect: [16, 5], // ratio horizontal large
+            });
+            if (res.canceled) return;
+            const asset = res.assets && res.assets[0];
+            const uri = asset?.uri;
+            if (!uri) {
+              Alert.alert('Erreur', 'Impossible de récupérer l\'image.');
+              return;
+            }
+            setUploading(true);
+            // Resize & compress
+            const manipResult = await ImageManipulator.manipulateAsync(
+              uri,
+              [{ resize: { width: 1200 } }],
+              { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+            );
+            const finalUri = manipResult.uri;
+            // Read as base64
+            const base64 = await FileSystem.readAsStringAsync(finalUri, { encoding: 'base64' });
+            const dataUrl = `data:image/jpeg;base64,${base64}`;
+            // Check size
+            const approxBytes = Math.floor((dataUrl.length - 22) * 3 / 4);
+            const MAX_BYTES = 1800000; // 1.8MB
+            if (approxBytes > MAX_BYTES) {
+              Alert.alert('Image trop lourde', 'Choisis une image plus petite ou réduis la qualité.');
+              setUploading(false);
+              return;
+            }
+            const auth = getAuth(app);
+            const user = auth.currentUser;
+            if (!user) throw new Error('Utilisateur non authentifié');
+            // Save in Firestore user doc
+            const qUser = query(collection(db, 'users'), where('uid', '==', user.uid));
+            const snapUser = await getDocs(qUser);
+            if (!snapUser.empty) {
+              const userDocRef = doc(db, 'users', snapUser.docs[0].id);
+              await updateDoc(userDocRef, { bannerURL: dataUrl });
+            }
+            setBannerURL(dataUrl);
+          } catch (e) {
+            Alert.alert('Erreur', 'Impossible de sélectionner la bannière.');
+          } finally {
+            setUploading(false);
+          }
+        }}>
+          <View style={styles.bannerEditIcon}>
+            <Image source={{ uri: 'https://img.icons8.com/ios-filled/50/FFA94D/camera.png' }} style={{ width: 22, height: 22, tintColor: '#FFA94D' }} />
+          </View>
+        </TouchableOpacity>
+      </View>
+
 
       {/* Avatar overlapping banner */}
       <View style={styles.metaRow}>
@@ -226,12 +289,12 @@ const Profile: React.FC = () => {
       {/* Œuvres */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Mes œuvres</Text>
-        {((works && works.length) || sampleWorks.length) === 0 ? (
+        {(works && works.length) === 0 ? (
           <Text style={styles.placeholder}>Tu n'as pas encore d'œuvres publiées.</Text>
         ) : (
           <FlatList
             horizontal
-            data={works && works.length ? works : sampleWorks}
+            data={works}
             keyExtractor={(i) => i.id}
             renderItem={renderWork}
             showsHorizontalScrollIndicator={false}
@@ -243,11 +306,11 @@ const Profile: React.FC = () => {
       {/* Continuez à lire */}
       <View style={[styles.section, { marginTop: 10 }]}>
         <Text style={styles.sectionTitle}>Continuez à lire</Text>
-        {((recentReads && recentReads.length) || sampleReads.length) === 0 ? (
+        {(recentReads && recentReads.length) === 0 ? (
           <Text style={styles.placeholder}>Aucune lecture récente.</Text>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {(recentReads && recentReads.length ? recentReads : sampleReads).map(r => (
+            {recentReads.map(r => (
               <View key={r.id} style={styles.workCard}>
                 <Image source={{ uri: r.couverture || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80' }} style={styles.workCover} />
                 <Text style={styles.workTitle} numberOfLines={2}>{r.titre || 'Titre'}</Text>
@@ -290,11 +353,33 @@ const styles = StyleSheet.create({
     minHeight: '100%',
     alignItems: 'center',
   },
+  bannerContainer: {
+    width: '100%',
+    height: 140,
+    position: 'relative',
+    marginBottom: -40,
+  },
   banner: {
     width: '100%',
     height: 140,
     resizeMode: 'cover',
-    marginBottom: -40,
+  },
+  bannerEditBtn: {
+    position: 'absolute',
+    right: 18,
+    bottom: 12,
+    backgroundColor: 'rgba(24,24,24,0.85)',
+    borderRadius: 18,
+    padding: 6,
+    zIndex: 2,
+    borderWidth: 1,
+    borderColor: '#FFA94D',
+  },
+  bannerEditIcon: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   metaRow: {
     width: '100%',
