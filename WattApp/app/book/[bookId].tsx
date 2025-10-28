@@ -401,8 +401,23 @@ const BookEditor: React.FC = () => {
   return (
     <View style={{ flex: 1, backgroundColor: '#18191c' }}>
       <StatusBar barStyle="light-content" />
-      {/* Chip Chapitres en haut à droite, ouvre la sidebar chapitres */}
-      <View style={{ width: '100%', alignItems: 'flex-end', marginTop: 18, marginBottom: -18, paddingRight: 18, zIndex: 10 }}>
+      {/* Chip Chapitres en haut à droite, ouvre la sidebar chapitres + badge status */}
+      <View style={{ width: '100%', alignItems: 'flex-end', marginTop: 38, marginBottom: -18, paddingRight: 18, zIndex: 10, flexDirection: 'row', justifyContent: 'flex-end' }}>
+        {book?.status && (
+          <View style={{
+            backgroundColor: book.status === 'published' ? '#FFA94D' : (book.status === 'finished' ? '#4CAF50' : '#888'),
+            borderRadius: 14,
+            paddingVertical: 5,
+            paddingHorizontal: 16,
+            marginRight: 10,
+            alignSelf: 'flex-start',
+            minWidth: 60,
+          }}>
+            <Text style={{ color: book.status === 'published' ? '#18191c' : '#fff', fontWeight: 'bold', fontSize: 13, textAlign: 'center', textTransform: 'capitalize' }}>
+              {book.status === 'published' ? 'Publié' : (book.status === 'finished' ? 'Fini' : book.status)}
+            </Text>
+          </View>
+        )}
         <TouchableOpacity
           onPress={() => setShowChapters(true)}
           activeOpacity={0.8}
@@ -631,15 +646,61 @@ const BookEditor: React.FC = () => {
           </View>
         )}
 
-        {/* Bouton principal modernisé */}
-        <TouchableOpacity
-          style={{ backgroundColor: '#FFA94D', borderRadius: 32, paddingVertical: 20, paddingHorizontal: 54, marginBottom: 40, marginTop: 12, shadowColor: '#FFA94D', shadowOpacity: 0.22, shadowRadius: 12, elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 10 }}
-          onPress={() => router.push(`/book/${bookId}/read`)}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="book-outline" size={26} color="#181818" style={{ marginRight: 8 }} />
-          <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 21, letterSpacing: 0.3 }}>Commencer la lecture</Text>
-        </TouchableOpacity>
+        {/* Bouton principal modernisé + bouton ajout bibliothèque */}
+        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 16, marginBottom: 40, marginTop: 12 }}>
+          <TouchableOpacity
+            style={{ backgroundColor: '#FFA94D', borderRadius: 32, paddingVertical: 20, paddingHorizontal: 54, shadowColor: '#FFA94D', shadowOpacity: 0.22, shadowRadius: 12, elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+            onPress={() => router.push(`/book/${bookId}/read`)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="book-outline" size={26} color="#181818" style={{ marginRight: 8 }} />
+            <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 21, letterSpacing: 0.3 }}>Commencer la lecture</Text>
+          </TouchableOpacity>
+          {/* Bouton + ou check pour ajouter à la bibliothèque */}
+          {(() => {
+            const auth = getAuth(app);
+            const user = auth.currentUser;
+            const isInLibrary = book && user && book.ownerUid === user.uid;
+            if (isInLibrary) {
+              return (
+                <View style={{ backgroundColor: '#23232a', borderRadius: 32, padding: 18, marginLeft: 8, borderWidth: 2, borderColor: '#FFA94D', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="checkmark" size={28} color="#FFA94D" />
+                </View>
+              );
+            } else {
+              return (
+                <TouchableOpacity
+                  style={{ backgroundColor: '#23232a', borderRadius: 32, padding: 18, marginLeft: 8, borderWidth: 2, borderColor: '#FFA94D', alignItems: 'center', justifyContent: 'center' }}
+                  onPress={async () => {
+                    try {
+                      const auth = getAuth(app);
+                      const user = auth.currentUser;
+                      if (!user || !book) {
+                        Alert.alert('Erreur', 'Vous devez être connecté pour ajouter ce livre.');
+                        return;
+                      }
+                      const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+                      const bookRef = doc(db, 'books', book.id);
+                      await setDoc(bookRef, {
+                        ...book,
+                        ownerUid: user.uid,
+                        status: 'published',
+                        addedAt: serverTimestamp(),
+                      }, { merge: true });
+                      setBook((prev: any) => prev ? { ...prev, ownerUid: user.uid } : prev);
+                      Alert.alert('Ajouté', `Le livre "${book.title || book.titre}" a été ajouté à votre bibliothèque !`);
+                    } catch (e) {
+                      Alert.alert('Erreur', 'Impossible d\'ajouter le livre.');
+                    }
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="add" size={28} color="#FFA94D" />
+                </TouchableOpacity>
+              );
+            }
+          })()}
+        </View>
         {/* Section Avis/Commentaires modernisée */}
         <View style={{ width: '92%', marginTop: 8, marginBottom: 32 }}>
           <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 19, marginBottom: 14, letterSpacing: 0.2 }}>Avis & Commentaires</Text>
