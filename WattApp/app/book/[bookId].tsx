@@ -391,8 +391,18 @@ const BookEditor: React.FC = () => {
           style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(35,39,47,0.65)', borderRadius: 18, paddingVertical: 8, paddingHorizontal: 20, borderWidth: 1, borderColor: '#FFA94D', marginBottom: 0 }}
         >
           <Ionicons name="list-outline" size={20} color="#FFA94D" />
-          <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 16, marginLeft: 7 }}>{book?.chapters ?? '—'}</Text>
-          <Text style={{ color: '#FFA94D', fontSize: 13, marginLeft: 4 }}>Chapitres</Text>
+          <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 16, marginLeft: 7 }}>
+            {book?.status === 'finished'
+              ? 'Fini'
+              : (book?.chapters && book.chapters > 0)
+                ? book.chapters
+                : 'En cours'}
+          </Text>
+          {book?.status === 'finished' || !(book?.chapters && book.chapters > 0) ? null : (
+            <Text style={{ color: '#FFA94D', fontSize: 13, marginLeft: 4 }}>
+              {book.chapters === 1 ? 'chapitre' : 'chapitres'}
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -481,8 +491,18 @@ const BookEditor: React.FC = () => {
           </View>
           <View style={{ alignItems: 'center', flexDirection: 'row', backgroundColor: '#23232a', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 18, marginHorizontal: 4 }}>
             <Ionicons name="list-outline" size={20} color="#FFA94D" style={{ marginRight: 6 }} />
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{book?.chapters ?? '—'}</Text>
-            <Text style={{ color: '#888', fontSize: 13, marginLeft: 4 }}>chapitres</Text>
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>
+              {book?.status === 'finished'
+                ? 'Fini'
+                : (book?.chapters && book.chapters > 0)
+                  ? book.chapters
+                  : 'En cours'}
+            </Text>
+            {book?.status === 'finished' || !(book?.chapters && book.chapters > 0) ? null : (
+              <Text style={{ color: '#888', fontSize: 13, marginLeft: 4 }}>
+                {book.chapters === 1 ? 'chapitre' : 'chapitres'}
+              </Text>
+            )}
           </View>
         </View>
         {book?.tags && Array.isArray(book.tags) && book.tags.length > 0 && (
