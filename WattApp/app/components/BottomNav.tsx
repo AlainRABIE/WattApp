@@ -10,6 +10,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 const TABS = [
   { id: 'home', label: 'Home', icon: 'home-outline', route: '/home/home' },
   { id: 'explore', label: 'Explore', icon: 'search-outline', route: '/explore' },
+  { id: 'short', label: 'Short', icon: 'flash-outline', route: '/short' },
   { id: 'write', label: 'Write', icon: 'pencil-outline', route: '/write' },
   { id: 'library', label: 'Bibliothèques', icon: 'book-outline', route: '/library' },
   { id: 'profile', label: 'Profile', icon: 'person-outline', route: '/profile' },
@@ -129,6 +130,7 @@ export default function BottomNav() {
                             tab.id === 'profile' ? 'person-outline' :
                             tab.id === 'home' ? 'home-outline' :
                             tab.id === 'library' ? 'book-outline' :
+                            tab.id === 'short' ? 'flash-outline' :
                             (tab.icon as any)
                           } size={26} color={'#181818'} />
                         </View>
@@ -138,6 +140,7 @@ export default function BottomNav() {
                         tab.id === 'profile' ? 'person-outline' :
                         tab.id === 'home' ? 'home-outline' :
                         tab.id === 'library' ? 'book-outline' :
+                        tab.id === 'short' ? 'flash-outline' :
                         (tab.icon as any)
                       } size={26} color={'#F5E9DA'} />
                     )}
