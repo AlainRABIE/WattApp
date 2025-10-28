@@ -10,80 +10,12 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 
 const Home: React.FC = () => {
 	const router = useRouter();
-		// helper to open explore
-		const openExplore = () => (router as any).push('/explore');
-	const livresLecture = [
-		{
-			id: '4',
-			titre: 'Le Séducteur',
-			auteur: 'Une Chana',
-			couverture: 'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&w=400&q=80',
-			tags: ['compétition', 'romance'],
-		},
-		{
-			id: '5',
-			titre: 'Un Agent en Tenue Moulante',
-			auteur: 'Lumi Scala',
-			couverture: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?auto=format&fit=crop&w=400&q=80',
-			tags: ['science-fiction'],
-		},
-		{
-			id: '6',
-			titre: 'La Valse des Maudits',
-			auteur: 'J. Loup',
-			couverture: 'https://images.unsplash.com/photo-1465101178521-c1a4c8a16d78?auto=format&fit=crop&w=400&q=80',
-			tags: ['loup-garou', 'chronique'],
-		},
-	];
+	// helper to open explore
+	const openExplore = () => (router as any).push('/explore');
 
-	const livresContinuer = [
-		{
-			id: '7',
-			titre: 'Pretty Boy',
-			auteur: 'Sophie Calune',
-			couverture: 'https://images.unsplash.com/photo-1503676382389-4809596d5290?auto=format&fit=crop&w=400&q=80',
-			tags: ['romance'],
-		},
-		{
-			id: '8',
-			titre: 'La Protégée du Diable',
-			auteur: 'M. Lapop',
-			couverture: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80',
-			tags: ['badboy', 'fiction'],
-		},
-		{
-			id: '9',
-			titre: 'L’Histoire de Soumaya',
-			auteur: 'Soumaya',
-			couverture: 'https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80',
-			tags: ['chronique'],
-		},
-	];
-	// Avatar fallback will be computed from user displayName/email (keeps initials consistent with Profile)
-	// Exemples de livres en dur
-		const livresExemple = [
-			{
-				id: '1',
-				titre: 'Le Voyageur des Étoiles',
-				auteur: 'A. Martin',
-				couverture: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=400&q=80',
-				tags: ['jalousie', 'aventure'],
-			},
-			{
-				id: '2',
-				titre: 'La Forêt des Secrets',
-				auteur: 'J. Dubois',
-				couverture: 'https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80',
-				tags: ['mystère', 'nature'],
-			},
-			{
-				id: '3',
-				titre: 'Manga: Légende du Vent',
-				auteur: 'K. Tanaka',
-				couverture: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80',
-				tags: ['manga', 'action'],
-			},
-		];
+	// State pour les livres dynamiques
+	const [books, setBooks] = useState<any[]>([]);
+	const [loadingBooks, setLoadingBooks] = useState(true);
 	const [email, setEmail] = useState('');
 	const [displayName, setDisplayName] = useState('');
 	const [photoURL, setPhotoURL] = useState<string | null>(null);
@@ -102,22 +34,36 @@ const Home: React.FC = () => {
 	const topOffset = Platform.OS === 'ios' ? 44 : (StatusBar.currentHeight ?? 0) + 8;
 	const contentPaddingTop = topOffset + avatarSize + 12; // keep content from being hidden under avatar
 
-	const renderBookItem = (item: any) => (
-		<View key={item.id} style={isTablet ? styles.livreCardTablet : styles.livreCardHorizontal}>
-			<View style={isTablet ? styles.livreImageBoxTablet : styles.livreImageBoxHorizontal}>
-				<Image source={{ uri: item.couverture }} style={isTablet ? styles.livreImageTablet : styles.livreImageHorizontal} />
+	const renderBookItem = (item: any) => {
+		// Champs Firestore adaptés : title, coverImage
+		let couverture = item.coverImage;
+		if (couverture && typeof couverture === 'object' && couverture.uri) {
+			couverture = couverture.uri;
+		}
+		if (!couverture || typeof couverture !== 'string' || couverture.trim() === '') {
+			couverture = 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128';
+		}
+		const titre = item.title || 'Titre inconnu';
+		// Pas de champ auteur dans Firestore, on affiche "Auteur inconnu"
+		const auteur = item.auteur || 'Auteur inconnu';
+		const tags = Array.isArray(item.tags) ? item.tags : [];
+		return (
+			<View key={item.id} style={isTablet ? styles.livreCardTablet : styles.livreCardHorizontal}>
+				<View style={isTablet ? styles.livreImageBoxTablet : styles.livreImageBoxHorizontal}>
+					<Image source={{ uri: couverture }} style={isTablet ? styles.livreImageTablet : styles.livreImageHorizontal} />
+				</View>
+				<Text style={styles.livreTitre}>{titre}</Text>
+				<Text style={styles.livreAuteur}>par {auteur}</Text>
+				<View style={styles.tagsRow}>
+					{tags.map((tag: string) => (
+						<View key={tag} style={styles.tagBox}>
+							<Text style={styles.tagText}>{tag}</Text>
+						</View>
+					))}
+				</View>
 			</View>
-			<Text style={styles.livreTitre}>{item.titre}</Text>
-			<Text style={styles.livreAuteur}>par {item.auteur}</Text>
-			<View style={styles.tagsRow}>
-				{item.tags.map((tag: string) => (
-					<View key={tag} style={styles.tagBox}>
-						<Text style={styles.tagText}>{tag}</Text>
-					</View>
-				))}
-			</View>
-		</View>
-	);
+		);
+	};
 
 	useEffect(() => {
 		const loadProfile = async () => {
@@ -142,41 +88,39 @@ const Home: React.FC = () => {
 				console.warn('Failed to fetch user photo from Firestore', err);
 			}
 		};
+
+		const loadBooks = async () => {
+			try {
+				const booksSnap = await getDocs(collection(db, 'books'));
+				const booksList = booksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+				setBooks(booksList);
+			} catch (err) {
+				console.warn('Erreur lors du chargement des livres', err);
+			} finally {
+				setLoadingBooks(false);
+			}
+		};
+
 		loadProfile();
+		loadBooks();
 	}, []);
 
 	return (
-			<View style={styles.container}>
-				{/* user button removed from Home - profile stays visible in BottomNav only */}
-
+		<View style={styles.container}>
 			<StatusBar barStyle="light-content" />
-					{/* Header supprimé pour un rendu épuré */}
-			<ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, { paddingTop: contentPaddingTop }]}>
-				{/* Section Nouveautés */}
-				<Text style={styles.sectionTitle}>Nouveautés de vos auteurs</Text>
-				<View style={[styles.sectionBox, isTablet && styles.sectionBoxTablet]}>
+			{/* Section Livres dynamiques */}
+			<Text style={styles.sectionTitle}>Livres disponibles</Text>
+			<View style={[styles.sectionBox, isTablet && styles.sectionBoxTablet]}>
+				{loadingBooks ? (
+					<Text>Chargement...</Text>
+				) : books.length === 0 ? (
+					<Text>Aucun livre trouvé.</Text>
+				) : (
 					<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-						{livresExemple.map(livre => renderBookItem(livre))}
+						{books.map(livre => renderBookItem(livre))}
 					</ScrollView>
-				</View>
-
-						{/* Section Style de lecture */}
-						<Text style={styles.sectionTitle}>Votre style de lecture</Text>
-						<View style={[styles.sectionBox, isTablet && styles.sectionBoxTablet]}>
-							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-								{livresLecture.map(livre => renderBookItem(livre))}
-							</ScrollView>
-						</View>
-
-						{/* Section Continuez à lire */}
-						<Text style={styles.sectionTitle}>Continuez à lire</Text>
-						<View style={[styles.sectionBox, isTablet && styles.sectionBoxTablet]}>
-							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-								{livresContinuer.map(livre => renderBookItem(livre))}
-							</ScrollView>
-						</View>
-
-			</ScrollView>
+				)}
+			</View>
 		</View>
 	);
 };
