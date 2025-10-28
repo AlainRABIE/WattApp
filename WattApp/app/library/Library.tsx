@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -18,74 +19,64 @@ import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 
-type Book = {
+// Types
+type BookType = {
   id: string;
   titre: string;
   auteur: string;
   couverture?: string;
   tags?: string[];
   views?: number;
+  status?: string;
+  createdAt?: any;
+  updatedAt?: any;
+  templateId?: string;
+  coverImage?: string;
 };
 
-const sampleBooks: Book[] = [
-  {
-    id: 's1',
-    titre: 'Le Voyageur des Étoiles',
-    auteur: 'A. Martin',
-    couverture: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=400&q=80',
-    tags: ['aventure'],
-  },
-  {
-    id: 's2',
-    titre: 'La Forêt des Secrets',
-    auteur: 'J. Dubois',
-    couverture: 'https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80',
-    tags: ['mystère'],
-  },
-  {
-    id: 's3',
-    titre: 'Pretty Boy',
-    auteur: 'Sophie Calune',
-    couverture: 'https://images.unsplash.com/photo-1503676382389-4809596d5290?auto=format&fit=crop&w=400&q=80',
-    tags: ['romance'],
-  },
-  {
-    id: 's4',
-    titre: 'Manga: Légende du Vent',
-    auteur: 'K. Tanaka',
-    couverture: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80',
-    tags: ['manga', 'action'],
-  },
-  {
-    id: 's5',
-    titre: 'La Protégée du Diable',
-    auteur: 'M. Lapop',
-    couverture: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80',
-    tags: ['fantasy', 'romance'],
-  },
-  {
-    id: 's6',
-    titre: 'L’Histoire de Soumaya',
-    auteur: 'Soumaya',
-    couverture: 'https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80',
-    tags: ['chronique'],
-  },
-];
+type FolderType = {
+  id: string;
+  name: string;
+  bookIds: string[];
+};
+
+const initialFolders: FolderType[] = [];
 
 const Library: React.FC = () => {
   const router = useRouter();
   const { width, height } = useWindowDimensions();
   const isTablet = Math.max(width, height) >= 768;
 
-  const [books, setBooks] = useState<Book[]>([]);
-  const [drafts, setDrafts] = useState<Book[]>([]);
+
+  // State
+  const [folders, setFolders] = useState<FolderType[]>(initialFolders);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [books, setBooks] = useState<BookType[]>([]);
+  const [drafts, setDrafts] = useState<BookType[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>('');
 
-  // split sample data into "read" and "created" for the UI
-  const readBooks = sampleBooks.slice(0, 3).map(b => ({ ...b }));
-  const createdBooks = sampleBooks.slice(3).map((b, i) => ({ ...b, views: 120 - i * 7 }));
+  // Ajout d'un dossier
+  const handleAddFolder = () => {
+    if (!newFolderName.trim()) return;
+    setFolders([...folders, { id: Date.now().toString(), name: newFolderName.trim(), bookIds: [] }]);
+    setNewFolderName('');
+  };
 
+  // Ajout d'un livre à un dossier
+  const handleAddBookToFolder = (folderId: string, bookId: string) => {
+    setFolders(folders.map((f: FolderType) => f.id === folderId ? { ...f, bookIds: [...f.bookIds, bookId] } : f));
+  };
+
+
+  // (supprimé: redéclaration inutile)
+
+  // Les livres lus et créés sont alimentés par la base de données uniquement
+  const readBooks = books.filter((b: BookType) => b.status === 'published');
+  const createdBooks = books.filter((b: BookType) => b.status !== 'published');
+
+  // Pour pouvoir rappeler loadBooks depuis un callback
+  const loadBooksRef = React.useRef<(() => Promise<void>) | null>(null);
   useEffect(() => {
     let mounted = true;
     const loadBooks = async () => {
@@ -96,35 +87,31 @@ const Library: React.FC = () => {
         if (!user) {
           // no user, show sample
           if (mounted) {
-            setBooks(sampleBooks);
+            setBooks([]);
             setDrafts([]);
           }
           return;
         }
-        
         // Charger les livres avec ownerUid (livres de la bibliothèque)
         const qBooks = query(collection(db, 'books'), where('ownerUid', '==', user.uid));
         const snapBooks = await getDocs(qBooks);
-        
         // Charger les brouillons avec authorUid (créés par l'utilisateur)
         const qDrafts = query(collection(db, 'books'), where('authorUid', '==', user.uid));
         const snapDrafts = await getDocs(qDrafts);
-        
         if (mounted) {
           // Livres de la bibliothèque
           if (snapBooks.empty) {
-            setBooks(sampleBooks);
+            setBooks([]);
           } else {
-            const booksList: Book[] = snapBooks.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+            const booksList: BookType[] = snapBooks.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
             setBooks(booksList);
           }
-          
           // Brouillons (filtrer seulement les drafts)
           if (!snapDrafts.empty) {
-            const allUserBooks = snapDrafts.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+            const allUserBooks = snapDrafts.docs.map((d: any) => ({ id: d.id, ...d.data() })) as BookType[];
             const userDrafts = allUserBooks
-              .filter((book: any) => book.status === 'draft')
-              .sort((a: any, b: any) => {
+              .filter((book: BookType) => book.status === 'draft')
+              .sort((a: BookType, b: BookType) => {
                 // Tri par date de création décroissante
                 const dateA = a.createdAt?.toDate?.() || new Date(0);
                 const dateB = b.createdAt?.toDate?.() || new Date(0);
@@ -138,14 +125,15 @@ const Library: React.FC = () => {
       } catch (err) {
         console.warn('Failed to load library books', err);
         if (mounted) {
-          setBooks(sampleBooks);
+          setBooks([]);
           setDrafts([]);
         }
       } finally {
         if (mounted) setLoading(false);
       }
     };
-    loadBooks();
+  loadBooksRef.current = loadBooks;
+  loadBooks();
     return () => {
       mounted = false;
     };
@@ -157,7 +145,7 @@ const Library: React.FC = () => {
     return (
       b.titre.toLowerCase().includes(q) ||
       b.auteur.toLowerCase().includes(q) ||
-      (b.tags || []).some(t => t.toLowerCase().includes(q))
+  (b.tags || []).some((t: string) => t.toLowerCase().includes(q))
     );
   });
 
@@ -218,23 +206,96 @@ const Library: React.FC = () => {
                   showsHorizontalScrollIndicator={false} 
                   contentContainerStyle={styles.horizontalList}
                 >
-                  {readBooks.map(book => (
-                    <TouchableOpacity 
-                      key={book.id} 
-                      style={styles.horizontalCard} 
-                      onPress={() => Alert.alert(book.titre, `${book.auteur}\n\nTags: ${(book.tags || []).join(', ')}`)}
-                    >
-                      <Image 
-                        source={{ uri: book.couverture || 'https://via.placeholder.com/120x180.png?text=Cover' }} 
-                        style={styles.horizontalCover} 
-                      />
-                      <View style={styles.horizontalCardContent}>
-                        <Text style={styles.horizontalBookTitle} numberOfLines={2}>{book.titre}</Text>
-                        <Text style={styles.horizontalBookAuthor} numberOfLines={1}>par {book.auteur}</Text>
-                      </View>
-                    </TouchableOpacity>
+                  {readBooks.map((book: BookType) => (
+                    <View key={book.id} style={styles.horizontalCard}>
+                      <TouchableOpacity
+                        onPress={() => Alert.alert(book.titre, `${book.auteur}\n\nTags: ${(book.tags || []).join(', ')}`)}
+                      >
+                        <Image
+                          source={{ uri: book.couverture || 'https://via.placeholder.com/120x180.png?text=Cover' }}
+                          style={styles.horizontalCover}
+                        />
+                        <View style={styles.horizontalCardContent}>
+                          <Text style={styles.horizontalBookTitle} numberOfLines={2}>{book.titre}</Text>
+                          <Text style={styles.horizontalBookAuthor} numberOfLines={1}>par {book.auteur}</Text>
+                        </View>
+                      </TouchableOpacity>
+                      {/* Bouton Ajouter à la bibliothèque */}
+                      <TouchableOpacity
+                        style={{
+                          marginTop: 8,
+                          backgroundColor: '#FFA94D',
+                          borderRadius: 8,
+                          paddingVertical: 6,
+                          paddingHorizontal: 12,
+                          alignSelf: 'center',
+                        }}
+                        onPress={async () => {
+                          try {
+                            const auth = getAuth(app);
+                            const user = auth.currentUser;
+                            if (!user) {
+                              Alert.alert('Erreur', 'Vous devez être connecté pour ajouter un livre.');
+                              return;
+                            }
+                            // Ajouter le livre à la collection de l'utilisateur (copie minimale)
+                            const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+                            const bookRef = doc(db, 'books', book.id);
+                            await setDoc(bookRef, {
+                              ...book,
+                              ownerUid: user.uid,
+                              status: 'published',
+                              addedAt: serverTimestamp(),
+                            }, { merge: true });
+                            Alert.alert('Ajouté', `Le livre "${book.titre}" a été ajouté à votre bibliothèque !`);
+                            // Recharger la liste
+                            if (loadBooksRef.current) await loadBooksRef.current();
+                          } catch (e) {
+                            Alert.alert('Erreur', 'Impossible d\'ajouter le livre.');
+                          }
+                        }}
+                      >
+                        <Text style={{ color: '#18191c', fontWeight: 'bold', fontSize: 13 }}>Ajouter à la bibliothèque</Text>
+                      </TouchableOpacity>
+                    </View>
                   ))}
                 </ScrollView>
+              </View>
+
+              {/* Section: Mes dossiers (playlists) */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>📁 Mes dossiers</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                  <TextInput
+                    value={newFolderName}
+                    onChangeText={setNewFolderName}
+                    placeholder="Nouveau dossier..."
+                    placeholderTextColor="#888"
+                    style={{ backgroundColor: '#232323', color: '#fff', borderRadius: 8, padding: 8, flex: 1, marginRight: 8 }}
+                  />
+                  <TouchableOpacity onPress={handleAddFolder} style={{ backgroundColor: '#FFA94D', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 14 }}>
+                    <Text style={{ color: '#18191c', fontWeight: 'bold', fontSize: 15 }}>Créer</Text>
+                  </TouchableOpacity>
+                </View>
+                {folders.length === 0 ? (
+                  <Text style={{ color: '#888', fontStyle: 'italic', marginBottom: 8 }}>Aucun dossier créé</Text>
+                ) : (
+                  folders.map(folder => (
+                    <View key={folder.id} style={{ marginBottom: 14, backgroundColor: '#23232a', borderRadius: 12, padding: 12 }}>
+                      <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 16, marginBottom: 6 }}>{folder.name}</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        {(folder.bookIds.map(id => books.find((b: BookType) => b.id === id)).filter(Boolean) as BookType[]).map(book => (
+                          <View key={book.id} style={{ marginRight: 12, alignItems: 'center' }}>
+                            <Image source={{ uri: book.couverture || 'https://via.placeholder.com/120x180.png?text=Cover' }} style={{ width: 60, height: 90, borderRadius: 8, marginBottom: 4 }} />
+                            <Text style={{ color: '#fff', fontSize: 12, maxWidth: 60 }} numberOfLines={2}>{book.titre}</Text>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  ))
+                )}
               </View>
 
               {/* Section: Mes créations - Carousel horizontal */}
@@ -249,30 +310,45 @@ const Library: React.FC = () => {
                   contentContainerStyle={styles.horizontalList}
                 >
                   {createdBooks.map(book => (
-                    <TouchableOpacity 
-                      key={book.id} 
-                      style={styles.creationCard} 
-                      onPress={() => Alert.alert(book.titre, `${book.auteur} • ${book.views ?? 0} vues\n\nTags: ${(book.tags || []).join(', ')}`)}
-                    >
-                      <Image 
-                        source={{ uri: book.couverture || 'https://via.placeholder.com/120x180.png?text=Cover' }} 
-                        style={styles.creationCover} 
-                      />
-                      <View style={styles.creationCardContent}>
-                        <Text style={styles.creationBookTitle} numberOfLines={2}>{book.titre}</Text>
-                        <Text style={styles.creationBookAuthor} numberOfLines={1}>par {book.auteur}</Text>
-                        <View style={styles.statsRow}>
-                          <Text style={styles.viewsText}>👁 {book.views ?? 0} vues</Text>
+                    <View key={book.id} style={{ flexDirection: 'column', alignItems: 'center', marginRight: 16 }}>
+                      <TouchableOpacity 
+                        style={styles.creationCard} 
+                        onPress={() => Alert.alert(book.titre, `${book.auteur} • ${book.views ?? 0} vues\n\nTags: ${(book.tags || []).join(', ')}`)}
+                      >
+                        <Image 
+                          source={{ uri: book.couverture || 'https://via.placeholder.com/120x180.png?text=Cover' }} 
+                          style={styles.creationCover} 
+                        />
+                        <View style={styles.creationCardContent}>
+                          <Text style={styles.creationBookTitle} numberOfLines={2}>{book.titre}</Text>
+                          <Text style={styles.creationBookAuthor} numberOfLines={1}>par {book.auteur}</Text>
+                          <View style={styles.statsRow}>
+                            <Text style={styles.viewsText}>👁 {book.views ?? 0} vues</Text>
+                          </View>
+                          <View style={styles.tagsRow}>
+                            {(book.tags || []).slice(0, 2).map((tag: string) => (
+                              <View key={tag} style={styles.tagBox}>
+                                <Text style={styles.tagText}>{tag}</Text>
+                              </View>
+                            ))}
+                          </View>
                         </View>
-                        <View style={styles.tagsRow}>
-                          {(book.tags || []).slice(0, 2).map(tag => (
-                            <View key={tag} style={styles.tagBox}>
-                              <Text style={styles.tagText}>{tag}</Text>
-                            </View>
+                      </TouchableOpacity>
+                      {/* Ajout à un dossier */}
+                      {folders.length > 0 && (
+                        <View style={{ flexDirection: 'row', marginTop: 4 }}>
+                          {folders.map(folder => (
+                            <TouchableOpacity
+                              key={folder.id}
+                              style={{ backgroundColor: '#FFA94D', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10, marginRight: 6 }}
+                              onPress={() => handleAddBookToFolder(folder.id, book.id)}
+                            >
+                              <Text style={{ color: '#18191c', fontWeight: 'bold', fontSize: 12 }}>Ajouter à {folder.name}</Text>
+                            </TouchableOpacity>
                           ))}
                         </View>
-                      </View>
-                    </TouchableOpacity>
+                      )}
+                    </View>
                   ))}
                 </ScrollView>
               </View>
