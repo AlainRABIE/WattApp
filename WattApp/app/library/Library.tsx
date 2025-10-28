@@ -16,8 +16,9 @@ import { useRouter } from 'expo-router';
 import { Alert } from 'react-native';
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import { getWishlistBooks } from './wishlistUtils';
+import { Ionicons } from '@expo/vector-icons';
 
 // Types
 type BookType = {
@@ -63,6 +64,7 @@ const Library: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>('');
   const [wishlist, setWishlist] = useState<BookType[]>([]);
+  const [wishlistLoading, setWishlistLoading] = useState(false);
 
   // Ajout d'un dossier
   const handleAddFolder = () => {
@@ -166,6 +168,42 @@ const Library: React.FC = () => {
     );
   });
 
+  // Fonction pour vider la wishlist
+  const handleClearWishlist = async () => {
+    setWishlistLoading(true);
+    try {
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+      if (!user) return;
+      // Récupérer tous les documents wishlist de l'utilisateur
+      const q = query(collection(db, 'wishlist'), where('uid', '==', user.uid));
+      const snap = await getDocs(q);
+      const batch = snap.docs.map(docSnap => deleteDoc(doc(db, 'wishlist', docSnap.id)));
+      await Promise.all(batch);
+      setWishlist([]);
+    } finally {
+      setWishlistLoading(false);
+    }
+  };
+
+  // Fonction pour retirer un livre de la wishlist
+  const handleRemoveFromWishlist = async (bookId: string) => {
+    setWishlistLoading(true);
+    try {
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+      if (!user) return;
+      // Trouver le document wishlist correspondant
+      const q = query(collection(db, 'wishlist'), where('uid', '==', user.uid), where('bookId', '==', bookId));
+      const snap = await getDocs(q);
+      const batch = snap.docs.map(docSnap => deleteDoc(doc(db, 'wishlist', docSnap.id)));
+      await Promise.all(batch);
+      setWishlist(wishlist => wishlist.filter(b => b.id !== bookId));
+    } finally {
+      setWishlistLoading(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -209,6 +247,9 @@ const Library: React.FC = () => {
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>💛 Liste d'envie</Text>
               <Text style={styles.sectionCount}>{wishlist.length}</Text>
+              <TouchableOpacity onPress={handleClearWishlist} disabled={wishlistLoading || wishlist.length === 0} style={{ marginLeft: 12, opacity: wishlist.length === 0 ? 0.4 : 1 }}>
+                <Ionicons name="trash" size={22} color="#FF4D4D" />
+              </TouchableOpacity>
             </View>
             {wishlist.length === 0 ? (
               <View style={styles.emptySection}>
@@ -229,6 +270,9 @@ const Library: React.FC = () => {
                         <Text style={styles.horizontalBookTitle} numberOfLines={2}>{book.titre || book.title || 'Titre inconnu'}</Text>
                         <Text style={styles.horizontalBookAuthor} numberOfLines={1}>par {book.auteur || book.author || 'Auteur inconnu'}</Text>
                       </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleRemoveFromWishlist(book.id)} style={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(255,77,77,0.9)', borderRadius: 16, padding: 4 }}>
+                      <Ionicons name="trash" size={18} color="#fff" />
                     </TouchableOpacity>
                   </View>
                 ))}
