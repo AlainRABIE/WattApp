@@ -24,10 +24,16 @@ export default function BottomNav() {
   const active = segments[segments.length - 1] || '';
 
   const handlePress = (route: string) => {
+    // Si déjà sur la page, ne rien faire (pour tous les boutons)
+    if (
+      pathname === route ||
+      (route === '/home/home' && pathname === '/home/home') ||
+      (route === '/explore' && pathname === '/explore') ||
+      (route === '/write' && pathname === '/write') ||
+      (route === '/library' && (pathname === '/library' || pathname === '/library/Library')) ||
+      (route === '/profile' && pathname === '/profile')
+    ) return;
     try {
-      // If route points to an explicit index file, push using the object form
-      // so it's not mistaken for a dynamic `[id]` route (which can match 'index').
-      // Map logical /library route to the actual index pathname so expo-router resolves the index file
       if (route === '/library') {
         router.push({ pathname: '/library/Library' } as any);
       } else if (route.endsWith('/index')) {
@@ -157,9 +163,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    top: 0,
+    bottom: 0,
     zIndex: 999,
     alignItems: 'center',
+    width: '100%',
   },
   container: {
     flexDirection: 'row',

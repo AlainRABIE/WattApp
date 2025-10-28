@@ -106,21 +106,100 @@ const Home: React.FC = () => {
 	}, []);
 
 	return (
-		<View style={styles.container}>
-			<StatusBar barStyle="light-content" />
-			{/* Section Livres dynamiques */}
-			<Text style={styles.sectionTitle}>Livres disponibles</Text>
-			<View style={[styles.sectionBox, isTablet && styles.sectionBoxTablet]}>
-				{loadingBooks ? (
-					<Text>Chargement...</Text>
-				) : books.length === 0 ? (
-					<Text>Aucun livre trouvé.</Text>
-				) : (
-					<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-						{books.map(livre => renderBookItem(livre))}
+				<View style={{ flex: 1, backgroundColor: '#181818' }}>
+					<StatusBar barStyle="light-content" />
+					<ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 0, paddingBottom: 120 }}>
+						{/* Carrousel principal */}
+						<Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 20, marginTop: 28, marginLeft: 18, marginBottom: 8 }}>À la une</Text>
+						<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 18, paddingRight: 18 }}>
+									{(() => {
+										if (loadingBooks) return <Text style={styles.placeholder}>Chargement...</Text>;
+										if (books.length === 0) return <Text style={styles.placeholder}>Aucun livre trouvé.</Text>;
+										// Utilisé pour éviter les doublons
+										const usedIds = new Set();
+										return books.map(livre => {
+											if (usedIds.has(livre.id)) return null;
+											usedIds.add(livre.id);
+											return (
+												<View key={livre.id} style={{ width: 100, marginRight: 14 }}>
+													<Image
+														source={{ uri: livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
+														style={{ width: 100, height: 150, borderRadius: 8, backgroundColor: '#232323' }}
+														resizeMode="cover"
+													/>
+													{/* Badge de genre */}
+													{Array.isArray(livre.tags) && livre.tags.length > 0 && (
+														<View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 }}>
+															{livre.tags.map((tag: string) => (
+																<View key={tag} style={{ backgroundColor: '#232323', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 2, marginRight: 6, marginBottom: 2 }}>
+																	<Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: 'bold' }}>{tag.toUpperCase()}</Text>
+																</View>
+															))}
+														</View>
+													)}
+													{/* Titre */}
+													<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, marginTop: 8 }} numberOfLines={1}>{livre.title || 'Titre inconnu'}</Text>
+													{/* Statistiques fictives */}
+													<View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+														<Text style={{ color: '#888', fontSize: 12, marginRight: 12 }}>👁️ 1.2K</Text>
+														<Text style={{ color: '#888', fontSize: 12 }}>⭐ 200</Text>
+													</View>
+												</View>
+											);
+										});
+									})()}
+						</ScrollView>
+
+						{/* Section Explorer */}
+						<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 18, marginTop: 28, marginLeft: 18, marginBottom: 8 }}>Explorer</Text>
+						<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 18, paddingRight: 18 }}>
+									{(() => {
+										if (loadingBooks) return <Text style={styles.placeholder}>Chargement...</Text>;
+										if (books.length === 0) return <Text style={styles.placeholder}>Aucun livre trouvé.</Text>;
+										// Utilisé pour éviter les doublons
+										const usedIds = new Set();
+										return books.slice(0, 6).map(livre => {
+											if (usedIds.has(livre.id)) return null;
+											usedIds.add(livre.id);
+											return (
+												<View key={livre.id + '-explore'} style={{ width: 80, marginRight: 10 }}>
+													<Image
+														source={{ uri: livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
+														style={{ width: 80, height: 120, borderRadius: 8, backgroundColor: '#232323' }}
+														resizeMode="cover"
+													/>
+													<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13, marginTop: 6 }} numberOfLines={2}>{livre.title || 'Titre inconnu'}</Text>
+												</View>
+											);
+										});
+									})()}
+						</ScrollView>
+
+						{/* Section Vos auteurs suivis */}
+						<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 18, marginTop: 28, marginLeft: 18, marginBottom: 8 }}>Vos auteurs suivis</Text>
+						<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 18, paddingRight: 18 }}>
+									{(() => {
+										if (loadingBooks) return <Text style={styles.placeholder}>Chargement...</Text>;
+										if (books.length === 0) return <Text style={styles.placeholder}>Aucun livre trouvé.</Text>;
+										// Utilisé pour éviter les doublons
+										const usedIds = new Set();
+										return books.slice(3, 9).map(livre => {
+											if (usedIds.has(livre.id)) return null;
+											usedIds.add(livre.id);
+											return (
+												<View key={livre.id + '-auteur'} style={{ width: 80, marginRight: 10 }}>
+													<Image
+														source={{ uri: livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
+														style={{ width: 80, height: 120, borderRadius: 8, backgroundColor: '#232323' }}
+														resizeMode="cover"
+													/>
+													<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13, marginTop: 6 }} numberOfLines={2}>{livre.title || 'Titre inconnu'}</Text>
+												</View>
+											);
+										});
+									})()}
+						</ScrollView>
 					</ScrollView>
-				)}
-			</View>
 		</View>
 	);
 };
