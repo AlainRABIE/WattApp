@@ -4,8 +4,10 @@ import { View, Text, StyleSheet, ActivityIndicator, StatusBar, TouchableOpacity,
 import PagerView from 'react-native-pager-view';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc, increment, onSnapshot, collection } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import { db } from '../../../constants/firebaseConfig';
+import StarRating from '../../components/StarRating';
 
 
 const BookReadScreen: React.FC<any> = () => {
@@ -18,7 +20,20 @@ const BookReadScreen: React.FC<any> = () => {
   const [pages, setPages] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
   const { width, height } = useWindowDimensions();
+  // Notation et vues
+  const [userRating, setUserRating] = useState(0);
+  const [avgRating, setAvgRating] = useState(0);
+  const [ratingCount, setRatingCount] = useState(0);
 
+
+  // Incrémente le nombre de vues à chaque ouverture
+  useEffect(() => {
+    if (!bookId || typeof bookId !== 'string') return;
+    const bookRef = doc(db, 'books', bookId);
+    updateDoc(bookRef, { reads: increment(1) }).catch(() => {});
+  }, [bookId]);
+
+  // Charge le livre et découpe en pages
   useEffect(() => {
     let isMounted = true;
     setLoading(true);
@@ -50,6 +65,40 @@ const BookReadScreen: React.FC<any> = () => {
     });
     return () => { isMounted = false; };
   }, [bookId]);
+
+  // Gestion des notes Firestore (ratings)
+  useEffect(() => {
+    if (!bookId || typeof bookId !== 'string') return;
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) return;
+    // Ecoute la note de l'utilisateur
+    const ratingRef = doc(db, 'books', bookId, 'ratings', user.uid);
+    getDoc(ratingRef).then(snap => {
+      if (snap.exists()) setUserRating(snap.data().rating || 0);
+    });
+    // Ecoute la moyenne et le nombre de votes
+    const ratingsCol = collection(db, 'books', bookId, 'ratings');
+    return onSnapshot(ratingsCol, snap => {
+      let sum = 0, count = 0;
+      snap.forEach(doc => {
+        const r = doc.data().rating;
+        if (typeof r === 'number') { sum += r; count++; }
+      });
+      setAvgRating(count ? sum / count : 0);
+      setRatingCount(count);
+    });
+  }, [bookId]);
+
+  // Fonction pour noter le livre
+  const handleRate = async (rating: number) => {
+    setUserRating(rating);
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user || !bookId || typeof bookId !== 'string') return;
+    const ratingRef = doc(db, 'books', bookId, 'ratings', user.uid);
+    await setDoc(ratingRef, { rating }, { merge: true });
+  };
 
   useEffect(() => {
     return () => {
@@ -88,6 +137,12 @@ const BookReadScreen: React.FC<any> = () => {
   return (
     <View style={{ flex: 1, backgroundColor: '#181818' }}>
       <StatusBar barStyle="light-content" />
+      {/* Affichage notation et stats */}
+      <View style={{ alignItems: 'center', marginTop: 12, marginBottom: 2 }}>
+        <StarRating rating={userRating} maxStars={5} size={32} onRate={handleRate} />
+        <Text style={{ color: '#FFA94D', marginTop: 2, fontSize: 15 }}>Note moyenne : {avgRating.toFixed(1)} / 5 ({ratingCount} votes)</Text>
+        <Text style={{ color: '#888', fontSize: 13, marginTop: 2 }}>Vues : {book?.reads ?? 1}</Text>
+      </View>
       <TouchableOpacity activeOpacity={1} style={{ flex: 1 }} onPress={handleToggleBack}>
         {/* Titre en haut, gris, centré */}
         <View style={{ width: '100%', alignItems: 'center', marginTop: 32, marginBottom: 8, position: 'absolute', top: 0, left: 0, zIndex: 20 }} pointerEvents="none">
