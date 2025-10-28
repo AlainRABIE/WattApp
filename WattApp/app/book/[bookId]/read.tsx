@@ -1,44 +1,72 @@
+
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, StatusBar, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, StatusBar, TouchableOpacity, useWindowDimensions } from 'react-native';
+import PagerView from 'react-native-pager-view';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { doc, getDoc } from 'firebase/firestore';
-import app, { db } from '../../../constants/firebaseConfig';
+import { db } from '../../../constants/firebaseConfig';
 
-const BookReadScreen: React.FC = () => {
+
+const BookReadScreen: React.FC<any> = () => {
   const { bookId } = useLocalSearchParams();
   const router = useRouter();
-  // TOUS les hooks doivent être appelés à chaque render, AVANT tout return
   const [book, setBook] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showBack, setShowBack] = useState(false);
-  const hideBackTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hideBackTimeout = useRef<number | null>(null);
+  const [pages, setPages] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(0);
+  const { width, height } = useWindowDimensions();
 
   useEffect(() => {
-    const load = async () => {
-      if (!bookId || typeof bookId !== 'string') {
+    let isMounted = true;
+    setLoading(true);
+    setBook(null);
+    setPages([]);
+    setCurrentPage(0);
+    if (!bookId || typeof bookId !== 'string') {
+      setLoading(false);
+      return;
+    }
+    getDoc(doc(db, 'books', bookId)).then(docSnap => {
+      if (!isMounted) return;
+      if (!docSnap.exists()) {
         setBook(null);
-        setLoading(false);
-        return;
-      }
-      try {
-        setLoading(true);
-        const docRef = doc(db, 'books', bookId);
-        const docSnap = await getDoc(docRef);
-        if (!docSnap.exists()) {
-          setBook(null);
-          setLoading(false);
-          return;
+      } else {
+        const data = { id: docSnap.id, ...(docSnap.data() as any) };
+        setBook(data);
+        const body: string = (data.body || '').toString();
+        const charsPerPage = 1200;
+        const paged: string[] = [];
+        for (let i = 0; i < body.length; i += charsPerPage) {
+          paged.push(body.slice(i, i + charsPerPage));
         }
-        setBook({ id: docSnap.id, ...docSnap.data() });
-      } finally {
-        setLoading(false);
+        setPages(paged.length ? paged : ['']);
       }
-    };
-    load();
+      setLoading(false);
+    }).catch(() => {
+      if (isMounted) setLoading(false);
+    });
+    return () => { isMounted = false; };
   }, [bookId]);
 
-  // On affiche le loader ou rien, mais TOUS les hooks sont toujours appelés
+  useEffect(() => {
+    return () => {
+      if (hideBackTimeout.current) clearTimeout(hideBackTimeout.current);
+    };
+  }, []);
+
+  const handleToggleBack = () => {
+    setShowBack((v) => {
+      if (!v) {
+        if (hideBackTimeout.current) clearTimeout(hideBackTimeout.current);
+        hideBackTimeout.current = setTimeout(() => setShowBack(false), 3000);
+      }
+      return !v;
+    });
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -57,54 +85,37 @@ const BookReadScreen: React.FC = () => {
     );
   }
 
-  // Affichage/masquage de la flèche retour
-  const handleToggleBack = () => {
-    setShowBack((v) => {
-      if (!v) {
-        // Si on affiche, cacher auto après 3s
-        if (hideBackTimeout.current) clearTimeout(hideBackTimeout.current);
-        hideBackTimeout.current = setTimeout(() => setShowBack(false), 3000);
-      }
-      return !v;
-    });
-  };
-
-  // Nettoyage du timeout au démontage
-  useEffect(() => () => { if (hideBackTimeout.current) clearTimeout(hideBackTimeout.current); }, []);
-
   return (
     <View style={{ flex: 1, backgroundColor: '#181818' }}>
       <StatusBar barStyle="light-content" />
-      <TouchableOpacity
-        activeOpacity={1}
-        style={{ flex: 1 }}
-        onPress={handleToggleBack}
-      >
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ alignItems: 'center', padding: 0, paddingBottom: 48 }}
-          scrollEnabled={true}
+      <TouchableOpacity activeOpacity={1} style={{ flex: 1 }} onPress={handleToggleBack}>
+        {/* Titre en haut, gris, centré */}
+        <View style={{ width: '100%', alignItems: 'center', marginTop: 32, marginBottom: 8, position: 'absolute', top: 0, left: 0, zIndex: 20 }} pointerEvents="none">
+          <Text style={{ color: '#aaa', fontSize: 18, fontWeight: 'bold', textAlign: 'center' }}>{book.title}</Text>
+        </View>
+        <PagerView
+          style={{ flex: 1, width: width, height: height }}
+          initialPage={0}
+          onPageSelected={e => setCurrentPage(e.nativeEvent.position)}
         >
-          {/* Bouton retour */}
-          {showBack && (
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={{ position: 'absolute', top: 36, left: 16, zIndex: 10, backgroundColor: 'rgba(30,30,30,0.7)', borderRadius: 20, padding: 6 }}
-            >
-              <Ionicons name="chevron-back" size={24} color="#fff" />
-            </TouchableOpacity>
-          )}
-          {/* Titre */}
-          <Text style={{ color: '#fff', fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginTop: 48, marginBottom: 8 }}>{book.title}</Text>
-          {/* Auteur */}
-          {book.author && (
-            <Text style={{ color: '#aaa', fontSize: 15, fontWeight: '600', textAlign: 'center', marginBottom: 18 }}>par {book.author}</Text>
-          )}
-          {/* Texte du livre, centré, police serif, blanc */}
-          <Text style={{ color: '#fff', fontSize: 20, lineHeight: 34, textAlign: 'left', fontFamily: 'serif', marginTop: 16, marginBottom: 32, width: '92%' }}>{book.body}</Text>
-          {/* Pagination simple (exemple) */}
-          <Text style={{ color: '#888', fontSize: 14, textAlign: 'center', marginBottom: 12 }}>Page 1</Text>
-        </ScrollView>
+          {pages.map((page, idx) => (
+            <View key={idx} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 48, paddingBottom: 48 }}>
+              {showBack && (
+                <TouchableOpacity
+                  onPress={() => router.back()}
+                  style={{ position: 'absolute', top: 36, left: 16, zIndex: 10, backgroundColor: 'rgba(30,30,30,0.7)', borderRadius: 20, padding: 6 }}
+                >
+                  <Ionicons name="chevron-back" size={24} color="#fff" />
+                </TouchableOpacity>
+              )}
+              {book.author && idx === 0 && (
+                <Text style={{ color: '#aaa', fontSize: 15, fontWeight: '600', textAlign: 'center', marginBottom: 18 }}>par {book.author}</Text>
+              )}
+              <Text style={{ color: '#fff', fontSize: 20, lineHeight: 34, textAlign: 'left', fontFamily: 'serif', marginTop: 16, marginBottom: 32, width: '92%' }}>{page}</Text>
+              <Text style={{ color: '#888', fontSize: 14, textAlign: 'center', marginBottom: 12 }}>Page {idx + 1} / {pages.length}</Text>
+            </View>
+          ))}
+        </PagerView>
       </TouchableOpacity>
     </View>
   );
