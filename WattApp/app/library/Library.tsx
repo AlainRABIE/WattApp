@@ -249,60 +249,7 @@ const Library: React.FC = () => {
 
 
 
-              {/* Section: Mes créations - Carousel horizontal */}
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>✍️ Mes créations</Text>
-                  <Text style={styles.sectionCount}>{createdBooks.length}</Text>
-                </View>
-                <ScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false} 
-                  contentContainerStyle={styles.horizontalList}
-                >
-                  {createdBooks.map(book => (
-                    <View key={book.id} style={{ flexDirection: 'column', alignItems: 'center', marginRight: 16 }}>
-                      <TouchableOpacity 
-                        style={styles.creationCard} 
-                        onPress={() => Alert.alert(book.titre || book.title || 'Titre inconnu', `${book.auteur || book.author || 'Auteur inconnu'} • ${book.views ?? 0} vues\n\nTags: ${(book.tags || []).join(', ')}`)}
-                      >
-                        <Image 
-                          source={{ uri: book.couverture || book.coverImage || 'https://via.placeholder.com/120x180.png?text=Cover' }} 
-                          style={styles.creationCover} 
-                        />
-                        <View style={styles.creationCardContent}>
-                          <Text style={styles.creationBookTitle} numberOfLines={2}>{book.titre || book.title || 'Titre inconnu'}</Text>
-                          <Text style={styles.creationBookAuthor} numberOfLines={1}>par {book.auteur || book.author || 'Auteur inconnu'}</Text>
-                          <View style={styles.statsRow}>
-                            <Text style={styles.viewsText}>👁 {book.views ?? 0} vues</Text>
-                          </View>
-                          <View style={styles.tagsRow}>
-                            {(book.tags || []).slice(0, 2).map((tag: string) => (
-                              <View key={tag} style={styles.tagBox}>
-                                <Text style={styles.tagText}>{tag}</Text>
-                              </View>
-                            ))}
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                      {/* Ajout à un dossier */}
-                      {folders.length > 0 && (
-                        <View style={{ flexDirection: 'row', marginTop: 4 }}>
-                          {folders.map(folder => (
-                            <TouchableOpacity
-                              key={folder.id}
-                              style={{ backgroundColor: '#FFA94D', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10, marginRight: 6 }}
-                              onPress={() => handleAddBookToFolder(folder.id, book.id)}
-                            >
-                              <Text style={{ color: '#18191c', fontWeight: 'bold', fontSize: 12 }}>Ajouter à {folder.name}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      )}
-                    </View>
-                  ))}
-                </ScrollView>
-              </View>
+             
 
               {/* Section: Mes brouillons - Carousel horizontal */}
               <View style={styles.section}>
