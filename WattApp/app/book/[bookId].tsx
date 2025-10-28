@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
   View,
   Text,
@@ -18,6 +19,8 @@ import app, { db } from '../../constants/firebaseConfig';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { TEMPLATES } from '../write';
 import NoteLayout from '../components/NoteLayout';
+
+import StarRating from '../components/StarRating';
 import * as ImagePicker from 'expo-image-picker';
 
 const BookEditor: React.FC = () => {
@@ -25,6 +28,10 @@ const BookEditor: React.FC = () => {
   const router = useRouter();
   
   const [book, setBook] = useState<any>(null);
+  const [isAuthor, setIsAuthor] = useState<boolean>(false);
+  const [userRating, setUserRating] = useState<number>(0);
+  const [avgRating, setAvgRating] = useState<number>(0);
+  const [ratingCount, setRatingCount] = useState<number>(0);
   const [template, setTemplate] = useState<any>(null);
   const [title, setTitle] = useState<string>('');
   const [body, setBody] = useState<string>('');
@@ -64,12 +71,7 @@ const BookEditor: React.FC = () => {
 
       const bookData = { id: docSnap.id, ...docSnap.data() } as any;
       
-      // Vérifier que l'utilisateur est bien l'auteur
-      if (bookData.authorUid !== user.uid) {
-        Alert.alert('Erreur', 'Vous n\'êtes pas autorisé à modifier ce livre');
-        router.back();
-        return;
-      }
+
 
       setBook(bookData);
       setTitle(bookData.title || '');
@@ -224,129 +226,75 @@ const BookEditor: React.FC = () => {
   }
 
   return (
-    <NoteLayout title={title || '(Sans titre)'}>
-      <View style={styles.container}>
-        <StatusBar barStyle="light-content" />
-        
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.cancelButton}>← Retour</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.headerActions}>
-            <TouchableOpacity 
-              style={[styles.actionButton, saving && styles.actionButtonDisabled]} 
-              onPress={saveBook}
-              disabled={saving}
-            >
-              <Text style={styles.actionButtonText}>
-                {saving ? 'Sauvegarde...' : 'Sauvegarder'}
-              </Text>
-            </TouchableOpacity>
-            
-            {book?.status === 'draft' && (
-              <TouchableOpacity 
-                style={[styles.publishButton, saving && styles.actionButtonDisabled]} 
-                onPress={publishBook}
-                disabled={saving}
-              >
-                <Text style={styles.publishButtonText}>Publier</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-
-        {/* Template info */}
-        {template && (
-          <View style={[styles.templateInfo, { borderLeftColor: template.color || '#FFA94D' }]}>
-            <Text style={styles.templateLabel}>📄 Template: {template.title}</Text>
-            <Text style={styles.templateDescription}>{template.subtitle}</Text>
-            <View style={[styles.templateColorIndicator, { backgroundColor: template.color || '#FFA94D' }]} />
-          </View>
+    <View style={{ flex: 1, backgroundColor: '#181818' }}>
+      <StatusBar barStyle="light-content" />
+      <ScrollView contentContainerStyle={{ alignItems: 'center', padding: 24, paddingBottom: 48 }}>
+        {/* Couverture */}
+        {coverImage && (
+          <Image source={{ uri: coverImage }} style={{ width: 220, height: 320, borderRadius: 16, marginBottom: 24 }} />
         )}
-
-        {/* Status */}
-        <View style={styles.statusInfo}>
-          <Text style={styles.statusText}>
-            Statut: {book?.status === 'draft' ? '📝 Brouillon' : '📚 Publié'}
-          </Text>
-          {book?.createdAt && (
-            <Text style={styles.dateText}>
-              Créé le: {book.createdAt.toDate?.()?.toLocaleDateString?.() || 'Date inconnue'}
-            </Text>
-          )}
-        </View>
-
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Section Couverture */}
-          <View style={styles.inputSection}>
-            <Text style={styles.inputLabel}>Couverture</Text>
-            <View style={styles.coverSection}>
-              {coverImage ? (
-                <View style={styles.coverContainer}>
-                  <Image source={{ uri: coverImage }} style={styles.coverImage} />
-                  <View style={styles.coverActions}>
-                    <TouchableOpacity style={styles.coverButton} onPress={pickCoverImage}>
-                      <Text style={styles.coverButtonText}>Changer</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.coverButton, styles.removeButton]} onPress={removeCoverImage}>
-                      <Text style={styles.removeButtonText}>Supprimer</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                <TouchableOpacity style={styles.addCoverButton} onPress={pickCoverImage}>
-                  <Text style={styles.addCoverIcon}>📷</Text>
-                  <Text style={styles.addCoverText}>Ajouter une couverture</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+        {/* Titre */}
+        <Text style={{ color: '#fff', fontSize: 26, fontWeight: 'bold', textAlign: 'center', marginBottom: 8 }}>{title}</Text>
+        {/* Auteur */}
+        {book?.author && (
+          <Text style={{ color: '#FFA94D', fontSize: 16, fontWeight: '600', marginBottom: 16 }}>par {book.author}</Text>
+        )}
+        {/* Stats */}
+        <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 20 }}>
+          <View style={{ alignItems: 'center', marginHorizontal: 16 }}>
+            <Ionicons name="eye-outline" size={22} color="#FFA94D" />
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{book?.reads ?? '—'}</Text>
+            <Text style={{ color: '#888', fontSize: 12 }}>Lect.</Text>
           </View>
-
-          {/* Titre */}
-          <View style={styles.inputSection}>
-            <Text style={styles.inputLabel}>Titre</Text>
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              placeholder="Titre de votre œuvre..."
-              placeholderTextColor="#888"
-              style={styles.titleInput}
+          <View style={{ alignItems: 'center', marginHorizontal: 16 }}>
+            <Ionicons name="star-outline" size={22} color="#FFA94D" />
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{ratingCount}</Text>
+            <Text style={{ color: '#888', fontSize: 12 }}>Votes</Text>
+          </View>
+          <View style={{ alignItems: 'center', marginHorizontal: 16 }}>
+            <Ionicons name="list-outline" size={22} color="#FFA94D" />
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{book?.chapters ?? '—'}</Text>
+            <Text style={{ color: '#888', fontSize: 12 }}>Chaps.</Text>
+          </View>
+        </View>
+        {/* Note moyenne */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+          <StarRating rating={avgRating} maxStars={5} size={28} disabled />
+          <Text style={{ color: '#FFA94D', marginLeft: 8, fontSize: 16 }}>{avgRating.toFixed(1)} / 5</Text>
+          <Text style={{ color: '#888', marginLeft: 8, fontSize: 14 }}>({ratingCount} votes)</Text>
+        </View>
+        {/* Notation utilisateur */}
+        {!isAuthor && (
+          <View style={{ marginBottom: 24 }}>
+            <Text style={{ color: '#fff', marginBottom: 4 }}>Votre note :</Text>
+            <StarRating
+              rating={userRating}
+              maxStars={5}
+              size={32}
+              onRate={setUserRating}
+              disabled={false}
             />
           </View>
-
-          {/* Contenu */}
-          <View style={styles.inputSection}>
-            <Text style={styles.inputLabel}>Contenu</Text>
-            <View style={styles.textInputContainer}>
-              {/* Template background overlay */}
-              {template?.backgroundImage && (
-                <Image 
-                  source={{ uri: template.backgroundImage }} 
-                  style={styles.templateBackgroundOverlay}
-                  resizeMode="cover"
-                />
-              )}
-              
-              <TextInput
-                value={body}
-                onChangeText={setBody}
-                placeholder={template?.starter || "Commencez à écrire votre histoire..."}
-                placeholderTextColor="#888"
-                style={[
-                  styles.bodyInput,
-                  template?.backgroundImage && styles.bodyInputWithTemplate,
-                  { zIndex: 2, position: 'relative' } // Au-dessus du template
-                ]}
-                multiline
-                textAlignVertical="top"
-              />
-            </View>
+        )}
+        {/* Bouton principal */}
+        <TouchableOpacity
+          style={{ backgroundColor: '#fff', borderRadius: 24, paddingVertical: 14, paddingHorizontal: 32, marginBottom: 32 }}
+          onPress={() => router.push(`/book/${bookId}/read`)}
+        >
+          <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 18 }}>📖 Commencer à lire</Text>
+        </TouchableOpacity>
+        {/* Section Avis/Commentaires */}
+        <View style={{ width: '100%', marginTop: 8, marginBottom: 32 }}>
+          <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 18, marginBottom: 8 }}>Avis & Commentaires</Text>
+          {/* TODO: Remplacer par un vrai système de commentaires Firestore */}
+          <View style={{ backgroundColor: '#232323', borderRadius: 8, padding: 16 }}>
+            <Text style={{ color: '#fff', fontStyle: 'italic' }}>
+              Les avis des lecteurs apparaîtront ici prochainement.
+            </Text>
           </View>
-        </ScrollView>
-      </View>
-    </NoteLayout>
+        </View>
+      </ScrollView>
+    </View>
   );
 };
 

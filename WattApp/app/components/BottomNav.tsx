@@ -125,24 +125,12 @@ export default function BottomNav() {
                     {isActive ? (
                       <BlurView intensity={60} tint="light" style={styles.activeBubble}>
                         <View style={styles.bubbleContent}>
-                          {tab.id === 'profile' ? (
-                            <Image
-                              source={{ uri: photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent((displayName || email || 'User'))}&length=${((displayName || email || 'User') as string).trim().includes(' ') ? 2 : 1}&background=FFA94D&color=181818&size=128` }}
-                              style={[styles.profileImg, isActive ? styles.profileActive : null]}
-                              resizeMode="cover"
-                            />
-                          ) : (
-                            <Ionicons name={tab.id === 'library' ? 'book-outline' : (tab.icon as any)} size={26} color={'#181818'} />
-                          )}
+                          <Ionicons name="person-outline" size={26} color={'#181818'} />
                         </View>
                       </BlurView>
                     ) : (
                       tab.id === 'profile' ? (
-                        <Image
-                          source={{ uri: photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent((displayName || email || 'User'))}&length=${((displayName || email || 'User') as string).trim().includes(' ') ? 2 : 1}&background=FFA94D&color=181818&size=128` }}
-                          style={[styles.profileImg]}
-                          resizeMode="cover"
-                        />
+                        <Ionicons name="person-outline" size={26} color={'#F5E9DA'} />
                       ) : (
                         <Ionicons name={tab.id === 'library' ? 'book-outline' : (tab.icon as any)} size={26} color={'#F5E9DA'} />
                       )

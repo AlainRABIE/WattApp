@@ -19,7 +19,8 @@ export default function RootLayout() {
     pathname.endsWith('/index') || 
     pathname.startsWith('/register') ||
     pathname.startsWith('/write/custom') ||
-    pathname.includes('/write/') // Cacher pour toutes les pages d'écriture
+    pathname.includes('/write/') ||
+    pathname.includes('/read') // Cacher pour toutes les pages de lecture
   );
 
   return (

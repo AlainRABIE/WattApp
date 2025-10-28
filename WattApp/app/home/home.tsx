@@ -1,7 +1,7 @@
 
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, StatusBar, ScrollView, Image, useWindowDimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, ScrollView, Image, useWindowDimensions, Platform, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { getAuth } from 'firebase/auth';
@@ -105,10 +105,20 @@ const Home: React.FC = () => {
 		loadBooks();
 	}, []);
 
-	return (
-				<View style={{ flex: 1, backgroundColor: '#181818' }}>
-					<StatusBar barStyle="light-content" />
-					<ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 0, paddingBottom: 120 }}>
+		return (
+			<View style={{ flex: 1, backgroundColor: '#181818' }}>
+				<StatusBar barStyle="light-content" />
+				{/* Avatar profil en haut à droite */}
+						<View style={{ position: 'absolute', top: 48, right: 18, zIndex: 100 }}>
+							<TouchableOpacity onPress={() => router.push('/profile')} activeOpacity={0.8}>
+								<Image
+									source={{ uri: photoURL || avatarUrl }}
+									style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#FFA94D', backgroundColor: '#232323' }}
+									resizeMode="cover"
+								/>
+							</TouchableOpacity>
+						</View>
+				<ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 60, paddingBottom: 120 }}>
 						{/* Carrousel principal */}
 						<Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 20, marginTop: 28, marginLeft: 18, marginBottom: 8 }}>À la une</Text>
 						<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 18, paddingRight: 18 }}>
@@ -121,7 +131,12 @@ const Home: React.FC = () => {
 											if (usedIds.has(livre.id)) return null;
 											usedIds.add(livre.id);
 											return (
-												<View key={livre.id} style={{ width: 100, marginRight: 14 }}>
+												<TouchableOpacity
+													key={livre.id}
+													style={{ width: 100, marginRight: 14 }}
+													activeOpacity={0.8}
+													onPress={() => router.push(`/book/${livre.id}`)}
+												>
 													<Image
 														source={{ uri: livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
 														style={{ width: 100, height: 150, borderRadius: 8, backgroundColor: '#232323' }}
@@ -144,7 +159,7 @@ const Home: React.FC = () => {
 														<Text style={{ color: '#888', fontSize: 12, marginRight: 12 }}>👁️ 1.2K</Text>
 														<Text style={{ color: '#888', fontSize: 12 }}>⭐ 200</Text>
 													</View>
-												</View>
+												</TouchableOpacity>
 											);
 										});
 									})()}
@@ -162,14 +177,19 @@ const Home: React.FC = () => {
 											if (usedIds.has(livre.id)) return null;
 											usedIds.add(livre.id);
 											return (
-												<View key={livre.id + '-explore'} style={{ width: 80, marginRight: 10 }}>
+												<TouchableOpacity
+													key={livre.id + '-explore'}
+													style={{ width: 80, marginRight: 10 }}
+													activeOpacity={0.8}
+													onPress={() => router.push(`/book/${livre.id}`)}
+												>
 													<Image
 														source={{ uri: livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
 														style={{ width: 80, height: 120, borderRadius: 8, backgroundColor: '#232323' }}
 														resizeMode="cover"
 													/>
 													<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13, marginTop: 6 }} numberOfLines={2}>{livre.title || 'Titre inconnu'}</Text>
-												</View>
+												</TouchableOpacity>
 											);
 										});
 									})()}
@@ -187,14 +207,19 @@ const Home: React.FC = () => {
 											if (usedIds.has(livre.id)) return null;
 											usedIds.add(livre.id);
 											return (
-												<View key={livre.id + '-auteur'} style={{ width: 80, marginRight: 10 }}>
+												<TouchableOpacity
+													key={livre.id + '-auteur'}
+													style={{ width: 80, marginRight: 10 }}
+													activeOpacity={0.8}
+													onPress={() => router.push(`/book/${livre.id}`)}
+												>
 													<Image
 														source={{ uri: livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
 														style={{ width: 80, height: 120, borderRadius: 8, backgroundColor: '#232323' }}
 														resizeMode="cover"
 													/>
 													<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13, marginTop: 6 }} numberOfLines={2}>{livre.title || 'Titre inconnu'}</Text>
-												</View>
+												</TouchableOpacity>
 											);
 										});
 									})()}

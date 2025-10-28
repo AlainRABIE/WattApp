@@ -252,6 +252,29 @@ const Profile: React.FC = () => {
           </ScrollView>
         )}
       </View>
+      {/* Bouton de déconnexion */}
+      <TouchableOpacity
+        style={{
+          backgroundColor: '#FFA94D',
+          padding: 12,
+          borderRadius: 8,
+          alignItems: 'center',
+          margin: 24,
+        }}
+        onPress={async () => {
+          try {
+            const auth = getAuth(app);
+            await auth.signOut();
+            router.replace('/register');
+          } catch (e) {
+            Alert.alert('Erreur', 'Impossible de se déconnecter.');
+          }
+        }}
+      >
+        <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 16 }}>Se déconnecter</Text>
+      </TouchableOpacity>
+      {/* Espace pour éviter le chevauchement avec la barre de navigation */}
+      <View style={{ height: 80 }} />
     </ScrollView>
   );
 };
