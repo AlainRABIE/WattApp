@@ -47,7 +47,11 @@ export default function ExploreScreen() {
   });
 
   const renderBook = ({ item, index }: { item: any, index: number }) => (
-    <TouchableOpacity style={styles.bookCard} onPress={() => Alert.alert(item.titre || item.title || 'Livre', `Auteur : ${item.auteur || item.author || 'Inconnu'}`)}>
+    <TouchableOpacity
+      style={styles.bookCard}
+      onPress={() => router.push(`/book/${item.id}`)}
+      activeOpacity={0.85}
+    >
       <View style={styles.bookRank}><Text style={styles.bookRankText}>{index + 1}</Text></View>
       <Image source={{ uri: item.couverture || item.coverImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.titre || item.title || 'Livre')}&background=23232a&color=FFA94D&size=128` }} style={styles.bookCover} />
       <View style={styles.bookInfo}>
