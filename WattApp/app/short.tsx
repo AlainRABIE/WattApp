@@ -136,9 +136,9 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   paperRect: {
-    width: width * 0.5, // réduit la largeur pour un effet page plus réaliste
-    minHeight: 680, // ajuste la hauteur minimale pour un compromis réaliste
-    backgroundColor: '#22232a', // noir clair
+    width: width * 0.5, 
+    minHeight: 680, 
+    backgroundColor: '#22232a', 
     borderRadius: 24,
     paddingVertical: 48,
     paddingHorizontal: 32,
