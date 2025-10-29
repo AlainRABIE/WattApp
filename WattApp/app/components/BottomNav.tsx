@@ -10,8 +10,8 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 const TABS = [
   { id: 'home', label: 'Home', icon: 'home-outline', route: '/home/home' },
   { id: 'explore', label: 'Explore', icon: 'search-outline', route: '/explore' },
-  { id: 'short', label: 'Short', icon: 'flash-outline', route: '/short' },
   { id: 'community', label: 'Communauté', icon: 'people-outline', route: '/community' },
+  { id: 'short', label: 'Short', icon: 'flash-outline', route: '/short' },
   { id: 'library', label: 'Bibliothèques', icon: 'book-outline', route: '/library' },
   { id: 'profile', label: 'Profile', icon: 'person-outline', route: '/profile' },
 ];
