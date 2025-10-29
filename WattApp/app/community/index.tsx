@@ -1,7 +1,7 @@
 
 import { getAuth } from 'firebase/auth';
 import { db } from '../../constants/firebaseConfig';
-import { collectionGroup, getDocs, where, query as fsQuery } from 'firebase/firestore';
+import { collectionGroup, getDocs, where, query as fsQuery, onSnapshot } from 'firebase/firestore';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -40,12 +40,11 @@ export default function CommunityIndex() {
   ];
 
   React.useEffect(() => {
-    const fetchMyGroups = async () => {
-      const auth = getAuth();
-      const user = auth.currentUser;
-      if (!user) return;
-      const q = collectionGroup(db, 'members');
-      const snap = await getDocs(fsQuery(q, where('uid', '==', user.uid)));
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) return;
+    const q = collectionGroup(db, 'members');
+    const unsubscribe = onSnapshot(fsQuery(q, where('uid', '==', user.uid)), (snap) => {
       const groups = snap.docs.map(doc => {
         const parent = doc.ref.parent.parent;
         return {
@@ -54,8 +53,8 @@ export default function CommunityIndex() {
         };
       });
       setMyGroups(groups);
-    };
-    fetchMyGroups();
+    });
+    return () => unsubscribe();
   }, []);
   const router = useRouter();
 

@@ -5,7 +5,7 @@ import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, Keyboard
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, setDoc, doc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
 
@@ -26,6 +26,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export default function CommunityChat() {
   const [myGroups, setMyGroups] = useState<any[]>([]);
+  const [showMembersSidebar, setShowMembersSidebar] = useState(false);
   useEffect(() => {
     const fetchMyGroups = async () => {
       const auth = getAuth(app);
@@ -85,12 +86,13 @@ export default function CommunityChat() {
   };
 
   return (
-    <LinearGradient
-      colors={["#fff7ef", "#ffe0c2"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.bg}
-    >
+    <>
+      <LinearGradient
+        colors={["#fff7ef", "#ffe0c2"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.bg}
+      >
       {/* Nom du groupe toujours visible en haut */}
       <View style={styles.groupHeaderBar}>
         {/* Bouton retour à gauche */}
@@ -109,7 +111,7 @@ export default function CommunityChat() {
         </View>
         {/* Bouton membres à droite, affiché seulement si membre */}
         {isMember && (
-          <TouchableOpacity style={styles.membersBtn} onPress={() => {/* Action à définir pour afficher les membres */}}>
+          <TouchableOpacity style={styles.membersBtn} onPress={() => setShowMembersSidebar(true)}>
             <Ionicons name="people-outline" size={22} color="#FFA94D" />
           </TouchableOpacity>
         )}
@@ -238,12 +240,16 @@ export default function CommunityChat() {
               if (!user) return;
               // Ajoute l'utilisateur à la collection des membres du groupe
               try {
-                await addDoc(collection(db, 'communityChats', String(category), 'members'), {
-                  uid: user.uid,
-                  user: user.displayName || user.email || 'Utilisateur',
-                  photoURL: user.photoURL || '',
-                  joinedAt: serverTimestamp(),
-                });
+                await setDoc(
+                  doc(db, 'communityChats', String(category), 'members', user.uid),
+                  {
+                    uid: user.uid,
+                    user: user.displayName || user.email || 'Utilisateur',
+                    photoURL: user.photoURL || '',
+                    joinedAt: serverTimestamp(),
+                  },
+                  { merge: true }
+                );
                 setIsMember(true);
               } catch (e) {
                 // Optionnel : afficher une erreur
@@ -254,11 +260,103 @@ export default function CommunityChat() {
           </TouchableOpacity>
         </View>
       )}
-    </LinearGradient>
+      </LinearGradient>
+      {/* Sidebar membres */}
+      {showMembersSidebar && (
+        <View style={styles.sidebarOverlay}>
+          <View style={styles.sidebarContainer}>
+            <View style={styles.sidebarHeader}>
+              <Text style={styles.sidebarTitle}>Membres du groupe</Text>
+              <TouchableOpacity onPress={() => setShowMembersSidebar(false)} style={styles.sidebarCloseBtn}>
+                <Ionicons name="close" size={26} color="#FFA94D" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={members}
+              keyExtractor={(item, idx) => (item.user || 'U') + idx}
+              renderItem={({ item }) => (
+                <View style={styles.sidebarMemberRow}>
+                  <Image
+                    source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }}
+                    style={styles.sidebarMemberAvatar}
+                  />
+                  <Text style={styles.sidebarMemberName}>{item.user}</Text>
+                </View>
+              )}
+              contentContainerStyle={{ paddingVertical: 16 }}
+              showsVerticalScrollIndicator={false}
+            />
+          </View>
+        </View>
+      )}
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  sidebarOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    zIndex: 100,
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+  },
+  sidebarContainer: {
+    width: 300,
+    height: '100%',
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 18,
+    borderBottomLeftRadius: 18,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: -2, height: 0 },
+    elevation: 8,
+    paddingHorizontal: 0,
+    paddingTop: 0,
+  },
+  sidebarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingTop: 24,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFA94D22',
+  },
+  sidebarTitle: {
+    fontSize: 19,
+    fontWeight: 'bold',
+    color: '#FFA94D',
+  },
+  sidebarCloseBtn: {
+    padding: 4,
+  },
+  sidebarMemberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFA94D11',
+  },
+  sidebarMemberAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    marginRight: 12,
+    backgroundColor: '#FFA94D33',
+  },
+  sidebarMemberName: {
+    fontSize: 15,
+    color: '#23232a',
+    fontWeight: '600',
+  },
   myGroupsSection: {
     marginTop: 70,
     marginBottom: 8,

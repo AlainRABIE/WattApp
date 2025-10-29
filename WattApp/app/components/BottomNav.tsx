@@ -11,6 +11,7 @@ const TABS = [
   { id: 'home', label: 'Home', icon: 'home-outline', route: '/home/home' },
   { id: 'explore', label: 'Explore', icon: 'search-outline', route: '/explore' },
   { id: 'community', label: 'Communauté', icon: 'people-outline', route: '/community' },
+  { id: 'mygroups', label: 'Mes groupes', icon: 'chatbubbles-outline', route: '/community/my-groups' },
   { id: 'short', label: 'Short', icon: 'flash-outline', route: '/short' },
   { id: 'library', label: 'Bibliothèques', icon: 'book-outline', route: '/library' },
   { id: 'profile', label: 'Profile', icon: 'person-outline', route: '/profile' },
