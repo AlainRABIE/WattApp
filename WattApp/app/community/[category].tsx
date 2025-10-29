@@ -1,6 +1,6 @@
 import { collectionGroup, getDocs, where, query as fsQuery } from 'firebase/firestore';
 export const unstable_settings = { layout: null };
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,12 +27,30 @@ const CATEGORY_LABELS: Record<string, string> = {
 export default function CommunityChat() {
   const [myGroups, setMyGroups] = useState<any[]>([]);
   const [showMembersSidebar, setShowMembersSidebar] = useState(false);
+  const [members, setMembers] = useState<any[]>([]);
+  const [input, setInput] = useState('');
+  const flatListRef = useRef<FlatList>(null);
+  const [isMember, setIsMember] = useState(false);
+  const [messages, setMessages] = useState<any[]>([]);
+
+  const { category } = useLocalSearchParams();
+  const router = useRouter();
+
+  // Filtrage des messages pour ne pas afficher le message système de join à l'utilisateur qui vient de rejoindre
+  const filteredMessages = messages.filter((item: any) => {
+    if (item.system && item.text && item.text.endsWith('a rejoint le groupe')) {
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+      if (user && item.uid === user.uid) return false;
+    }
+    return true;
+  });
+
   useEffect(() => {
     const fetchMyGroups = async () => {
       const auth = getAuth(app);
       const user = auth.currentUser;
       if (!user) return;
-      // Recherche tous les groupes où l'utilisateur est membre
       const q = collectionGroup(db, 'members');
       const snap = await getDocs(fsQuery(q, where('uid', '==', user.uid)));
       const groups = snap.docs.map(doc => {
@@ -46,19 +64,19 @@ export default function CommunityChat() {
     };
     fetchMyGroups();
   }, []);
-  const { category } = useLocalSearchParams();
-  const router = useRouter();
-  const [messages, setMessages] = useState<any[]>([]);
-  const members = useMemo(() => {
-    const map = new Map();
-    messages.forEach(m => {
-      if (m.uid) map.set(m.uid, { user: m.user, photoURL: m.photoURL });
-    });
-    return Array.from(map.values());
-  }, [messages]);
-  const [input, setInput] = useState('');
-  const flatListRef = useRef<FlatList>(null);
-  const [isMember, setIsMember] = useState(false);
+
+  useEffect(() => {
+    const fetchMembers = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'communityChats', String(category), 'members'));
+        const list = snap.docs.map(doc => doc.data());
+        setMembers(list);
+      } catch (e) {
+        // Optionnel : log erreur
+      }
+    };
+    fetchMembers();
+  }, [category]);
 
   useEffect(() => {
     if (!category) return;
@@ -93,173 +111,189 @@ export default function CommunityChat() {
         end={{ x: 1, y: 1 }}
         style={styles.bg}
       >
-      {/* Nom du groupe toujours visible en haut */}
-      <View style={styles.groupHeaderBar}>
-        {/* Bouton retour à gauche */}
-        {isMember ? (
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtnRound}>
-            <Ionicons name="arrow-back" size={22} color="#FFA94D" />
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtnPreview}>
-            <Ionicons name="arrow-back" size={22} color="#FFD600" />
-          </TouchableOpacity>
-        )}
-        {/* Nom du groupe dans la bulle au centre */}
-        <View style={styles.bubbleHeaderWrap}>
-          <Text style={styles.groupHeaderTitle}>{CATEGORY_LABELS[String(category)] || category}</Text>
+        {/* Nom du groupe toujours visible en haut */}
+        <View style={styles.groupHeaderBar}>
+          {isMember ? (
+            <TouchableOpacity onPress={() => router.back()} style={styles.backBtnRound}>
+              <Ionicons name="arrow-back" size={22} color="#FFA94D" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={() => router.back()} style={styles.backBtnPreview}>
+              <Ionicons name="arrow-back" size={22} color="#FFD600" />
+            </TouchableOpacity>
+          )}
+          <View style={styles.bubbleHeaderWrap}>
+            <Text style={styles.groupHeaderTitle}>{CATEGORY_LABELS[String(category)] || category}</Text>
+          </View>
+          {isMember && (
+            <TouchableOpacity style={styles.membersBtn} onPress={() => setShowMembersSidebar(true)}>
+              <Ionicons name="people-outline" size={22} color="#FFA94D" />
+            </TouchableOpacity>
+          )}
         </View>
-        {/* Bouton membres à droite, affiché seulement si membre */}
-        {isMember && (
-          <TouchableOpacity style={styles.membersBtn} onPress={() => setShowMembersSidebar(true)}>
-            <Ionicons name="people-outline" size={22} color="#FFA94D" />
-          </TouchableOpacity>
-        )}
-      </View>
 
-      {/* Section Mes groupes */}
-      {myGroups.length > 0 && (
-        <View style={styles.myGroupsSection}>
-          <Text style={styles.myGroupsTitle}>Mes groupes</Text>
-          <FlatList
-            data={myGroups}
-            keyExtractor={(item, idx) => `${item.groupId}-${item.uid || ''}-${idx}`}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 8 }}
-            renderItem={({ item }) => (
-              <View style={styles.myGroupBubble}>
-                <Text style={styles.myGroupText}>{item.groupId}</Text>
-              </View>
-            )}
-          />
-        </View>
-      )}
-      {members.length > 0 && (
-        <View style={styles.membersBar}>
-          <FlatList
-            data={members}
-            keyExtractor={(item, idx) => item.user + idx}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 8 }}
-            renderItem={({ item }) => (
-              <View style={styles.memberAvatarWrap}>
-                <Image
-                  source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }}
-                  style={styles.memberAvatar}
-                />
-              </View>
-            )}
-            ListFooterComponent={<Text style={styles.membersCount}>+{members.length}</Text>}
-          />
-        </View>
-      )}
-
-      {/* Chat et input toujours visibles, mais assombris si non membre */}
-      <View style={isMember ? undefined : { opacity: 0.25, pointerEvents: 'none' }}>
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={item => item.id}
-          renderItem={({ item, index }) => {
-            const isEven = index % 2 === 0;
-            return (
-              <View style={styles.messageRowPremium}>
-                <Image source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }} style={styles.avatarPremium} />
-                <View style={styles.bubbleWrapPremium}>
-                  <Text style={styles.userPremium}>{item.user}</Text>
-                  <LinearGradient
-                    colors={isEven ? ["#FFA94D", "#FFCC80"] : ["#fff", "#ffe0c2"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.bubblePremium}
-                  >
-                    <Text style={[styles.textPremium, { color: isEven ? '#23232a' : '#FFA94D' }]}>{item.text}</Text>
-                  </LinearGradient>
-                  {item.createdAt?.seconds ? (
-                    <Text style={styles.timePremium}>{new Date(item.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
-                  ) : null}
+        {/* Section Mes groupes */}
+        {myGroups.length > 0 && (
+          <View style={styles.myGroupsSection}>
+            <Text style={styles.myGroupsTitle}>Mes groupes</Text>
+            <FlatList
+              data={myGroups}
+              keyExtractor={(item, idx) => `${item.groupId}-${item.uid || ''}-${idx}`}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 8 }}
+              renderItem={({ item }) => (
+                <View style={styles.myGroupBubble}>
+                  <Text style={styles.myGroupText}>{item.groupId}</Text>
                 </View>
-              </View>
-            );
-          }}
-          contentContainerStyle={{ padding: 18, paddingBottom: 100 }}
-          showsVerticalScrollIndicator={false}
-        />
-      </View>
+              )}
+            />
+          </View>
+        )}
+        {members.length > 0 && (
+          <View style={styles.membersBar}>
+            <FlatList
+              data={members}
+              keyExtractor={(item, idx) => item.user + idx}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 8 }}
+              renderItem={({ item }) => (
+                <View style={styles.memberAvatarWrap}>
+                  <Image
+                    source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }}
+                    style={styles.memberAvatar}
+                  />
+                </View>
+              )}
+              ListFooterComponent={<Text style={styles.membersCount}>+{members.length}</Text>}
+            />
+          </View>
+        )}
 
-      {/* Barre d'écriture toujours en bas de l'écran */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 38 : 0}
-        style={styles.inputBarWrapPremium}
-      >
-        <View style={styles.inputBarPremium}>
-          <TextInput
-            value={input}
-            onChangeText={setInput}
-            placeholder="Écrire un message..."
-            placeholderTextColor="#FFA94D"
-            style={styles.inputPremium}
-            onSubmitEditing={sendMessage}
-            returnKeyType="send"
-          />
-          <TouchableOpacity onPress={sendMessage} style={styles.sendBtnPremium}>
-            <Ionicons name="send" size={22} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-
-      {/* Overlay d'assombrissement + bouton rejoindre en bas si non membre */}
-      {!isMember && (
-        <View style={styles.previewOverlay} pointerEvents="box-none">
-          {/* Avatars des membres en ligne */}
+        {/* Chat et input toujours visibles, mais assombris si non membre */}
+        <View style={isMember ? undefined : { opacity: 0.25, pointerEvents: 'none' }}>
           <FlatList
-            data={members}
-            keyExtractor={(item, idx) => item.user + idx}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 8, marginBottom: 8 }}
-            style={{ maxHeight: 54 }}
-            renderItem={({ item }) => (
-              <View style={styles.memberAvatarWrap}>
-                <Image
-                  source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }}
-                  style={styles.memberAvatar}
-                />
-              </View>
-            )}
-          />
-          <Text style={styles.memberCountText}>{members.length} membre{members.length > 1 ? 's' : ''} dans ce groupe</Text>
-          <TouchableOpacity
-            style={styles.joinBtn}
-            onPress={async () => {
-              const auth = getAuth(app);
-              const user = auth.currentUser;
-              if (!user) return;
-              // Ajoute l'utilisateur à la collection des membres du groupe
-              try {
-                await setDoc(
-                  doc(db, 'communityChats', String(category), 'members', user.uid),
-                  {
-                    uid: user.uid,
-                    user: user.displayName || user.email || 'Utilisateur',
-                    photoURL: user.photoURL || '',
-                    joinedAt: serverTimestamp(),
-                  },
-                  { merge: true }
-                );
-                setIsMember(true);
-              } catch (e) {
-                // Optionnel : afficher une erreur
-              }
+            ref={flatListRef}
+            data={filteredMessages}
+            keyExtractor={item => item.id}
+            renderItem={({ item, index }) => {
+              const isEven = index % 2 === 0;
+              return (
+                <View style={styles.messageRowPremium}>
+                  <Image source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }} style={styles.avatarPremium} />
+                  <View style={styles.bubbleWrapPremium}>
+                    <Text style={styles.userPremium}>{item.user}</Text>
+                    <LinearGradient
+                      colors={isEven ? ["#FFA94D", "#FFCC80"] : ["#fff", "#ffe0c2"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.bubblePremium}
+                    >
+                      <Text style={[styles.textPremium, { color: isEven ? '#23232a' : '#FFA94D' }]}>{item.text}</Text>
+                    </LinearGradient>
+                    {item.createdAt?.seconds ? (
+                      <Text style={styles.timePremium}>{new Date(item.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                    ) : null}
+                  </View>
+                </View>
+              );
             }}
-          >
-            <Text style={styles.joinBtnText}>Rejoindre</Text>
-          </TouchableOpacity>
+            contentContainerStyle={{ padding: 18, paddingBottom: 100 }}
+            showsVerticalScrollIndicator={false}
+          />
         </View>
-      )}
+
+        {/* Barre d'écriture toujours en bas de l'écran */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 38 : 0}
+          style={styles.inputBarWrapPremium}
+        >
+          <View style={styles.inputBarPremium}>
+            <TextInput
+              value={input}
+              onChangeText={setInput}
+              placeholder="Écrire un message..."
+              placeholderTextColor="#FFA94D"
+              style={styles.inputPremium}
+              onSubmitEditing={sendMessage}
+              returnKeyType="send"
+            />
+            <TouchableOpacity onPress={sendMessage} style={styles.sendBtnPremium}>
+              <Ionicons name="send" size={22} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+
+        {/* Overlay d'assombrissement + bouton rejoindre en bas si non membre */}
+        {!isMember && (
+          <View style={styles.previewOverlay} pointerEvents="box-none">
+            <FlatList
+              data={members}
+              keyExtractor={(item, idx) => item.user + idx}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 8, marginBottom: 8 }}
+              style={{ maxHeight: 54 }}
+              renderItem={({ item }) => (
+                <View style={styles.memberAvatarWrap}>
+                  <Image
+                    source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }}
+                    style={styles.memberAvatar}
+                  />
+                </View>
+              )}
+            />
+            <Text style={styles.memberCountText}>{members.length} membre{members.length > 1 ? 's' : ''} dans ce groupe</Text>
+            <TouchableOpacity
+              style={styles.joinBtn}
+              onPress={async () => {
+                const auth = getAuth(app);
+                const user = auth.currentUser;
+                if (!user) return;
+                try {
+                  await setDoc(
+                    doc(db, 'communityChats', String(category), 'members', user.uid),
+                    {
+                      uid: user.uid,
+                      user: user.displayName || user.email || 'Utilisateur',
+                      photoURL: user.photoURL || '',
+                      joinedAt: serverTimestamp(),
+                    },
+                    { merge: true }
+                  );
+                  setMembers(prev => [
+                    ...prev.filter(m => m.uid !== user.uid),
+                    {
+                      uid: user.uid,
+                      user: user.displayName || user.email || 'Utilisateur',
+                      photoURL: user.photoURL || '',
+                      joinedAt: new Date(),
+                    }
+                  ]);
+                  // Envoie un message système dans le chat
+                  await addDoc(
+                    collection(db, 'communityChats', String(category), 'messages'),
+                    {
+                      text: `${user.displayName || user.email || 'Utilisateur'} a rejoint le groupe`,
+                      uid: user.uid,
+                      user: user.displayName || user.email || 'Utilisateur',
+                      photoURL: user.photoURL || '',
+                      createdAt: serverTimestamp(),
+                      system: true,
+                    }
+                  );
+                  setIsMember(true);
+                } catch (e) {
+                  alert('Erreur lors de la tentative de rejoindre le groupe.');
+                }
+              }}
+            >
+              <Text style={styles.joinBtnText}>Rejoindre</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </LinearGradient>
       {/* Sidebar membres */}
       {showMembersSidebar && (
@@ -294,6 +328,177 @@ export default function CommunityChat() {
 }
 
 const styles = StyleSheet.create({
+  // Ajout des styles manquants utilisés dans le composant
+  bg: { flex: 1 },
+  groupHeaderBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 200,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 38,
+    paddingBottom: 10,
+    paddingHorizontal: 18,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
+    shadowColor: '#FFA94D',
+    shadowOpacity: 0.13,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 10,
+  },
+  groupHeaderTitle: {
+    color: '#FFA94D',
+    fontSize: 22,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+    textShadowColor: '#fff7',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  backBtnRound: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#fff7ef',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+    shadowColor: '#FFA94D',
+    shadowOpacity: 0.10,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  backBtnPreview: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(24,24,24,0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+    shadowColor: '#FFA94D',
+    shadowOpacity: 0.10,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  bubbleHeaderWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    marginLeft: -38,
+  },
+  membersBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#fff7ef',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 14,
+    shadowColor: '#FFA94D',
+    shadowOpacity: 0.10,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  myGroupsSection: {
+    marginTop: 70,
+    marginBottom: 8,
+    paddingHorizontal: 8,
+  },
+  myGroupsTitle: {
+    color: '#FFA94D',
+    fontWeight: 'bold',
+    fontSize: 17,
+    marginBottom: 6,
+    marginLeft: 8,
+  },
+  myGroupBubble: {
+    backgroundColor: '#FFA94D',
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    marginRight: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  myGroupText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+  membersBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    marginTop: 70,
+    minHeight: 54,
+    paddingBottom: 2,
+  },
+  memberAvatarWrap: {
+    marginRight: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 2,
+    borderColor: '#FFA94D',
+    backgroundColor: '#fff',
+  },
+  membersCount: {
+    color: '#FFA94D',
+    fontWeight: 'bold',
+    fontSize: 15,
+    marginLeft: 6,
+    marginRight: 2,
+  },
+  previewOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(24,24,24,0.72)',
+    zIndex: 99,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingBottom: 24,
+  },
+  joinBtn: {
+    backgroundColor: '#FFA94D',
+    borderRadius: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    shadowColor: '#FFA94D',
+    shadowOpacity: 0.13,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
+  },
+  joinBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+    letterSpacing: 0.5,
+  },
+  memberCountText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '600',
+    marginBottom: 18,
+    textAlign: 'center',
+    textShadowColor: '#0008',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
   sidebarOverlay: {
     position: 'absolute',
     top: 0,
@@ -357,244 +562,24 @@ const styles = StyleSheet.create({
     color: '#23232a',
     fontWeight: '600',
   },
-  myGroupsSection: {
-    marginTop: 70,
-    marginBottom: 8,
-    paddingHorizontal: 8,
-  },
-  myGroupsTitle: {
-    color: '#FFA94D',
-    fontWeight: 'bold',
-    fontSize: 17,
-    marginBottom: 6,
-    marginLeft: 8,
-  },
-  myGroupBubble: {
-    backgroundColor: '#FFA94D',
-    borderRadius: 999,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    marginRight: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  myGroupText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 15,
-  },
-  backBtnPreview: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(24,24,24,0.72)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.10,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  circleBg: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: '#FFA94D',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  circleBubble: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: '#FFA94D',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    overflow: 'hidden',
-  },
-  circleBubbleText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    paddingHorizontal: 4,
-  },
-  membersBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#fff7ef',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 14,
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.10,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  bubbleHeaderWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    marginLeft: -38, // pour compenser le bouton retour
-  },
-  activeBubble: {
-    backgroundColor: '#FFA94D',
-    width: 54,
-    height: 54,
-    borderRadius: 999,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bubbleContent: {
-    width: 48,
-    height: 48,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  bubbleHeaderText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-    textAlign: 'center',
-  },
-  bg: { flex: 1 },
-  groupHeaderBar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 200,
-    // backgroundColor supprimé pour enlever le fond blanc
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 38,
-    paddingBottom: 10,
-    paddingHorizontal: 18,
-    borderBottomLeftRadius: 22,
-    borderBottomRightRadius: 22,
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.13,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 10,
-  },
-  groupHeaderTitle: {
-    color: '#FFA94D',
-    fontSize: 22,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-    textShadowColor: '#fff7',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  backBtnRound: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#fff7ef',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.10,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  headerCenter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  membersBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    marginTop: 70, // pour laisser la place au header
-    minHeight: 54,
-    paddingBottom: 2,
-  },
-  memberAvatarWrap: {
-    marginRight: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  memberAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 2,
-    borderColor: '#FFA94D',
-    backgroundColor: '#fff',
-  },
-  membersCount: {
-    color: '#FFA94D',
-    fontWeight: 'bold',
-    fontSize: 15,
-    marginLeft: 6,
-    marginRight: 2,
-  },
-  messageRowPremium: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 26,
-  },
-  avatarPremium: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    marginRight: 14,
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#FFA94D',
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.10,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
   bubbleWrapPremium: {
     flex: 1,
-    minWidth: 0,
+    marginLeft: 8,
+    backgroundColor: 'transparent',
   },
   userPremium: {
-    color: '#FFA94D',
     fontWeight: 'bold',
-    fontSize: 14,
+    color: '#FFA94D',
     marginBottom: 2,
-    marginLeft: 2,
+    fontSize: 14,
   },
   bubblePremium: {
-    borderRadius: 22,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    maxWidth: '100%',
-    alignSelf: 'flex-start',
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     marginBottom: 2,
+    minWidth: 60,
+    alignSelf: 'flex-start',
   },
   textPremium: {
     fontSize: 15,
@@ -650,42 +635,24 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     elevation: 2,
   },
-  previewOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(24,24,24,0.72)',
-    zIndex: 99,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingBottom: 24,
+    messageRowPremium: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 26,
   },
-  joinBtn: {
-    backgroundColor: '#FFA94D',
-    borderRadius: 18,
-    paddingVertical: 12,
-    paddingHorizontal: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
+  avatarPremium: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 14,
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#FFA94D',
     shadowColor: '#FFA94D',
-    shadowOpacity: 0.13,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
     elevation: 2,
-  },
-  joinBtnText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-    letterSpacing: 0.5,
-  },
-  memberCountText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
-    marginBottom: 18,
-    textAlign: 'center',
-    textShadowColor: '#0008',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    marginBottom: 2,
   },
 });
