@@ -121,7 +121,7 @@ export default function CommunityChat() {
           <Text style={styles.myGroupsTitle}>Mes groupes</Text>
           <FlatList
             data={myGroups}
-            keyExtractor={item => item.groupId}
+            keyExtractor={(item, idx) => `${item.groupId}-${item.uid || ''}-${idx}`}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 8 }}
