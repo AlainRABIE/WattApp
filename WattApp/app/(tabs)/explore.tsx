@@ -19,7 +19,6 @@ export default function ExploreScreen() {
   const router = useRouter();
   const debounceRef = useRef<number | null>(null);
 
-  // Charger les livres (simule suggestions + recherche)
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -34,7 +33,6 @@ export default function ExploreScreen() {
     })();
   }, []);
 
-  // Filtrage par recherche et catégorie
   const filteredBooks = books.filter(b => {
     const search = q.trim().toLowerCase();
     const tags = (b.tags || []).map((t: string) => t.toLowerCase());
@@ -48,7 +46,6 @@ export default function ExploreScreen() {
     return matchCat && matchSearch;
   });
 
-  // Affichage grille 2 colonnes façon Wattpad
   const renderBook = ({ item, index }: { item: any, index: number }) => (
     <TouchableOpacity style={styles.bookCard} onPress={() => Alert.alert(item.titre || item.title || 'Livre', `Auteur : ${item.auteur || item.author || 'Inconnu'}`)}>
       <View style={styles.bookRank}><Text style={styles.bookRankText}>{index + 1}</Text></View>
@@ -113,17 +110,21 @@ const styles = StyleSheet.create({
   },
   tabsRow: {
     backgroundColor: '#181818',
-    paddingVertical: 2,
-    marginBottom: 2,
+    paddingVertical: 0,
+    marginBottom: 0,
     borderBottomWidth: 1,
     borderBottomColor: '#23232a',
+    marginTop: 0,
   },
   tabBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-    marginRight: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 14,
+    marginRight: 8,
     backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
   },
   tabBtnActive: {
     backgroundColor: '#23232a',
@@ -147,7 +148,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     minHeight: 120,
+    maxHeight: 120,
     maxWidth: (width / 2) - 18,
+    overflow: 'hidden',
   },
   bookRank: {
     width: 22,
@@ -180,11 +183,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 2,
+    maxWidth: 110,
+    overflow: 'hidden',
   },
   bookAuthor: {
     color: '#aaa',
     fontSize: 14,
     marginBottom: 2,
+    maxWidth: 110,
+    overflow: 'hidden',
   },
   bookStatsRow: {
     flexDirection: 'row',
@@ -215,38 +222,42 @@ const styles = StyleSheet.create({
     color: '#FFA94D',
     fontSize: 12,
     fontWeight: '500',
+    maxWidth: 60,
+    overflow: 'hidden',
   },
 });
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Barre de recherche */}
-      <View style={styles.topBar}>
-        <Ionicons name="chevron-back" size={24} color="#fff" style={{ marginRight: 8, opacity: 0 }} />
-        <TextInput
-          value={q}
-          onChangeText={setQ}
-          placeholder="Rechercher des histoires/personnes"
-          placeholderTextColor="#888"
-          style={styles.searchBar}
-          returnKeyType="search"
-          onSubmitEditing={Keyboard.dismiss}
-        />
-        <TouchableOpacity style={styles.filterBtn}>
-          <Feather name="filter" size={20} color="#fff" />
-        </TouchableOpacity>
-      </View>
-      {/* Onglets catégories */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsRow} contentContainerStyle={{ paddingHorizontal: 8 }}>
-        {CATEGORIES.map(cat => (
-          <TouchableOpacity
-            key={cat}
-            style={[styles.tabBtn, category === cat && styles.tabBtnActive]}
-            onPress={() => setCategory(cat)}>
-            <Text style={[styles.tabBtnText, category === cat && styles.tabBtnTextActive]}>{cat}</Text>
+      {/* Barre de recherche + onglets (une seule fois) */}
+      <View style={{marginBottom: 0}}>
+        <View style={styles.topBar}>
+          <Ionicons name="chevron-back" size={24} color="#fff" style={{ marginRight: 8, opacity: 0 }} />
+          <TextInput
+            value={q}
+            onChangeText={setQ}
+            placeholder="Rechercher des histoires/personnes"
+            placeholderTextColor="#888"
+            style={styles.searchBar}
+            returnKeyType="search"
+            onSubmitEditing={Keyboard.dismiss}
+          />
+          <TouchableOpacity style={styles.filterBtn}>
+            <Feather name="filter" size={20} color="#fff" />
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+        </View>
+        {/* Onglets catégories */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.tabsRow, {marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0}]} contentContainerStyle={{ paddingHorizontal: 8, marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}>
+          {CATEGORIES.map(cat => (
+            <TouchableOpacity
+              key={cat}
+              style={[styles.tabBtn, category === cat && styles.tabBtnActive]}
+              onPress={() => setCategory(cat)}>
+              <Text style={[styles.tabBtnText, category === cat && styles.tabBtnTextActive]}>{cat}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
       {/* Résultats */}
       <View style={{ flex: 1 }}>
         {loading ? (
