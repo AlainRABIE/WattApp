@@ -108,16 +108,19 @@ const Home: React.FC = () => {
 		return (
 			<View style={{ flex: 1, backgroundColor: '#181818' }}>
 				<StatusBar barStyle="light-content" />
-				{/* Avatar profil en haut à droite */}
-						<View style={{ position: 'absolute', top: 48, right: 18, zIndex: 100 }}>
-							<TouchableOpacity onPress={() => router.push('/profile')} activeOpacity={0.8}>
-								<Image
-									source={{ uri: photoURL || avatarUrl }}
-									style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#FFA94D', backgroundColor: '#232323' }}
-									resizeMode="cover"
-								/>
-							</TouchableOpacity>
-						</View>
+								 {/* Logo amis à gauche et avatar profil à droite */}
+								 <View style={{ position: 'absolute', top: 48, left: 18, right: 18, zIndex: 100, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+													 <TouchableOpacity onPress={() => router.push('/friends')} activeOpacity={0.8} style={{ backgroundColor: '#232323', borderRadius: 22, padding: 6 }}>
+														 <Ionicons name="people" size={28} color="#FFA94D" />
+													 </TouchableOpacity>
+									 <TouchableOpacity onPress={() => router.push('/profile')} activeOpacity={0.8}>
+										 <Image
+											 source={{ uri: photoURL || avatarUrl }}
+											 style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#FFA94D', backgroundColor: '#232323' }}
+											 resizeMode="cover"
+										 />
+									 </TouchableOpacity>
+								 </View>
 				<ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 60, paddingBottom: 120 }}>
 						{/* Carrousel principal */}
 						<Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 20, marginTop: 28, marginLeft: 18, marginBottom: 8 }}>À la une</Text>

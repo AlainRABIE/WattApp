@@ -296,31 +296,32 @@ export default function FriendsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={styles.title}>Amis</Text>
-        <View style={{ flexDirection: 'row' }}>
-          <TouchableOpacity onPress={() => { setView('search'); loadPendingOutgoing(); }} style={{ marginRight: 8 }}>
-            <Text style={{ color: view === 'search' ? '#FFA94D' : '#fff' }}>Rechercher</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => { setView('friends'); loadFriends(); }} style={{ marginRight: 8 }}>
-            <Text style={{ color: view === 'friends' ? '#FFA94D' : '#fff' }}>Mes amis</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => { setView('incoming'); loadIncomingRequests(); }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ color: view === 'incoming' ? '#FFA94D' : '#fff' }}>Demandes</Text>
-              {incomingCount > 0 ? (
-                <View style={{ backgroundColor: '#ff6b6b', minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginLeft: 8, paddingHorizontal: 6 }}>
-                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{incomingCount}</Text>
-                </View>
-              ) : null}
-            </View>
-          </TouchableOpacity>
-        </View>
+      {/* Header moderne */}
+      <View style={styles.headerBar}>
+        <Text style={styles.headerTitle}>Amis</Text>
+      </View>
+      {/* Onglets modernes */}
+      <View style={styles.tabsRow}>
+        <TouchableOpacity onPress={() => { setView('search'); loadPendingOutgoing(); }} style={[styles.tabBtn, view === 'search' && styles.tabBtnActive]}>
+          <Text style={[styles.tabBtnText, view === 'search' && styles.tabBtnTextActive]}>Rechercher</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => { setView('friends'); loadFriends(); }} style={[styles.tabBtn, view === 'friends' && styles.tabBtnActive]}>
+          <Text style={[styles.tabBtnText, view === 'friends' && styles.tabBtnTextActive]}>Mes amis</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => { setView('incoming'); loadIncomingRequests(); }} style={[styles.tabBtn, view === 'incoming' && styles.tabBtnActive]}> 
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={[styles.tabBtnText, view === 'incoming' && styles.tabBtnTextActive]}>Demandes</Text>
+            {incomingCount > 0 ? (
+              <View style={styles.badge}><Text style={styles.badgeText}>{incomingCount}</Text></View>
+            ) : null}
+          </View>
+        </TouchableOpacity>
       </View>
 
+      {/* Contenu selon l'onglet */}
       {view === 'search' ? (
         <>
-          <TextInput value={q} onChangeText={setQ} placeholder="Rechercher par pseudo ou email" placeholderTextColor="#888" style={styles.input} />
+          <TextInput value={q} onChangeText={setQ} placeholder="Rechercher par pseudo ou email" placeholderTextColor="#888" style={styles.inputModern} />
           {loading ? <ActivityIndicator color="#FFA94D" style={{ marginTop: 12 }} /> : null}
           <FlatList data={results} keyExtractor={(i) => i.id} renderItem={renderItem} style={{ width: '100%', marginTop: 12 }} />
           {(!q || results.length === 0) && !loading ? <Text style={styles.subtitle}>Ta liste d'amis apparaîtra ici.</Text> : null}
@@ -335,18 +336,18 @@ export default function FriendsScreen() {
                 const user = item.otherUser;
                 if (!user) return null;
                 return (
-                  <View style={styles.row}>
-                    <Image source={{ uri: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.pseudo || user.displayName || 'User')}&length=${((user.pseudo || user.displayName || 'User') as string).trim().includes(' ') ? 2 : 1}&background=FFA94D&color=181818&size=128` }} style={styles.avatar} />
+                  <View style={styles.friendRow}>
+                    <Image source={{ uri: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.pseudo || user.displayName || 'User')}&length=${((user.pseudo || user.displayName || 'User') as string).trim().includes(' ') ? 2 : 1}&background=FFA94D&color=181818&size=128` }} style={styles.avatarModern} />
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.name}>{user.pseudo || user.displayName || 'Utilisateur'}</Text>
-                      <Text style={styles.email}>{user.mail || user.email || ''}</Text>
+                      <Text style={styles.nameModern}>{user.pseudo || user.displayName || 'Utilisateur'}</Text>
+                      <Text style={styles.emailModern}>{user.mail || user.email || ''}</Text>
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <TouchableOpacity style={[styles.addButton, { backgroundColor: '#3b82f6', marginRight: 8 }]} onPress={() => createOrOpenChat(user)}>
-                        <Text style={{ color: '#fff', fontWeight: '700' }}>Tchat</Text>
+                      <TouchableOpacity style={styles.chatBtn} onPress={() => createOrOpenChat(user)}>
+                        <Text style={styles.chatBtnText}>Tchat</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={[styles.addButton, { backgroundColor: '#ff6b6b' }]} onPress={() => removeFriend(item)}>
-                        <Text style={{ color: '#fff', fontWeight: '700' }}>Retirer</Text>
+                      <TouchableOpacity style={styles.removeBtn} onPress={() => removeFriend(item)}>
+                        <Text style={styles.removeBtnText}>Retirer</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -368,13 +369,90 @@ export default function FriendsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#181818' },
-  title: { color: '#FFA94D', fontSize: 28, fontWeight: '700' },
-  subtitle: { color: '#fff', marginTop: 12 },
-  input: { backgroundColor: '#232323', color: '#fff', padding: 12, borderRadius: 8, marginTop: 12 },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#222' },
-  avatar: { width: 48, height: 48, borderRadius: 24, marginRight: 12, backgroundColor: '#333' },
+  container: { flex: 1, backgroundColor: '#181818', paddingHorizontal: 0, paddingTop: 0 },
+  headerBar: {
+    backgroundColor: '#23232a',
+    paddingTop: 48,
+    paddingBottom: 18,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#23232a',
+    marginBottom: 0,
+    zIndex: 10,
+  },
+  headerTitle: {
+    color: '#FFA94D',
+    fontSize: 28,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#181818',
+    paddingVertical: 10,
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#23232a',
+  },
+  tabBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 7,
+    borderRadius: 18,
+    marginHorizontal: 6,
+    backgroundColor: 'transparent',
+  },
+  tabBtnActive: {
+    backgroundColor: '#23232a',
+  },
+  tabBtnText: {
+    color: '#aaa',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  tabBtnTextActive: {
+    color: '#FFA94D',
+    fontWeight: 'bold',
+  },
+  badge: {
+    backgroundColor: '#ff6b6b',
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+    paddingHorizontal: 6,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  inputModern: {
+    backgroundColor: '#23232a',
+    color: '#fff',
+    padding: 14,
+    borderRadius: 14,
+    marginTop: 16,
+    marginHorizontal: 18,
+    fontSize: 16,
+  },
+  subtitle: { color: '#fff', marginTop: 12, textAlign: 'center' },
+  // Liste recherche
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#23232a', marginHorizontal: 10 },
+  avatar: { width: 48, height: 48, borderRadius: 24, marginRight: 14, backgroundColor: '#333' },
   name: { color: '#fff', fontSize: 16, fontWeight: '600' },
   email: { color: '#aaa', fontSize: 13, marginTop: 2 },
-  addButton: { backgroundColor: '#FFA94D', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  addButton: { backgroundColor: '#FFA94D', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, marginLeft: 8 },
+  // Liste amis
+  friendRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#23232a', marginHorizontal: 10 },
+  avatarModern: { width: 52, height: 52, borderRadius: 26, marginRight: 16, backgroundColor: '#333' },
+  nameModern: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  emailModern: { color: '#aaa', fontSize: 13, marginTop: 2 },
+  chatBtn: { backgroundColor: '#3b82f6', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10, marginRight: 8 },
+  chatBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  removeBtn: { backgroundColor: '#ff6b6b', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
+  removeBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });
