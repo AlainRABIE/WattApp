@@ -41,7 +41,19 @@ export default function MessengerList() {
         const uQuery = query(collection(db, 'users'), where('uid', '==', otherUid));
         const uSnap = await getDocs(uQuery);
         if (!uSnap.empty) {
-          return { ...fd, otherUser: { id: uSnap.docs[0].id, ...uSnap.docs[0].data() } };
+          const user = uSnap.docs[0].data();
+          return {
+            ...fd,
+            otherUser: {
+              id: uSnap.docs[0].id,
+              uid: otherUid,
+              pseudo: user.pseudo || user.displayName || '',
+              displayName: user.displayName || '',
+              mail: user.mail || user.email || '',
+              email: user.email || '',
+              photoURL: user.photoURL || '',
+            }
+          };
         }
         return null;
       }));
@@ -107,20 +119,27 @@ export default function MessengerList() {
           }
           // Trouve l'autre participant
           const otherUid = (thread.participants || []).find((uid: string) => uid !== user.uid);
-          // Récupère les infos de l'autre utilisateur
-          let otherUser = { nom: 'Utilisateur', photoURL: '' };
+          // Récupère les infos de l'autre utilisateur (comme dans le modal)
+          let otherUser = { pseudo: 'Utilisateur', displayName: '', mail: '', email: '', photoURL: '' };
           if (otherUid) {
-            const userDoc = await getDoc(doc(db, 'users', otherUid));
-            if (userDoc.exists()) {
-              const d = userDoc.data();
-              otherUser = { nom: d.nom || d.pseudo || 'Utilisateur', photoURL: d.photoURL || '' };
+            const uQuery = query(collection(db, 'users'), where('uid', '==', otherUid));
+            const uSnap = await getDocs(uQuery);
+            if (!uSnap.empty) {
+              const d = uSnap.docs[0].data();
+              otherUser = {
+                pseudo: d.pseudo || d.displayName || 'Utilisateur',
+                displayName: d.displayName || '',
+                mail: d.mail || d.email || '',
+                email: d.email || '',
+                photoURL: d.photoURL || '',
+              };
             }
           }
           return {
             id: threadId,
             type: 'dm',
-            name: otherUser.nom,
-            avatar: otherUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(otherUser.nom)}&background=FFA94D&color=181818&size=128`,
+            name: otherUser.pseudo || otherUser.displayName || 'Utilisateur',
+            avatar: otherUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(otherUser.pseudo || otherUser.displayName || 'User')}&background=FFA94D&color=181818&size=128`,
             lastMsg: lastMsg || 'Aucun message',
             lastMsgAt: lastMsgAt || new Date(),
             unread: 0,
@@ -203,43 +222,49 @@ export default function MessengerList() {
               <FlatList
                 data={friends}
                 keyExtractor={item => item.otherUser.uid}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10 }}
-                    onPress={async () => {
-                      setShowFriendsModal(false);
-                      // Ouvre ou crée le chat DM
-                      const auth = getAuth();
-                      const current = auth.currentUser;
-                      if (!current) return;
-                      const fromUid = current.uid;
-                      const toUid = item.otherUser.uid;
-                      if (fromUid === toUid) return;
-                      // Cherche un thread DM existant
-                      const q = query(collection(db, 'dmThreads'), where('participants', 'array-contains', fromUid));
-                      const snap = await getDocs(q);
-                      let existing = null;
-                      for (const d of snap.docs) {
-                        const data = d.data();
-                        const parts = data.participants || [];
-                        if (parts.includes(toUid)) { existing = { id: d.id, ...data }; break; }
-                      }
-                      if (existing) {
-                        router.push({ pathname: `/chat/[chatId]`, params: { chatId: existing.id } });
-                        return;
-                      }
-                      // Crée un nouveau thread DM
-                      const threadRef = await addDoc(collection(db, 'dmThreads'), {
-                        participants: [fromUid, toUid],
-                        createdAt: new Date(),
-                      });
-                      router.push({ pathname: `/chat/[chatId]`, params: { chatId: threadRef.id } });
-                    }}
-                  >
-                    <Image source={{ uri: item.otherUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.otherUser.pseudo || item.otherUser.displayName || 'User')}&background=FFA94D&color=181818&size=128` }} style={{ width: 44, height: 44, borderRadius: 22, marginRight: 14, backgroundColor: '#FFA94D33' }} />
-                    <Text style={{ color: '#fff', fontSize: 16 }}>{item.otherUser.pseudo || item.otherUser.displayName || 'Utilisateur'}</Text>
-                  </TouchableOpacity>
-                )}
+                renderItem={({ item }) => {
+                  const user = item.otherUser;
+                  return (
+                    <TouchableOpacity
+                      style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10 }}
+                      onPress={async () => {
+                        setShowFriendsModal(false);
+                        // Ouvre ou crée le chat DM
+                        const auth = getAuth();
+                        const current = auth.currentUser;
+                        if (!current) return;
+                        const fromUid = current.uid;
+                        const toUid = user.uid;
+                        if (fromUid === toUid) return;
+                        // Cherche un thread DM existant
+                        const q = query(collection(db, 'dmThreads'), where('participants', 'array-contains', fromUid));
+                        const snap = await getDocs(q);
+                        let existing = null;
+                        for (const d of snap.docs) {
+                          const data = d.data();
+                          const parts = data.participants || [];
+                          if (parts.includes(toUid)) { existing = { id: d.id, ...data }; break; }
+                        }
+                        if (existing) {
+                          router.push({ pathname: `/chat/[chatId]`, params: { chatId: existing.id } });
+                          return;
+                        }
+                        // Crée un nouveau thread DM
+                        const threadRef = await addDoc(collection(db, 'dmThreads'), {
+                          participants: [fromUid, toUid],
+                          createdAt: new Date(),
+                        });
+                        router.push({ pathname: `/chat/[chatId]`, params: { chatId: threadRef.id } });
+                      }}
+                    >
+                      <Image source={{ uri: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.pseudo || user.displayName || 'User')}&background=FFA94D&color=181818&size=128` }} style={{ width: 44, height: 44, borderRadius: 22, marginRight: 14, backgroundColor: '#FFA94D33' }} />
+                      <View>
+                        <Text style={{ color: '#fff', fontSize: 16 }}>{user.pseudo || user.displayName || 'Utilisateur'}</Text>
+                        <Text style={{ color: '#aaa', fontSize: 13 }}>{user.mail || user.email || ''}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }}
                 style={{ maxHeight: 300 }}
               />
             )}
