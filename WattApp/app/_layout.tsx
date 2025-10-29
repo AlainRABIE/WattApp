@@ -20,7 +20,8 @@ export default function RootLayout() {
     pathname.startsWith('/register') ||
     pathname.startsWith('/write/custom') ||
     pathname.includes('/write/') ||
-    pathname.includes('/read') // Cacher pour toutes les pages de lecture
+    pathname.includes('/read') ||
+    pathname.startsWith('/community/') // Cacher pour toutes les pages de chat communautaire
   );
 
   return (
