@@ -53,14 +53,6 @@ export default function CustomWriteScreen() {
           <Text style={styles.templateTitle}>{template.title || 'Template personnalisé'}</Text>
           {template.subtitle ? <Text style={styles.templateSubtitle}>{template.subtitle}</Text> : null}
         </View>
-        <TouchableOpacity
-          style={styles.smartNotebookBtn}
-          onPress={() => setShowLines((prev) => !prev)}
-        >
-          <Text style={styles.smartNotebookBtnText}>
-            {showLines ? 'Masquer les lignes' : 'Cahier intelligent'}
-          </Text>
-        </TouchableOpacity>
       </View>
   
 
@@ -197,19 +189,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: 0.2,
-  },
-  smartNotebookBtn: {
-    marginLeft: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    alignSelf: 'center',
-  },
-  smartNotebookBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 14,
   },
   
 });
