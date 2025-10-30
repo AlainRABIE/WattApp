@@ -1,5 +1,7 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, usePathname } from 'expo-router';
+import { Animated } from 'react-native';
+import type { StackCardInterpolationProps } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -9,6 +11,25 @@ import BottomNav from './components/BottomNav';
 
 export const unstable_settings = {
   anchor: '(tabs)',
+};
+
+// Animation de transition personnalisée (fade + scale)
+const customTransition = {
+  cardStyleInterpolator: ({ current, next, layouts }: StackCardInterpolationProps) => {
+    return {
+      cardStyle: {
+        opacity: current.progress,
+        transform: [
+          {
+            scale: current.progress.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.95, 1],
+            }),
+          },
+        ],
+      },
+    };
+  },
 };
 
 export default function RootLayout() {
@@ -29,7 +50,12 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         {/* Hide headers globally so pages don't show route names like "home/home" */}
-        <Stack screenOptions={{ headerShown: false }}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            ...customTransition,
+          }}
+        >
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
