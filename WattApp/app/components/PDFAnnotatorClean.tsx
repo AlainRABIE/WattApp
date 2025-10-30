@@ -34,13 +34,61 @@ interface PDFAnnotatorProps {
 
 export function PDFAnnotator(props: PDFAnnotatorProps) {
   const { pdfUri } = props;
+
+  // Valeurs animées pour le zoom et le déplacement
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const savedTranslateX = useSharedValue(0);
+  const savedTranslateY = useSharedValue(0);
+
+  // Gestes
+  const pinchGesture = Gesture.Pinch()
+    .onStart(() => { savedScale.value = scale.value; })
+    .onUpdate((event) => { scale.value = Math.max(0.5, Math.min(savedScale.value * event.scale, 5)); })
+    .onEnd(() => { savedScale.value = scale.value; });
+
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    })
+    .onUpdate((event) => {
+      translateX.value = savedTranslateX.value + event.translationX;
+      translateY.value = savedTranslateY.value + event.translationY;
+    })
+    .onEnd(() => {
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    });
+
+  const combinedGesture = Gesture.Simultaneous(
+    pinchGesture,
+    panGesture
+  );
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { scale: scale.value },
+        { translateX: translateX.value },
+        { translateY: translateY.value },
+      ],
+    };
+  });
+
   return (
     <View style={styles.container}>
-      <Image
-        source={{ uri: pdfUri }}
-        style={styles.pdfBackground}
-        contentFit="contain"
-      />
+      <GestureDetector gesture={combinedGesture}>
+        <Animated.View style={[styles.pdfContainer, animatedStyle]}>
+          <Image
+            source={{ uri: pdfUri }}
+            style={styles.pdfBackground}
+            contentFit="contain"
+          />
+        </Animated.View>
+      </GestureDetector>
     </View>
   );
 }
