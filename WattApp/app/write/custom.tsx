@@ -1,9 +1,15 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, Platform, Alert } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { PDFAnnotator } from '../components/PDFAnnotatorClean';
 import { DrawingCanvas } from '../components/DrawingCanvas';
+
+const DISPLAY_MODES = [
+  { key: 'light', label: 'Clair', icon: 'sunny-outline', bg: '#FFF8E1', toolbar: 'rgba(255,255,255,0.7)', btn: '#23272F' },
+  { key: 'dark', label: 'Sombre', icon: 'moon-outline', bg: '#181C22', toolbar: 'rgba(30,34,40,0.92)', btn: '#fff' },
+  { key: 'calm', label: 'Calme', icon: 'leaf-outline', bg: '#E3F2FD', toolbar: 'rgba(200,230,201,0.7)', btn: '#388E3C' },
+];
 
 export default function CustomWriteScreen() {
   const router = useRouter();
@@ -19,6 +25,8 @@ export default function CustomWriteScreen() {
   }
 
   const [saving, setSaving] = useState(false);
+  const [displayModeIdx, setDisplayModeIdx] = useState(0);
+  const displayMode = DISPLAY_MODES[displayModeIdx];
 
   const pdfUri = template.pdfUri || template.backgroundImage || '';
 
@@ -46,15 +54,36 @@ export default function CustomWriteScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle={Platform.OS === 'ios' ? 'dark-content' : 'light-content'} />
+    <SafeAreaView style={[styles.container, { backgroundColor: displayMode.bg }]}>
+      <StatusBar barStyle={displayMode.key === 'dark' ? 'light-content' : 'dark-content'} />
 
-
-      {/* Bouton retour minimal, fin, collé au coin */}
+      {/* Bouton retour minimal */}
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtnMinimalist}>
-        <Ionicons name="chevron-back" size={22} color="#23272F" style={{ opacity: 0.7 }} />
+        <Ionicons name="chevron-back" size={22} color={displayMode.key === 'dark' ? '#fff' : '#23272F'} style={{ opacity: 0.7 }} />
       </TouchableOpacity>
 
+      {/* Boutons d'action et mode en haut à gauche */}
+      <View style={styles.actionBarTopLeft}>
+        <TouchableOpacity
+          style={[styles.actionBtnTop, { backgroundColor: displayMode.btn }]}
+          onPress={() => setDisplayModeIdx((displayModeIdx + 1) % DISPLAY_MODES.length)}
+        >
+          <Ionicons name={displayMode.icon as any} size={20} color={displayMode.key === 'dark' ? '#23272F' : '#fff'} />        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionBtnTop, styles.draftBtnTop, { backgroundColor: displayMode.key === 'dark' ? '#388E3C' : '#43a047' }]}
+          onPress={saveDraft}
+          disabled={saving}
+        >
+          <Ionicons name="save-outline" size={20} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionBtnTop, styles.publishBtnTop, { backgroundColor: displayMode.key === 'dark' ? '#1976D2' : '#1e88e5' }]}
+          onPress={publishBook}
+          disabled={saving}
+        >
+          <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
 
       <View style={{ flex: 1 }}>
         {/* PDF et dessin */}
@@ -63,7 +92,7 @@ export default function CustomWriteScreen() {
           penColor={color}
           penSize={size}
           currentTool={'pen'}
-          onSaveAnnotations={() => {}}
+          onSaveAnnotations={() => { }}
         />
         <DrawingCanvas
           ref={canvasRef}
@@ -71,23 +100,33 @@ export default function CustomWriteScreen() {
           penSize={size}
         />
         {/* Barre d'outils verticale à droite, centrée verticalement */}
-        <View style={styles.toolbarModernVertical}>
-          {/* Outils principaux (stylo, surligneur, gomme) */}
+        <View style={[
+          styles.toolbarModernVertical,
+          { backgroundColor: displayMode.toolbar, borderColor: displayMode.key === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.18)' }
+        ]}>
+          {/* Outils principaux */}
           <TouchableOpacity style={styles.modernBtn} onPress={() => setColor(COLORS[0])}>
-            <Ionicons name="pencil" size={20} color={color === COLORS[0] ? '#43a047' : '#23272F'} />
+            <Ionicons name="pencil" size={20} color={color === COLORS[0] ? '#43a047' : (displayMode.key === 'dark' ? '#fff' : '#23272F')} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.modernBtn} onPress={() => setColor(COLORS[3])}>
-            <Ionicons name="brush" size={20} color={color === COLORS[3] ? '#43a047' : '#23272F'} />
+            <Ionicons name="brush" size={20} color={color === COLORS[3] ? '#43a047' : (displayMode.key === 'dark' ? '#fff' : '#23272F')} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.modernBtn} onPress={() => setColor(COLORS[2])}>
-            <Ionicons name="color-fill" size={20} color={color === COLORS[2] ? '#43a047' : '#23272F'} />
+            <Ionicons name="color-fill" size={20} color={color === COLORS[2] ? '#43a047' : (displayMode.key === 'dark' ? '#fff' : '#23272F')} />
           </TouchableOpacity>
           <View style={styles.modernSeparatorVertical} />
           {/* Couleurs */}
           {COLORS.map((c) => (
             <TouchableOpacity
               key={c}
-              style={[styles.modernColorBtn, { backgroundColor: c, borderWidth: color === c ? 2 : 0, borderColor: color === c ? '#43a047' : 'rgba(35,39,47,0.12)' }]}
+              style={[
+                styles.modernColorBtn,
+                {
+                  backgroundColor: c,
+                  borderWidth: color === c ? 2 : 0,
+                  borderColor: color === c ? '#43a047' : (displayMode.key === 'dark' ? 'rgba(255,255,255,0.18)' : 'rgba(35,39,47,0.12)')
+                }
+              ]}
               onPress={() => setColor(c)}
             />
           ))}
@@ -96,32 +135,33 @@ export default function CustomWriteScreen() {
           {SIZES.map((s) => (
             <TouchableOpacity
               key={s}
-              style={[styles.modernSizeBtn, { borderWidth: size === s ? 2 : 0, borderColor: size === s ? '#43a047' : 'rgba(35,39,47,0.12)' }]}
+              style={[
+                styles.modernSizeBtn,
+                {
+                  borderWidth: size === s ? 2 : 0,
+                  borderColor: size === s ? '#43a047' : (displayMode.key === 'dark' ? 'rgba(255,255,255,0.18)' : 'rgba(35,39,47,0.12)')
+                }
+              ]}
               onPress={() => setSize(s)}
             >
-              <View style={{ backgroundColor: '#23272F', width: s * 2, height: s * 2, borderRadius: s, opacity: 0.7 }} />
+              <View style={{
+                backgroundColor: displayMode.key === 'dark' ? '#fff' : '#23272F',
+                width: s * 2,
+                height: s * 2,
+                borderRadius: s,
+                opacity: 0.7
+              }} />
             </TouchableOpacity>
           ))}
           <View style={styles.modernSeparatorVertical} />
           {/* Actions */}
           <TouchableOpacity style={styles.modernBtn} onPress={() => canvasRef.current?.undo?.()}>
-            <Ionicons name="arrow-undo" size={20} color="#23272F" />
+            <Ionicons name="arrow-undo" size={20} color={displayMode.key === 'dark' ? '#fff' : '#23272F'} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.modernBtn} onPress={() => canvasRef.current?.clear?.()}>
             <Ionicons name="trash" size={20} color="#e53935" />
           </TouchableOpacity>
         </View>
-      </View>
-
-      {/* Actions flottantes en bas */}
-      {/* Boutons d'action en haut à gauche */}
-      <View style={styles.actionBarTopLeft}>
-        <TouchableOpacity style={[styles.actionBtnTop, styles.draftBtnTop]} onPress={saveDraft} disabled={saving}>
-          <Ionicons name="save-outline" size={20} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtnTop, styles.publishBtnTop]} onPress={publishBook} disabled={saving}>
-          <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
-        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -130,7 +170,6 @@ export default function CustomWriteScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF8E1',
   },
   backBtnMinimalist: {
     position: 'absolute',
@@ -144,13 +183,33 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 50,
   },
-  backIconMinimalist: {
-    fontSize: 20,
-    color: '#fff',
-    fontWeight: '300',
-    opacity: 0.7,
-    marginLeft: 1,
-    marginTop: -1,
+  actionBarTopLeft: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 48 : 32,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    zIndex: 60,
+  },
+  actionBtnTop: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.10,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  draftBtnTop: {
+    backgroundColor: '#43a047',
+  },
+  publishBtnTop: {
+    backgroundColor: '#1e88e5',
   },
   toolbarModernVertical: {
     position: 'absolute',
@@ -184,19 +243,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.5)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 4,
-  },
-  modernSeparator: {
-    width: 1,
-    height: 28,
-    backgroundColor: 'rgba(35,39,47,0.10)',
-    marginHorizontal: 8,
+    marginVertical: 4,
   },
   modernColorBtn: {
     width: 26,
     height: 26,
     borderRadius: 13,
-    marginHorizontal: 2,
+    marginVertical: 2,
     borderWidth: 1,
   },
   modernSizeBtn: {
@@ -205,76 +258,7 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 2,
+    marginVertical: 2,
     backgroundColor: 'rgba(255,255,255,0.5)',
-  },
-  actionBarTopLeft: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 48 : 32,
-    left: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    zIndex: 60,
-  },
-  actionBtnTop: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
-    shadowRadius: 6,
-    elevation: 6,
-  },
-  draftBtnTop: {
-    backgroundColor: '#43a047',
-  },
-  publishBtnTop: {
-    backgroundColor: '#1e88e5',
-  },
-  actionBarGlass: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    marginBottom: 18,
-    marginHorizontal: 24,
-    borderRadius: 32,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.10,
-    shadowRadius: 12,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    gap: 18,
-  },
-  actionGlassBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    borderRadius: 22,
-    marginHorizontal: 4,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    shadowColor: '#fff',
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-  },
-  draftGlassButton: {
-    backgroundColor: 'rgba(251,192,45,0.85)',
-  },
-  publishGlassButton: {
-    backgroundColor: 'rgba(67,160,71,0.85)',
-  },
-  actionGlassBtnText: {
-    color: '#23272F',
-    fontWeight: 'bold',
-    fontSize: 16,
-    letterSpacing: 0.5,
   },
 });
