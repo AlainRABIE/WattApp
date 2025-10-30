@@ -223,19 +223,13 @@ const WriteScreen: React.FC = () => {
           setSelected(template);
           setBody(template.starter || '');
           setShowTemplateManager(false);
-          
-          // Si c'est un template personnalisé, utiliser un éditeur générique
-          if (template.isCustom) {
-            (router as any).push({
-              pathname: '/write/custom',
-              params: { 
-                templateData: JSON.stringify(template)
-              }
-            });
-          } else {
-            // Template prédéfini, utiliser l'éditeur existant
-            (router as any).push(`/write/${template.id}`);
-          }
+          // Toujours ouvrir custom.tsx avec le template sélectionné
+          (router as any).push({
+            pathname: '/write/custom',
+            params: { 
+              templateData: JSON.stringify(template)
+            }
+          });
         }}
         recentTemplates={recentTemplates}
         onUpdateRecentTemplates={setRecentTemplates}
