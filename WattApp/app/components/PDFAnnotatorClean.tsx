@@ -23,6 +23,7 @@ import {
   Gesture,
   GestureDetector,
 } from 'react-native-gesture-handler';
+  export default PDFAnnotator;
 
 const { width, height } = Dimensions.get('window');
 
@@ -41,15 +42,17 @@ interface PDFAnnotatorProps {
   penSize: number;
   currentTool: 'pen' | 'highlighter' | 'eraser' | 'text';
   onSaveAnnotations: (annotations: any) => void;
+  showLines?: boolean;
 }
-
-export default function PDFAnnotator({ 
-  pdfUri, 
-  penColor, 
-  penSize, 
-  currentTool,
-  onSaveAnnotations 
-}: PDFAnnotatorProps) {
+export function PDFAnnotator(props: PDFAnnotatorProps) {
+  const {
+    pdfUri,
+    penColor,
+    penSize,
+    currentTool,
+    onSaveAnnotations,
+    showLines = false,
+  } = props;
   const [textAnnotations, setTextAnnotations] = useState<TextAnnotation[]>([]);
   const [showAddText, setShowAddText] = useState(false);
   const [newTextPosition, setNewTextPosition] = useState({ x: 0, y: 0 });
@@ -60,17 +63,22 @@ export default function PDFAnnotator({
   const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
+  const LINE_SPACING = 22;
+  const NUM_LINES = 22;
+  const [lines, setLines] = useState<string[]>(Array(NUM_LINES).fill(''));
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
 
-  // Gestionnaire de tap pour ajouter du texte
+  // Snap automatique sur la ligne la plus proche lors de l'ajout de texte
+  // (supprimé doublon LINE_SPACING)
   const handleTextAdd = (x: number, y: number) => {
     if (currentTool === 'text') {
       // Ajuster les coordonnées en fonction du zoom et du pan
       const adjustedX = (x - translateX.value) / scale.value;
       const adjustedY = (y - translateY.value) / scale.value;
-      
-      setNewTextPosition({ x: adjustedX - 100, y: adjustedY - 30 });
+      // Snap Y sur la ligne la plus proche
+      const snappedY = Math.round(adjustedY / LINE_SPACING) * LINE_SPACING;
+      setNewTextPosition({ x: adjustedX - 100, y: snappedY - 12 }); // -12 pour centrer sur la ligne
       setShowAddText(true);
     }
   };
@@ -181,7 +189,21 @@ export default function PDFAnnotator({
             style={styles.pdfBackground}
             contentFit="contain"
           />
-          
+          {/* Lignes jaunes adaptatives (mode Cahier intelligent) */}
+          {showLines && Array.from({ length: 22 }).map((_, i) => (
+            <View
+              key={i}
+              style={{
+                position: 'absolute',
+                left: 24,
+                right: 24,
+                height: 4,
+                backgroundColor: 'rgba(255, 221, 51, 0.7)',
+                top: i * 22 + 34,
+                borderRadius: 2,
+              }}
+            />
+          ))}
           {/* Annotations textuelles */}
           {textAnnotations.map((annotation) => (
             <TouchableOpacity
