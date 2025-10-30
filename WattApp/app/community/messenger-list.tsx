@@ -4,9 +4,10 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react
 import BottomNav from '../components/BottomNav';
 import { getAuth } from 'firebase/auth';
 import { db } from '../../constants/firebaseConfig';
-import { collectionGroup, onSnapshot, query, where, doc, getDoc, collection, orderBy, limit, getDocs, addDoc } from 'firebase/firestore';
+import { collectionGroup, onSnapshot, query, where, doc, getDoc, collection, orderBy, limit, getDocs, addDoc, deleteDoc } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { Swipeable } from 'react-native-gesture-handler';
 
 // Type pour un chat (DM ou groupe)
 type ChatItem = {
@@ -25,6 +26,7 @@ export default function MessengerList() {
   const [friends, setFriends] = useState<any[]>([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
   const router = useRouter();
+
   // Charge la liste des amis pour le modal
   async function loadFriendsForModal() {
     setLoadingFriends(true);
@@ -100,51 +102,57 @@ export default function MessengerList() {
       const groups = (await Promise.all(groupPromises)).filter(Boolean) as ChatItem[];
 
       // --- DMs TEMPS RÉEL ---
-      const qDMs = query(collection(db, 'dmThreads'), where('participants', 'array-contains', user.uid));
+      const qDMs = query(collection(db, 'chats'), where('participants', 'array-contains', user.uid));
       const unsubscribeDMs = onSnapshot(qDMs, async dmsSnap => {
-        const dmPromises = dmsSnap.docs.map(async threadDoc => {
-          const thread = threadDoc.data();
-          const threadId = threadDoc.id;
-          // Récupère le dernier message du thread en temps réel
-          const messagesCol = collection(db, 'dmThreads', threadId, 'messages');
-          const lastMsgSnap = await getDocs(query(messagesCol, orderBy('createdAt', 'desc'), limit(1)));
-          let lastMsg = '';
-          let lastMsgAt = null;
-          let senderUid = '';
-          if (!lastMsgSnap.empty) {
-            const msg = lastMsgSnap.docs[0].data();
-            lastMsg = msg.text || '';
-            lastMsgAt = msg.createdAt?.toDate ? msg.createdAt.toDate() : new Date();
-            senderUid = msg.senderUid || '';
-          }
-          // Trouve l'autre participant
-          const otherUid = (thread.participants || []).find((uid: string) => uid !== user.uid);
-          // Récupère les infos de l'autre utilisateur (comme dans le modal)
-          let otherUser = { pseudo: 'Utilisateur', displayName: '', mail: '', email: '', photoURL: '' };
-          if (otherUid) {
-            const uQuery = query(collection(db, 'users'), where('uid', '==', otherUid));
-            const uSnap = await getDocs(uQuery);
-            if (!uSnap.empty) {
-              const d = uSnap.docs[0].data();
-              otherUser = {
-                pseudo: d.pseudo || d.displayName || 'Utilisateur',
-                displayName: d.displayName || '',
-                mail: d.mail || d.email || '',
-                email: d.email || '',
-                photoURL: d.photoURL || '',
-              };
+        const dmPromises = dmsSnap.docs
+          .filter(threadDoc => {
+            const data = threadDoc.data();
+            // On ne garde que les DMs (2 participants)
+            return Array.isArray(data.participants) && data.participants.length === 2;
+          })
+          .map(async threadDoc => {
+            const thread = threadDoc.data();
+            const threadId = threadDoc.id;
+            // Récupère le dernier message du thread en temps réel
+            const messagesCol = collection(db, 'chats', threadId, 'messages');
+            const lastMsgSnap = await getDocs(query(messagesCol, orderBy('createdAt', 'desc'), limit(1)));
+            let lastMsg = '';
+            let lastMsgAt = null;
+            let senderUid = '';
+            if (!lastMsgSnap.empty) {
+              const msg = lastMsgSnap.docs[0].data();
+              lastMsg = msg.text || '';
+              lastMsgAt = msg.createdAt?.toDate ? msg.createdAt.toDate() : new Date();
+              senderUid = msg.senderUid || '';
             }
-          }
-          return {
-            id: threadId,
-            type: 'dm',
-            name: otherUser.pseudo || otherUser.displayName || 'Utilisateur',
-            avatar: otherUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(otherUser.pseudo || otherUser.displayName || 'User')}&background=FFA94D&color=181818&size=128`,
-            lastMsg: lastMsg || 'Aucun message',
-            lastMsgAt: lastMsgAt || new Date(),
-            unread: 0,
-          } as ChatItem;
-        });
+            // Trouve l'autre participant
+            const otherUid = (thread.participants || []).find((uid: string) => uid !== user.uid);
+            // Récupère les infos de l'autre utilisateur (comme dans le modal)
+            let otherUser = { pseudo: 'Utilisateur', displayName: '', mail: '', email: '', photoURL: '' };
+            if (otherUid) {
+              const uQuery = query(collection(db, 'users'), where('uid', '==', otherUid));
+              const uSnap = await getDocs(uQuery);
+              if (!uSnap.empty) {
+                const d = uSnap.docs[0].data();
+                otherUser = {
+                  pseudo: d.pseudo || d.displayName || 'Utilisateur',
+                  displayName: d.displayName || '',
+                  mail: d.mail || d.email || '',
+                  email: d.email || '',
+                  photoURL: d.photoURL || '',
+                };
+              }
+            }
+            return {
+              id: threadId,
+              type: 'dm',
+              name: otherUser.pseudo || otherUser.displayName || 'Utilisateur',
+              avatar: otherUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(otherUser.pseudo || otherUser.displayName || 'User')}&background=FFA94D&color=181818&size=128`,
+              lastMsg: lastMsg || 'Aucun message',
+              lastMsgAt: lastMsgAt || new Date(),
+              unread: 0,
+            } as ChatItem;
+          });
         const dms = (await Promise.all(dmPromises)).filter(Boolean) as ChatItem[];
         // Fusionne et trie par date du dernier message
         const allChats = [...groups, ...dms].sort((a, b) => b.lastMsgAt.getTime() - a.lastMsgAt.getTime());
@@ -155,6 +163,27 @@ export default function MessengerList() {
     return () => unsubscribeGroups();
   }, []);
 
+  // Suppression d'un DM (local, à adapter pour Firestore si besoin)
+  // Supprime le chat DM et tous ses messages dans Firestore (collection 'chats')
+  const handleDeleteDM = async (chatId: string) => {
+    setChats((prev) => prev.filter((c) => !(c.id === chatId && c.type === 'dm')));
+    try {
+      // Supprime tous les messages du chat
+      const messagesCol = collection(db, 'chats', chatId, 'messages');
+      const messagesSnap = await getDocs(messagesCol);
+      const batchDeletes: Promise<void>[] = [];
+      messagesSnap.forEach((docSnap) => {
+        batchDeletes.push(deleteDoc(docSnap.ref));
+      });
+      await Promise.all(batchDeletes);
+      // Supprime le chat lui-même
+      await deleteDoc(doc(db, 'chats', chatId));
+    } catch (e) {
+      // Optionnel: afficher une erreur ou logger
+      console.error('Erreur lors de la suppression du DM:', e);
+    }
+  };
+
   return (
     <View style={{ flex: 1 }}>
       <View style={styles.container}>
@@ -163,36 +192,61 @@ export default function MessengerList() {
           data={chats}
           keyExtractor={(item, idx) => item.id + '-' + idx}
           ListEmptyComponent={<Text style={styles.empty}>Aucune conversation.</Text>}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.chatRow}
-              activeOpacity={0.85}
-              onPress={() => {
-                if (item.type === 'group') {
-                  router.push({ pathname: `/community/[category]`, params: { category: item.id } });
-                } else {
-                  router.push({ pathname: `/chat/[chatId]`, params: { chatId: item.id } });
-                }
-              }}
-            >
-              <Image
-                source={{ uri: item.avatar }}
-                style={styles.avatar}
-              />
-              <View style={styles.chatContent}>
-                <View style={styles.chatHeaderRow}>
-                  <Text style={styles.chatName}>{item.name}</Text>
-                  <Text style={styles.chatTime}>14:32</Text>
+          renderItem={({ item }) =>
+            item.type === 'dm' ? (
+              <Swipeable
+                renderRightActions={(_, dragX) => (
+                  <TouchableOpacity
+                    style={styles.deleteAction}
+                    onPress={() => handleDeleteDM(item.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="trash" size={28} color="#fff" />
+                  </TouchableOpacity>
+                )}
+              >
+                <TouchableOpacity
+                  style={styles.chatRow}
+                  activeOpacity={0.85}
+                  onPress={() => router.push({ pathname: `/chat/[chatId]`, params: { chatId: item.id } })}
+                >
+                  <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                  <View style={styles.chatContent}>
+                    <View style={styles.chatHeaderRow}>
+                      <Text style={styles.chatName}>{item.name}</Text>
+                      <Text style={styles.chatTime}>14:32</Text>
+                    </View>
+                    <View style={styles.chatFooterRow}>
+                      <Text style={styles.chatLastMsg} numberOfLines={1}>{item.lastMsg}</Text>
+                      {item.unread > 0 && (
+                        <View style={styles.badgeUnread}><Text style={styles.badgeUnreadText}>{item.unread}</Text></View>
+                      )}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </Swipeable>
+            ) : (
+              <TouchableOpacity
+                style={styles.chatRow}
+                activeOpacity={0.85}
+                onPress={() => router.push({ pathname: `/community/[category]`, params: { category: item.id } })}
+              >
+                <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                <View style={styles.chatContent}>
+                  <View style={styles.chatHeaderRow}>
+                    <Text style={styles.chatName}>{item.name}</Text>
+                    <Text style={styles.chatTime}>14:32</Text>
+                  </View>
+                  <View style={styles.chatFooterRow}>
+                    <Text style={styles.chatLastMsg} numberOfLines={1}>{item.lastMsg}</Text>
+                    {item.unread > 0 && (
+                      <View style={styles.badgeUnread}><Text style={styles.badgeUnreadText}>{item.unread}</Text></View>
+                    )}
+                  </View>
                 </View>
-                <View style={styles.chatFooterRow}>
-                  <Text style={styles.chatLastMsg} numberOfLines={1}>{item.lastMsg}</Text>
-                  {item.unread > 0 && (
-                    <View style={styles.badgeUnread}><Text style={styles.badgeUnreadText}>{item.unread}</Text></View>
-                  )}
-                </View>
-              </View>
-            </TouchableOpacity>
-          )}
+              </TouchableOpacity>
+            )
+          }
           style={{ flexGrow: 0 }}
         />
         <TouchableOpacity
@@ -204,76 +258,76 @@ export default function MessengerList() {
         >
           <Ionicons name="chatbubble-ellipses" size={30} color="#fff" />
         </TouchableOpacity>
-      {/* Modal de sélection d'ami */}
-      <Modal
-        visible={showFriendsModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowFriendsModal(false)}
-      >
-        <View style={{ flex: 1, backgroundColor: 'rgba(24,24,24,0.85)', justifyContent: 'center', alignItems: 'center' }}>
-          <View style={{ backgroundColor: '#23232a', borderRadius: 18, padding: 24, width: '85%', maxHeight: '70%' }}>
-            <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 20, marginBottom: 16 }}>Choisis un ami</Text>
-            {loadingFriends ? (
-              <Text style={{ color: '#fff' }}>Chargement...</Text>
-            ) : friends.length === 0 ? (
-              <Text style={{ color: '#fff' }}>Aucun ami trouvé.</Text>
-            ) : (
-              <FlatList
-                data={friends}
-                keyExtractor={item => item.otherUser.uid}
-                renderItem={({ item }) => {
-                  const user = item.otherUser;
-                  return (
-                    <TouchableOpacity
-                      style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10 }}
-                      onPress={async () => {
-                        setShowFriendsModal(false);
-                        // Ouvre ou crée le chat DM
-                        const auth = getAuth();
-                        const current = auth.currentUser;
-                        if (!current) return;
-                        const fromUid = current.uid;
-                        const toUid = user.uid;
-                        if (fromUid === toUid) return;
-                        // Cherche un thread DM existant
-                        const q = query(collection(db, 'dmThreads'), where('participants', 'array-contains', fromUid));
-                        const snap = await getDocs(q);
-                        let existing = null;
-                        for (const d of snap.docs) {
-                          const data = d.data();
-                          const parts = data.participants || [];
-                          if (parts.includes(toUid)) { existing = { id: d.id, ...data }; break; }
-                        }
-                        if (existing) {
-                          router.push({ pathname: `/chat/[chatId]`, params: { chatId: existing.id } });
-                          return;
-                        }
-                        // Crée un nouveau thread DM
-                        const threadRef = await addDoc(collection(db, 'dmThreads'), {
-                          participants: [fromUid, toUid],
-                          createdAt: new Date(),
-                        });
-                        router.push({ pathname: `/chat/[chatId]`, params: { chatId: threadRef.id } });
-                      }}
-                    >
-                      <Image source={{ uri: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.pseudo || user.displayName || 'User')}&background=FFA94D&color=181818&size=128` }} style={{ width: 44, height: 44, borderRadius: 22, marginRight: 14, backgroundColor: '#FFA94D33' }} />
-                      <View>
-                        <Text style={{ color: '#fff', fontSize: 16 }}>{user.pseudo || user.displayName || 'Utilisateur'}</Text>
-                        <Text style={{ color: '#aaa', fontSize: 13 }}>{user.mail || user.email || ''}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                }}
-                style={{ maxHeight: 300 }}
-              />
-            )}
-            <TouchableOpacity onPress={() => setShowFriendsModal(false)} style={{ marginTop: 18, alignSelf: 'center' }}>
-              <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 16 }}>Annuler</Text>
-            </TouchableOpacity>
+        {/* Modal de sélection d'ami */}
+        <Modal
+          visible={showFriendsModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowFriendsModal(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(24,24,24,0.85)', justifyContent: 'center', alignItems: 'center' }}>
+            <View style={{ backgroundColor: '#23232a', borderRadius: 18, padding: 24, width: '85%', maxHeight: '70%' }}>
+              <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 20, marginBottom: 16 }}>Choisis un ami</Text>
+              {loadingFriends ? (
+                <Text style={{ color: '#fff' }}>Chargement...</Text>
+              ) : friends.length === 0 ? (
+                <Text style={{ color: '#fff' }}>Aucun ami trouvé.</Text>
+              ) : (
+                <FlatList
+                  data={friends}
+                  keyExtractor={item => item.otherUser.uid}
+                  renderItem={({ item }) => {
+                    const user = item.otherUser;
+                    return (
+                      <TouchableOpacity
+                        style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10 }}
+                        onPress={async () => {
+                          setShowFriendsModal(false);
+                          // Ouvre ou crée le chat DM
+                          const auth = getAuth();
+                          const current = auth.currentUser;
+                          if (!current) return;
+                          const fromUid = current.uid;
+                          const toUid = user.uid;
+                          if (fromUid === toUid) return;
+                          // Cherche un thread DM existant
+                          const q = query(collection(db, 'dmThreads'), where('participants', 'array-contains', fromUid));
+                          const snap = await getDocs(q);
+                          let existing = null;
+                          for (const d of snap.docs) {
+                            const data = d.data();
+                            const parts = data.participants || [];
+                            if (parts.includes(toUid)) { existing = { id: d.id, ...data }; break; }
+                          }
+                          if (existing) {
+                            router.push({ pathname: `/chat/[chatId]`, params: { chatId: existing.id } });
+                            return;
+                          }
+                          // Crée un nouveau thread DM
+                          const threadRef = await addDoc(collection(db, 'dmThreads'), {
+                            participants: [fromUid, toUid],
+                            createdAt: new Date(),
+                          });
+                          router.push({ pathname: `/chat/[chatId]`, params: { chatId: threadRef.id } });
+                        }}
+                      >
+                        <Image source={{ uri: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.pseudo || user.displayName || 'User')}&background=FFA94D&color=181818&size=128` }} style={{ width: 44, height: 44, borderRadius: 22, marginRight: 14, backgroundColor: '#FFA94D33' }} />
+                        <View>
+                          <Text style={{ color: '#fff', fontSize: 16 }}>{user.pseudo || user.displayName || 'Utilisateur'}</Text>
+                          <Text style={{ color: '#aaa', fontSize: 13 }}>{user.mail || user.email || ''}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  }}
+                  style={{ maxHeight: 300 }}
+                />
+              )}
+              <TouchableOpacity onPress={() => setShowFriendsModal(false)} style={{ marginTop: 18, alignSelf: 'center' }}>
+                <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 16 }}>Annuler</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
       </View>
       <BottomNav />
     </View>
@@ -384,5 +438,16 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginLeft: 18,
     marginBottom: 10,
+  },
+  deleteAction: {
+    backgroundColor: '#E53935',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 70,
+    height: '90%',
+    marginVertical: 6,
+    borderRadius: 16,
+    alignSelf: 'flex-end',
+    marginRight: 10,
   },
 });

@@ -144,6 +144,7 @@ export default function FriendsScreen() {
   }
 
   // Create or open a chat between current user and the given user
+  // Utilise la collection 'chats' pour tous les DMs (création/ouverture)
   async function createOrOpenChat(user: any) {
     try {
       const auth = getAuth(app);
@@ -153,7 +154,7 @@ export default function FriendsScreen() {
       const toUid = user.uid || user.id;
       if (fromUid === toUid) return Alert.alert('Erreur', 'Impossible d\'ouvrir un chat avec toi-même.');
 
-      // search for existing chat where both participants are present
+      // Cherche un chat DM existant dans 'chats'
       const q = firestoreQuery(collection(db, 'chats'), where('participants', 'array-contains', fromUid));
       const snap = await getDocs(q);
       let existing: any = null;
@@ -167,14 +168,14 @@ export default function FriendsScreen() {
         return;
       }
 
-      // create new chat
+      // Crée un nouveau chat DM dans 'chats'
       const participantsMeta: Record<string, any> = {};
       participantsMeta[fromUid] = { displayName: current.displayName || current.email || 'Moi', photoURL: current.photoURL || null };
       participantsMeta[toUid] = { displayName: user.pseudo || user.displayName || user.mail || 'Utilisateur', photoURL: user.photoURL || null };
       const chatRef = await addDoc(collection(db, 'chats'), {
         participants: [fromUid, toUid],
         participantsMeta,
-        createdAt: serverTimestamp(),
+        createdAt: new Date(),
       });
       (router as any).push(`/chat/${chatRef.id}`);
     } catch (e) {
