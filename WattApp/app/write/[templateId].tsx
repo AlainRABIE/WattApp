@@ -258,7 +258,7 @@ const TemplateEditor: React.FC = () => {
               <PublishDetailsModal
                 visible={showPublishModal}
                 onClose={() => setShowPublishModal(false)}
-                onSubmit={async (cover, title, synopsis) => {
+                onSubmit={async (cover, title, synopsis, price) => {
                   setShowPublishModal(false);
                   try {
                     const auth = getAuth(app);
@@ -281,11 +281,15 @@ const TemplateEditor: React.FC = () => {
                       strokes: Array.isArray(publishStrokes) ? publishStrokes : [],
                       reads: 0,
                       status: 'published',
+                      price: price ? parseFloat(price) : 0,
                     };
                     await addDoc(collection(db, 'books'), docData);
                     Alert.alert('Publié', 'Votre document a été publié !');
                   } catch (e) {
-                    Alert.alert('Erreur', e?.message || String(e));
+                    let msg = '';
+                    if (e instanceof Error) msg = e.message;
+                    else msg = String(e);
+                    Alert.alert('Erreur', msg);
                   }
                   setTimeout(() => {
                     (router as any).push('/library/Library');
