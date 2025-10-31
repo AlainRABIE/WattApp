@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, Image } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
 import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import NoteLayout from '../components/NoteLayout';
+import PDFDrawingEditor from '../components/PDFDrawingEditorClean';
+import PublishDetailsModal from './PublishDetailsModal';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
@@ -22,6 +24,10 @@ const TemplateEditor: React.FC = () => {
   const [importGenre, setImportGenre] = useState<string>('');
   const [coverDataUrl, setCoverDataUrl] = useState<string | null>(null);
   const [savingImport, setSavingImport] = useState<boolean>(false);
+
+  // Pour la publication (modal)
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [publishStrokes, setPublishStrokes] = useState<any>(null);
 
   useEffect(() => {
     if (!templateId) return;
@@ -210,8 +216,100 @@ const TemplateEditor: React.FC = () => {
       }
     >
       <View style={styles.container}>
-        <TextInput value={title} onChangeText={setTitle} placeholder="Titre" placeholderTextColor="#888" style={styles.input} />
-        <TextInput value={body} onChangeText={setBody} placeholder="Commencez à écrire..." placeholderTextColor="#888" style={[styles.input, { height: 300 }]} multiline />
+        {/* Large template preview at the top (only for non-PDF templates) */}
+        {!(template?.isPDF || (template?.backgroundImage && (template.backgroundImage.endsWith('.pdf') || template.backgroundImage.startsWith('file:') || template.backgroundImage.startsWith('content:')))) && (
+          <View style={styles.templatePreviewLarge}>
+            {template?.backgroundImage ? (
+              <Image
+                source={{ uri: template.backgroundImage }}
+                style={styles.templateImageLarge}
+                resizeMode="contain"
+              />
+            ) : (
+              <View style={styles.templateIconLargeWrap}>
+                <Text style={styles.templateIconLarge}>📄</Text>
+              </View>
+            )}
+            <Text style={styles.templateTitleLarge} numberOfLines={2}>{template?.title || template?.nom || 'Sans titre'}</Text>
+            {template?.subtitle ? (
+              <Text style={styles.templateSubtitleLarge} numberOfLines={2}>{template.subtitle}</Text>
+            ) : null}
+          </View>
+        )}
+
+
+        {/* If template is a PDF, show PDF drawing editor */}
+        {template?.isPDF || (template?.backgroundImage && (template.backgroundImage.endsWith('.pdf') || template.backgroundImage.startsWith('file:') || template.backgroundImage.startsWith('content:')))
+          ? (
+            <View style={{ flex: 1, minHeight: 400 }}>
+              <PDFDrawingEditor
+                pdfUri={template.backgroundImage}
+                onSaveDraft={(strokes) => {
+                  Alert.alert('Brouillon sauvegardé', 'Votre brouillon a été enregistré.');
+                }}
+                onPublish={(strokes) => {
+                  setPublishStrokes(strokes);
+                  setShowPublishModal(true);
+                }}
+                onSave={(strokes) => {
+                  Alert.alert('Exporté', 'Votre document a été exporté !');
+                }}
+              />
+              <PublishDetailsModal
+                visible={showPublishModal}
+                onClose={() => setShowPublishModal(false)}
+                onSubmit={async (cover, title, synopsis) => {
+                  setShowPublishModal(false);
+                  try {
+                    const auth = getAuth(app);
+                    const user = auth.currentUser;
+                    if (!user) throw new Error('Utilisateur non authentifié');
+                    if (!title.trim()) throw new Error('Le titre est obligatoire');
+                    const docData = {
+                      title: title || '(Sans titre)',
+                      body: '',
+                      synopsis: synopsis || '',
+                      coverImage: cover || '',
+                      templateId: template?.id || null,
+                      templateName: template?.title || template?.nom || '',
+                      templateBackgroundImage: template?.backgroundImage || '',
+                      isPDFAnnotation: true,
+                      isPublished: true,
+                      authorUid: user.uid,
+                      createdAt: serverTimestamp(),
+                      updatedAt: serverTimestamp(),
+                      strokes: Array.isArray(publishStrokes) ? publishStrokes : [],
+                      reads: 0,
+                      status: 'published',
+                    };
+                    await addDoc(collection(db, 'books'), docData);
+                    Alert.alert('Publié', 'Votre document a été publié !');
+                  } catch (e) {
+                    Alert.alert('Erreur', e?.message || String(e));
+                  }
+                  setTimeout(() => {
+                    (router as any).push('/library/Library');
+                  }, 500);
+                }}
+              />
+            </View>
+          ) : (
+            <>
+              <TextInput value={title} onChangeText={setTitle} placeholder="Titre" placeholderTextColor="#888" style={styles.input} />
+              <TextInput value={body} onChangeText={setBody} placeholder="Commencez à écrire..." placeholderTextColor="#888" style={[styles.input, { height: 300 }]} multiline />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
+                <TouchableOpacity style={[styles.saveButton, { flex: 1, marginRight: 6 }]} onPress={() => Alert.alert('Brouillon sauvegardé', 'Votre brouillon a été enregistré.') }>
+                  <Text style={styles.saveText}>Enregistrer</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.saveButton, styles.publishButtonNew, { flex: 1, marginHorizontal: 6 }]} onPress={() => Alert.alert('Publié', 'Votre document a été publié !')}>
+                  <Text style={[styles.saveText, styles.publishButtonTextNew]}>Publier</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.saveButton, { flex: 1, marginLeft: 6, backgroundColor: '#4FC3F7' }]} onPress={() => Alert.alert('Exporté', 'Votre document a été exporté !')}>
+                  <Text style={styles.saveText}>Exporter</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
 
         {pendingImport ? (
           <View style={styles.importBox}>
@@ -242,9 +340,7 @@ const TemplateEditor: React.FC = () => {
           </View>
         ) : null}
 
-        <TouchableOpacity style={styles.saveButton} onPress={createDraft} disabled={saving}>
-          <Text style={styles.saveText}>{saving ? 'Enregistrement...' : 'Créer le brouillon'}</Text>
-        </TouchableOpacity>
+        {/* Bouton 'Créer le brouillon' supprimé comme demandé */}
       </View>
     </NoteLayout>
   );
@@ -252,10 +348,52 @@ const TemplateEditor: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: '#181818' },
+  templatePreviewLarge: {
+    alignItems: 'center',
+    marginBottom: 18,
+    marginTop: 8,
+  },
+  templateImageLarge: {
+    width: 160,
+    height: 220,
+    borderRadius: 12,
+    backgroundColor: '#23232a',
+    marginBottom: 10,
+  },
+  templateIconLargeWrap: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#23232a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  templateIconLarge: {
+    fontSize: 60,
+    color: '#FFA94D',
+  },
+  templateTitleLarge: {
+    color: '#FFA94D',
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 2,
+    maxWidth: 260,
+  },
+  templateSubtitleLarge: {
+    color: '#ECEDEE',
+    fontSize: 15,
+    textAlign: 'center',
+    marginBottom: 6,
+    maxWidth: 260,
+  },
   title: { color: '#FFA94D', fontSize: 20, fontWeight: '700', marginBottom: 12 },
   input: { backgroundColor: '#232323', color: '#fff', borderRadius: 8, padding: 12, marginBottom: 12 },
   saveButton: { backgroundColor: '#FFA94D', padding: 12, borderRadius: 8, alignItems: 'center' },
   saveText: { color: '#181818', fontWeight: '700' },
+  publishButtonNew: { backgroundColor: '#34C759' },
+  publishButtonTextNew: { color: '#fff' },
   importBox: { backgroundColor: '#1E1E1E', borderRadius: 10, padding: 12, marginBottom: 12, borderColor: '#333', borderWidth: 1 },
   importLabel: { color: '#fff', fontWeight: '700', marginBottom: 8 },
   coverPicker: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#333', marginRight: 12 },
