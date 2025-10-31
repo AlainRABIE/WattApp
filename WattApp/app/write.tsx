@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList, Dimensions, Modal, Pressable, ActivityIndicator, Image } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import app, { db } from '../constants/firebaseConfig';
 import { collection, getDocs, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useRouter } from 'expo-router';
 
 const CATEGORIES = [
   'Roman', 'Manga', 'Poésie', 'Nouvelle', 'Fiche lecture', 'Bullet Journal', 'Note', 'Autre', 'imported'
@@ -243,6 +245,7 @@ const styles = StyleSheet.create({
 });
 
 export default function WriteScreen() {
+  const router = useRouter();
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [modalVisible, setModalVisible] = useState(false);
   const [pickedFile, setPickedFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
@@ -299,6 +302,7 @@ export default function WriteScreen() {
     <TouchableOpacity
       style={styles.bookCard}
       activeOpacity={0.85}
+      onPress={() => router.push(`/write/${item.id}`)}
       onLongPress={() => setPreviewModal({ visible: true, item })}
       delayLongPress={250}
     >

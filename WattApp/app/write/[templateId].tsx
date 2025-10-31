@@ -3,8 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert } from 'reac
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { TEMPLATES } from '../write';
+import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import NoteLayout from '../components/NoteLayout';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -26,14 +25,25 @@ const TemplateEditor: React.FC = () => {
 
   useEffect(() => {
     if (!templateId) return;
-    const t = TEMPLATES.find(x => x.id === templateId);
-    if (t) {
-      setTemplate(t);
-      setBody(t.starter || '');
-    } else {
-      // if not found, go back
-      router.back();
-    }
+    const fetchTemplate = async () => {
+      try {
+        const ref = doc(db, 'templates', String(templateId));
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          const t = { id: snap.id, ...snap.data() };
+          setTemplate(t);
+          let starterText = '';
+          if ('starter' in t && typeof t.starter === 'string') starterText = t.starter;
+          else if ('body' in t && typeof t.body === 'string') starterText = t.body;
+          setBody(starterText);
+        } else {
+          router.back();
+        }
+      } catch (e) {
+        router.back();
+      }
+    };
+    fetchTemplate();
   }, [templateId]);
 
   async function createDraft() {
