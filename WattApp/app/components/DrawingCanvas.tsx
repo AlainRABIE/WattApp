@@ -25,12 +25,18 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(props: any, ref) {
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt) => {
+        const touches = evt.nativeEvent.touches ? evt.nativeEvent.touches.length : 0;
+        console.log('[DrawingCanvas] Grant - touches:', touches);
+        if (touches > 1) return;
         const { locationX, locationY } = evt.nativeEvent;
         const p = Skia.Path.Make();
         p.moveTo(locationX, locationY);
         setCurrentPath(p.toSVGString());
       },
       onPanResponderMove: (evt) => {
+        const touches = evt.nativeEvent.touches ? evt.nativeEvent.touches.length : 0;
+        console.log('[DrawingCanvas] Move - touches:', touches);
+        if (touches > 1) return;
         const { locationX, locationY } = evt.nativeEvent;
         if (currentPath) {
           const p = Skia.Path.MakeFromSVGString(currentPath);
@@ -40,7 +46,10 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(props: any, ref) {
           }
         }
       },
-      onPanResponderRelease: () => {
+      onPanResponderRelease: (evt) => {
+        const touches = evt.nativeEvent.touches ? evt.nativeEvent.touches.length : 0;
+        console.log('[DrawingCanvas] Release - touches:', touches);
+        if (touches > 1) return;
         if (currentPath) {
           setPaths((prev: PathType[]) => {
             const updated = [
@@ -53,7 +62,10 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(props: any, ref) {
           setCurrentPath(null);
         }
       },
-      onPanResponderTerminate: () => {
+      onPanResponderTerminate: (evt) => {
+        const touches = evt.nativeEvent.touches ? evt.nativeEvent.touches.length : 0;
+        console.log('[DrawingCanvas] Terminate - touches:', touches);
+        if (touches > 1) return;
         setCurrentPath(null);
       },
     })
@@ -77,7 +89,7 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(props: any, ref) {
   }));
 
   return (
-    <View style={styles.container} {...panResponder.panHandlers}>
+    <View style={styles.container} pointerEvents="box-none" {...panResponder.panHandlers}>
       <Canvas style={styles.canvas}>
         <Group>
           {paths.map((p: PathType, i: number) => (
@@ -112,7 +124,6 @@ export { DrawingCanvas };
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 10,
   },
   canvas: {
     width: '100%',

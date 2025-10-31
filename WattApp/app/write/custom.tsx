@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, Platform, Alert } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, Platform, Alert, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { PDFAnnotator } from '../components/PDFAnnotatorClean';
@@ -62,13 +62,29 @@ export default function CustomWriteScreen() {
         <Ionicons name="chevron-back" size={22} color={displayMode.key === 'dark' ? '#fff' : '#23272F'} style={{ opacity: 0.7 }} />
       </TouchableOpacity>
 
+      {/* Affichage du modèle (titre, description) */}
+      {(template.title || template.subtitle || template.description) && (
+        <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 2 }}>
+          {template.title ? (
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: displayMode.key === 'dark' ? '#fff' : '#23272F' }} numberOfLines={2}>{template.title}</Text>
+          ) : null}
+          {template.subtitle ? (
+            <Text style={{ fontSize: 15, color: '#888', marginTop: 2 }} numberOfLines={2}>{template.subtitle}</Text>
+          ) : null}
+          {template.description ? (
+            <Text style={{ fontSize: 14, color: '#888', marginTop: 2 }} numberOfLines={3}>{template.description}</Text>
+          ) : null}
+        </View>
+      )}
+
       {/* Boutons d'action et mode en haut à gauche */}
       <View style={styles.actionBarTopLeft}>
         <TouchableOpacity
           style={[styles.actionBtnTop, { backgroundColor: displayMode.btn }]}
           onPress={() => setDisplayModeIdx((displayModeIdx + 1) % DISPLAY_MODES.length)}
         >
-          <Ionicons name={displayMode.icon as any} size={20} color={displayMode.key === 'dark' ? '#23272F' : '#fff'} />        </TouchableOpacity>
+          <Ionicons name={displayMode.icon as any} size={20} color={displayMode.key === 'dark' ? '#23272F' : '#fff'} />
+        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionBtnTop, styles.draftBtnTop, { backgroundColor: displayMode.key === 'dark' ? '#388E3C' : '#43a047' }]}
           onPress={saveDraft}
@@ -85,7 +101,7 @@ export default function CustomWriteScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={{ flex: 1 }}>
+  <View style={{ flex: 1 }} pointerEvents="box-none">
         {/* PDF et dessin */}
         <PDFAnnotator
           pdfUri={pdfUri}

@@ -45,20 +45,32 @@ export function PDFAnnotator(props: PDFAnnotatorProps) {
 
   // Gestes
   const pinchGesture = Gesture.Pinch()
-    .onStart(() => { savedScale.value = scale.value; })
-    .onUpdate((event) => { scale.value = Math.max(0.5, Math.min(savedScale.value * event.scale, 5)); })
-    .onEnd(() => { savedScale.value = scale.value; });
+    .onStart(() => {
+      console.log('[PDFAnnotator] Pinch START');
+      savedScale.value = scale.value;
+    })
+    .onUpdate((event) => {
+      console.log('[PDFAnnotator] Pinch UPDATE', event.scale);
+      scale.value = Math.max(0.5, Math.min(savedScale.value * event.scale, 5));
+    })
+    .onEnd(() => {
+      console.log('[PDFAnnotator] Pinch END');
+      savedScale.value = scale.value;
+    });
 
   const panGesture = Gesture.Pan()
     .onStart(() => {
+      console.log('[PDFAnnotator] Pan START');
       savedTranslateX.value = translateX.value;
       savedTranslateY.value = translateY.value;
     })
     .onUpdate((event) => {
+      console.log('[PDFAnnotator] Pan UPDATE', event.translationX, event.translationY);
       translateX.value = savedTranslateX.value + event.translationX;
       translateY.value = savedTranslateY.value + event.translationY;
     })
     .onEnd(() => {
+      console.log('[PDFAnnotator] Pan END');
       savedTranslateX.value = translateX.value;
       savedTranslateY.value = translateY.value;
     });

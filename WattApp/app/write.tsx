@@ -1,292 +1,428 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, Image } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useEffect } from 'react';
-import { getAuth } from 'firebase/auth';
+import React, { useState, useEffect } from 'react';
+import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList, Dimensions, Modal, Pressable, ActivityIndicator, Image } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import app, { db } from '../constants/firebaseConfig';
-import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
-import NoteLayout from './components/NoteLayout';
-import TemplateManager from './components/TemplateManager';
+import { collection, getDocs, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
 
-type Template = { id: string; title: string; subtitle: string; starter: string; color: string };
-
-export const TEMPLATES: Template[] = [
-  { id: 'vierge', title: 'Vierge', subtitle: 'Page blanche', starter: '', color: '#FFFFFF' },
-  { id: 'quadrillage', title: 'Quadrillage', subtitle: 'Papier quadrillé', starter: '', color: '#FFF8E1' },
-  { id: 'reglure', title: 'À régule', subtitle: 'Lignes régulières', starter: '', color: '#FFFFFF' },
-  { id: 'note', title: 'Note', subtitle: "Note courte, listes à puces", starter: "- Point 1\n- Point 2\n- Point 3\n", color: '#FFF59D' },
-  { id: 'roman', title: 'Roman', subtitle: 'Narration longue, description', starter: "Chapitre 1\n\nIl était une fois...", color: '#BBDEFB' },
-  { id: 'manga', title: 'Manga', subtitle: 'Scènes et dialogues, format visuel', starter: "Page 1\n\n[Planche 1]\nPersonnage: \n- \n", color: '#F8BBD0' },
-  { id: 'nouvelle', title: 'Nouvelle', subtitle: "Courte, percutante", starter: "Le matin où tout a changé...", color: '#C8E6C9' },
-  { id: 'poesie', title: 'Poésie', subtitle: 'Vers et rimes', starter: "Sur le pavé, la lune danse...", color: '#E1BEE7' },
-  
-  // Nouveaux templates inspirés de TheGoodocs
-  { id: 'cornell', title: 'Cornell Notes', subtitle: 'Méthode Cornell pour prise de notes', starter: "📝 Sujet: \n\n📋 Notes principales:\n\n\n🔍 Résumé:\n", color: '#F0F8FF' },
-  { id: 'bullet-journal', title: 'Bullet Journal', subtitle: 'Organisation quotidienne', starter: "📅 Date: \n\n• Tâches importantes\n○ Événements\n- Notes\n! Priorité\n", color: '#FFF5EE' },
-  { id: 'pointille', title: 'Pointillé', subtitle: 'Grille de points discrets', starter: '', color: '#FAFAFA' },
-  { id: 'seyes', title: 'Seyès', subtitle: 'Réglure française traditionnelle', starter: '', color: '#FFFFFF' },
-  { id: 'meeting', title: 'Réunion', subtitle: 'Prise de notes de réunion', starter: "📅 Date: \n👥 Participants: \n🎯 Objectifs:\n\n📝 Points abordés:\n\n✅ Actions à retenir:\n", color: '#F0FFF0' },
-  { id: 'daily-planner', title: 'Planning Jour', subtitle: 'Organisation quotidienne', starter: "📅 Date: \n\n🌅 Matin:\n\n☀️ Après-midi:\n\n🌙 Soir:\n\n📌 Priorités:\n", color: '#FFF8DC' },
-  { id: 'creative', title: 'Créatif', subtitle: 'Espace libre pour créativité', starter: "💡 Idée:\n\n🎨 Inspiration:\n\n✨ Développement:\n", color: '#FFFACD' },
-  { id: 'lecture', title: 'Fiche Lecture', subtitle: 'Notes de lecture structurées', starter: "📚 Titre: \n✍️ Auteur: \n📖 Genre: \n\n💭 Résumé:\n\n⭐ Avis personnel:\n", color: '#F5F5DC' },
+const CATEGORIES = [
+  'Roman', 'Manga', 'Poésie', 'Nouvelle', 'Fiche lecture', 'Bullet Journal', 'Note', 'Autre', 'imported'
 ];
+const { width } = Dimensions.get('window');
 
-const WriteScreen: React.FC = () => {
-  const router = useRouter();
-  const [selected, setSelected] = useState<Template | null>(null);
-  const [title, setTitle] = useState<string>('');
-  const [body, setBody] = useState<string>('');
-  const [isPortrait, setIsPortrait] = useState<boolean>(true);
-  const [drafts, setDrafts] = useState<any[]>([]);
-  const [saving, setSaving] = useState<boolean>(false);
-  const [showTemplateManager, setShowTemplateManager] = useState<boolean>(false);
-  const [recentTemplates, setRecentTemplates] = useState<any[]>([]);
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#181818',
+  },
+  tabsRow: {
+    backgroundColor: '#181818',
+    paddingVertical: 0,
+    marginBottom: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: '#23232a',
+    marginTop: 0,
+  },
+  tabBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 14,
+    marginRight: 8,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+  },
+  tabBtnActive: {
+    backgroundColor: '#23232a',
+  },
+  tabBtnText: {
+    color: '#aaa',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  tabBtnTextActive: {
+    color: '#FFA94D',
+    fontWeight: 'bold',
+  },
+  bookCard: {
+    backgroundColor: '#181818',
+    borderRadius: 16,
+    marginBottom: 18,
+    flex: 1,
+    marginHorizontal: 6,
+    padding: 8,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    minHeight: 120,
+    maxHeight: 120,
+    maxWidth: (width / 2) - 18,
+    overflow: 'hidden',
+  },
+  bookRank: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#23232a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+    marginTop: 2,
+  },
+  bookRankText: {
+    color: '#FFA94D',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+  bookCoverPlaceholder: {
+    width: 54,
+    height: 74,
+    borderRadius: 8,
+    backgroundColor: '#333',
+    marginRight: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bookCoverEmoji: {
+    fontSize: 28,
+    color: '#FFA94D',
+  },
+  bookInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  bookTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 2,
+    maxWidth: 110,
+    overflow: 'hidden',
+  },
+  bookAuthor: {
+    color: '#aaa',
+    fontSize: 14,
+    marginBottom: 2,
+    maxWidth: 110,
+    overflow: 'hidden',
+  },
+  bookPreview: {
+    color: '#ECEDEE',
+    fontSize: 13,
+    marginTop: 2,
+    opacity: 0.85,
+    maxWidth: 110,
+    overflow: 'hidden',
+  },
+  fab: {
+    position: 'absolute',
+    right: 24,
+    bottom: 32,
+    backgroundColor: '#FFA94D',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#FFA94D',
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 6,
+    zIndex: 10,
+  },
+  fabIcon: {
+    color: '#23232a',
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginTop: -2,
+  },
+  // Styles pour le modal et le picker
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#23232a',
+    borderRadius: 18,
+    padding: 24,
+    minWidth: 260,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  modalTitle: {
+    color: '#FFA94D',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 18,
+  },
+  modalOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    width: 180,
+  },
+  modalOptionActive: {
+    backgroundColor: '#FFA94D',
+  },
+  modalOptionText: {
+    color: '#ECEDEE',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  modalOptionTextActive: {
+    color: '#23232a',
+    fontWeight: 'bold',
+  },
+  pickFileBtn: {
+    marginTop: 18,
+    backgroundColor: '#FFA94D',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+  },
+  pickFileBtnText: {
+    color: '#23232a',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+  pickedFileName: {
+    color: '#FFA94D',
+    fontSize: 13,
+    marginTop: 8,
+    maxWidth: 180,
+    textAlign: 'center',
+  },
+  // Styles pour la prévisualisation grand format
+  previewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewContent: {
+    backgroundColor: '#23232a',
+    borderRadius: 18,
+    padding: 18,
+    alignItems: 'center',
+    maxWidth: '90%',
+    maxHeight: '80%',
+  },
+  previewImage: {
+    width: 240,
+    height: 320,
+    borderRadius: 12,
+    marginBottom: 18,
+    backgroundColor: '#333',
+  },
+  previewIcon: {
+    fontSize: 90,
+    color: '#FFA94D',
+    marginBottom: 18,
+  },
+  previewTitle: {
+    color: '#FFA94D',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  previewSubtitle: {
+    color: '#ECEDEE',
+    fontSize: 15,
+    marginBottom: 2,
+    textAlign: 'center',
+  },
+});
 
+export default function WriteScreen() {
+  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [pickedFile, setPickedFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [previewModal, setPreviewModal] = useState<{visible: boolean, item?: any}>({visible: false});
+
+  // Charger les templates Firestore filtrés par catégorie
   useEffect(() => {
-    let unsub: any;
-    const load = async () => {
-      const auth = getAuth(app);
-      const user = auth.currentUser;
-      if (!user) return;
-      
-      // Requête simplifiée pour éviter l'index composite
-      const q = query(
-        collection(db, 'books'), 
-        where('authorUid', '==', user.uid)
-      );
-      
-      unsub = onSnapshot(q, snap => {
-        // Filtrer et trier côté client pour éviter l'index Firebase
-        const allBooks = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-        const draftBooks = allBooks
-          .filter((book: any) => book.status === 'draft')
-          .sort((a: any, b: any) => {
-            // Tri par date de création décroissante
-            const dateA = a.createdAt?.toDate?.() || new Date(0);
-            const dateB = b.createdAt?.toDate?.() || new Date(0);
-            return dateB.getTime() - dateA.getTime();
-          });
-        setDrafts(draftBooks);
-      });
-    };
-    load();
-    return () => { if (unsub) unsub(); };
-  }, []);
-
-  function chooseTemplate(t: Template) {
-    // open dedicated editor for this template
-    (router as any).push(`/write/${t.id}`);
-  }
-
-  async function createDraft() {
-    if (!title.trim() && !body.trim()) {
-      Alert.alert('Erreur', 'Veuillez saisir au moins un titre ou du contenu');
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const auth = getAuth(app);
-      const user = auth.currentUser;
-      if (!user) {
-        Alert.alert('Erreur', 'Utilisateur non authentifié');
-        return;
+    const fetchTemplates = async () => {
+      setLoading(true);
+      try {
+        const q = query(
+          collection(db, 'templates'),
+          where('type', '==', category)
+        );
+        const snap = await getDocs(q);
+        setTemplates(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (e) {
+        setTemplates([]);
       }
+      setLoading(false);
+    };
+    fetchTemplates();
+  }, [category]);
 
-      const docRef = await addDoc(collection(db, 'books'), {
-        title: title.trim() || '(Sans titre)',
-        body: body.trim(),
-        templateId: selected?.id || null,
-        authorUid: user.uid,
-        status: 'draft',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+  const handlePickFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+        multiple: false,
       });
-
-      // Réinitialiser les champs
-      setTitle('');
-      setBody('');
-      setSelected(null);
-      
-      // Rediriger vers la bibliothèque
-      Alert.alert(
-        'Brouillon créé', 
-        'Votre brouillon a été enregistré avec succès !',
-        [
-          {
-            text: 'OK',
-            onPress: () => (router as any).push('/library/Library')
-          }
-        ]
-      );
-    } catch (e: any) {
-      console.warn('createDraft error', e);
-      Alert.alert('Erreur', `Impossible de sauvegarder: ${e?.message ?? String(e)}`);
-    } finally {
-      setSaving(false);
+      if (result.assets && result.assets.length > 0) {
+        const file = result.assets[0];
+        setPickedFile(file);
+        // Ajout Firestore avec la catégorie sélectionnée
+        await addDoc(collection(db, 'templates'), {
+          title: file.name,
+          subtitle: 'Importé depuis un fichier',
+          backgroundImage: file.uri,
+          type: category,
+          isCustom: true,
+          isPDF: file.name?.toLowerCase().endsWith('.pdf') || false,
+          createdAt: serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      // Gestion d'erreur
     }
-  }
+  };
+
+  const renderCard = ({ item, index }: { item: any; index: number }) => (
+    <TouchableOpacity
+      style={styles.bookCard}
+      activeOpacity={0.85}
+      onLongPress={() => setPreviewModal({ visible: true, item })}
+      delayLongPress={250}
+    >
+      <View style={styles.bookRank}><Text style={styles.bookRankText}>{index + 1}</Text></View>
+      <View style={styles.bookCoverPlaceholder}>
+        {item.backgroundImage ? (
+          <Image
+            source={{ uri: item.backgroundImage }}
+            style={{ width: 54, height: 74, borderRadius: 8 }}
+            resizeMode="cover"
+          />
+        ) : (
+          <Text style={styles.bookCoverEmoji}>📄</Text>
+        )}
+      </View>
+      <View style={styles.bookInfo}>
+        <Text style={styles.bookTitle} numberOfLines={1}>{item.title || item.nom || 'Sans titre'}</Text>
+        <Text style={styles.bookAuthor} numberOfLines={1}>{item.subtitle || ''}</Text>
+        <Text style={styles.bookPreview} numberOfLines={2}>{item.starter || item.preview || ''}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  // Modal de prévisualisation grand format
+  const renderPreviewModal = () => (
+    <Modal
+      visible={previewModal.visible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setPreviewModal({ visible: false })}
+    >
+      <Pressable style={styles.previewOverlay} onPress={() => setPreviewModal({ visible: false })}>
+        <View style={styles.previewContent}>
+          {previewModal.item?.backgroundImage ? (
+            <Image
+              source={{ uri: previewModal.item.backgroundImage }}
+              style={styles.previewImage}
+              resizeMode="contain"
+            />
+          ) : (
+            <Text style={styles.previewIcon}>📄</Text>
+          )}
+          <Text style={styles.previewTitle}>{previewModal.item?.title || previewModal.item?.nom || 'Sans titre'}</Text>
+          <Text style={styles.previewSubtitle}>{previewModal.item?.subtitle || ''}</Text>
+        </View>
+      </Pressable>
+    </Modal>
+  );
 
   return (
-    <NoteLayout title="Sélectionner un modèle">
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.cancel}>Annuler</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Sélectionner un modèle</Text>
-        <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => setShowTemplateManager(true)}>
-            <Text style={styles.iconText}>📋 Templates</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn}><Text style={styles.iconText}>Photos</Text></TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Portrait / Paysage toggles */}
-      <View style={styles.controlsRow}>
-        <View style={styles.toggleRow}>
-          <TouchableOpacity style={[styles.toggleBtn, isPortrait ? styles.toggleActive : null]} onPress={() => setIsPortrait(true)}>
-            <Text style={isPortrait ? styles.toggleTextActive : styles.toggleText}>Portrait</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.toggleBtn, !isPortrait ? styles.toggleActive : null]} onPress={() => setIsPortrait(false)}>
-            <Text style={!isPortrait ? styles.toggleTextActive : styles.toggleText}>Paysage</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Récents */}
-      <View style={styles.sectionLarge}>
-        <Text style={styles.sectionTitleLarge}>Récents</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingVertical: 8 }}>
-          {(recentTemplates.length > 0 ? recentTemplates : TEMPLATES.slice(0, 6)).map(t => (
-            <TouchableOpacity key={`recent-${t.id}`} onPress={() => chooseTemplate(t)} style={styles.recentThumbWrap}>
-              <View style={[styles.recentThumb, { backgroundColor: t.color || '#eee' }]}> 
-                {t.backgroundImage ? (
-                  <Image 
-                    source={{ uri: t.backgroundImage }} 
-                    style={styles.recentBackgroundImage}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <>
-                    <Text style={[styles.previewTitle, (t.color && t.color.toUpperCase().includes('FFF')) ? { color: '#222' } : { color: '#222' }]} numberOfLines={1}>{t.title}</Text>
-                    {t.starter ? t.starter.split('\n').slice(0,2).map((ln: string, i: number) => (
-                      <Text key={i} style={[styles.previewLine, (t.color && t.color.toUpperCase().includes('FFF')) ? { color: '#333' } : { color: '#333' }]} numberOfLines={1}>{ln}</Text>
-                    )) : null}
-                  </>
-                )}
-              </View>
-              <Text style={styles.recentLabel}>{t.title}</Text>
+    <SafeAreaView style={styles.safeArea}>
+      {/* Onglets catégories tout en haut */}
+      <View style={{backgroundColor: '#181818'}}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsRow} contentContainerStyle={{ paddingHorizontal: 8 }}>
+          {CATEGORIES.map(cat => (
+            <TouchableOpacity
+              key={cat}
+              style={[styles.tabBtn, category === cat && styles.tabBtnActive]}
+              onPress={() => setCategory(cat)}>
+              <Text style={[styles.tabBtnText, category === cat && styles.tabBtnTextActive]}>{cat}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
-
-      {/* Editor inputs below selection */}
-      <View style={styles.sectionLarge}>
-        <Text style={styles.sectionTitleLarge}>Mes brouillons</Text>
-        {drafts.length === 0 ? (
-          <Text style={styles.placeholder}>Tu n'as pas encore de brouillons.</Text>
+      {/* Grille de templates Firestore */}
+      <View style={{ flex: 1 }}>
+        {loading ? (
+          <ActivityIndicator color="#FFA94D" style={{ marginTop: 32 }} size="large" />
+        ) : templates.length === 0 ? (
+          <View style={{ alignItems: 'center', marginTop: 32 }}>
+            <Text style={{ color: '#aaa', fontSize: 16 }}>Aucun template trouvé.</Text>
+          </View>
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingVertical: 8 }}>
-            {drafts.map(d => (
-              <TouchableOpacity key={d.id} style={styles.draftCard} onPress={() => (router as any).push(`/book/${d.id}`)}>
-                <Text style={styles.draftTitle} numberOfLines={1}>{d.title || '(Sans titre)'}</Text>
-                <Text style={styles.draftMeta}>{d.templateId || d.type || '—'}</Text>
+          <FlatList
+            data={templates}
+            keyExtractor={item => item.id}
+            renderItem={renderCard}
+            numColumns={2}
+            columnWrapperStyle={{ justifyContent: 'space-between', paddingHorizontal: 8 }}
+            contentContainerStyle={{ paddingBottom: 32, paddingTop: 8 }}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+        {renderPreviewModal()}
+      </View>
+      {/* Bouton flottant pour ajouter un template */}
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.85}
+        onPress={() => setModalVisible(true)}
+      >
+        <Text style={styles.fabIcon}>＋</Text>
+      </TouchableOpacity>
+      {/* Modal de sélection de domaine et fichier */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Choisir un domaine</Text>
+            {CATEGORIES.map((cat) => (
+              <TouchableOpacity
+                key={cat}
+                style={[styles.modalOption, category === cat && styles.modalOptionActive]}
+                onPress={() => {
+                  setCategory(cat);
+                  setModalVisible(false);
+                }}
+              >
+                <Text style={[styles.modalOptionText, category === cat && styles.modalOptionTextActive]}>{cat}</Text>
               </TouchableOpacity>
             ))}
-          </ScrollView>
-        )}
-      </View>
-      <View style={{ paddingHorizontal: 20, marginTop: 18 }}>
-        <TextInput value={title} onChangeText={setTitle} placeholder="Titre de l'œuvre" placeholderTextColor="#888" style={styles.input} />
-        <TextInput value={body} onChangeText={setBody} placeholder={selected ? undefined : "Début de votre histoire..."} placeholderTextColor="#888" style={[styles.input, { height: 220 }]} multiline />
-
-        <TouchableOpacity 
-          style={[styles.saveButton, saving && styles.saveButtonDisabled]} 
-          onPress={createDraft}
-          disabled={saving}
-        >
-          <Text style={styles.saveText}>
-            {saving ? 'Sauvegarde...' : (selected ? `Créer (${selected.title})` : 'Créer (sans template)')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-      </ScrollView>
-      
-      <TemplateManager
-        visible={showTemplateManager}
-        onClose={() => setShowTemplateManager(false)}
-        onSelectTemplate={(template) => {
-          setSelected(template);
-          setBody(template.starter || '');
-          setShowTemplateManager(false);
-          // Toujours ouvrir custom.tsx avec le template sélectionné
-          (router as any).push({
-            pathname: '/write/custom',
-            params: { 
-              templateData: JSON.stringify(template)
-            }
-          });
-        }}
-        recentTemplates={recentTemplates}
-        onUpdateRecentTemplates={setRecentTemplates}
-      />
-    </NoteLayout>
+            <TouchableOpacity style={styles.pickFileBtn} onPress={handlePickFile}>
+              <Text style={styles.pickFileBtnText}>Sélectionner un fichier</Text>
+            </TouchableOpacity>
+            {pickedFile && (
+              <Text style={styles.pickedFileName} numberOfLines={1}>{pickedFile.name}</Text>
+            )}
+          </View>
+        </Pressable>
+      </Modal>
+    </SafeAreaView>
   );
-};
-
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: '#181818' },
-  title: { color: '#FFA94D', fontSize: 20, fontWeight: '700', marginBottom: 12 },
-  sectionLabel: { color: '#fff', marginBottom: 8 },
-  templateCard: { backgroundColor: '#232323', padding: 12, borderRadius: 10, marginRight: 10, minWidth: 140, minHeight: 110, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 6, elevation: 3 },
-  templateCardActive: { borderColor: '#FFA94D', borderWidth: 2 },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  pin: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#FFF176', marginRight: 8, transform: [{ rotate: '20deg' }] },
-  templateTitle: { color: '#3E2723', fontWeight: '700', marginBottom: 2 },
-  templateSubtitle: { color: '#3E2723', fontSize: 12 },
-  previewLines: { marginTop: 8 },
-  line: { height: 6, backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 3, marginTop: 6 },
-  header: { width: '100%', paddingHorizontal: 12, paddingTop: 12, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cancel: { color: '#4FC3F7' },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  headerRight: { flexDirection: 'row', alignItems: 'center' },
-  iconBtn: { backgroundColor: '#222', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, marginLeft: 8 },
-  iconText: { color: '#ddd', fontSize: 12 },
-  controlsRow: { width: '100%', paddingHorizontal: 12, marginTop: 6 },
-  toggleRow: { flexDirection: 'row' },
-  toggleBtn: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 18, backgroundColor: '#1F1F1F', marginRight: 8 },
-  toggleActive: { backgroundColor: '#333' },
-  toggleText: { color: '#aaa' },
-  toggleTextActive: { color: '#fff', fontWeight: '700' },
-  sectionLarge: { width: '100%', paddingHorizontal: 12, marginTop: 12 },
-  sectionTitleLarge: { color: '#fff', fontWeight: '700', marginBottom: 8 },
-  recentThumbWrap: { alignItems: 'center', marginRight: 12 },
-  recentThumb: { width: 96, height: 120, borderRadius: 6, backgroundColor: '#222', overflow: 'hidden' },
-  recentBackgroundImage: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-  },
-  recentInner: { flex: 1, backgroundColor: '#eee' },
-  recentLabel: { color: '#ccc', fontSize: 12, marginTop: 6, textAlign: 'center' },
-  previewTitle: { fontWeight: '700', fontSize: 12, marginTop: 8, paddingHorizontal: 6 },
-  previewLine: { fontSize: 11, paddingHorizontal: 6, color: '#444' },
-  placeholder: { color: '#888', fontStyle: 'italic' },
-  draftCard: { width: 160, height: 84, backgroundColor: '#222', borderRadius: 8, padding: 10, marginRight: 12, justifyContent: 'center' },
-  draftTitle: { color: '#fff', fontWeight: '700' },
-  draftMeta: { color: '#aaa', fontSize: 12, marginTop: 6 },
-  input: { backgroundColor: '#232323', color: '#fff', borderRadius: 8, padding: 12, marginBottom: 12 },
-  saveButton: { backgroundColor: '#FFA94D', padding: 12, borderRadius: 8, alignItems: 'center' },
-  saveButtonDisabled: { backgroundColor: '#666', opacity: 0.7 },
-  saveText: { color: '#181818', fontWeight: '700' },
-});
-
-export default WriteScreen;
+}
