@@ -239,7 +239,8 @@ const BookEditor: React.FC = () => {
 
       const bookData = { id: docSnap.id, ...docSnap.data() } as any;
       
-
+      // Vérifier si l'utilisateur actuel est l'auteur
+      setIsAuthor(bookData.authorUid === user.uid);
 
       setBook(bookData);
   setTitle(bookData.title || '');
@@ -469,8 +470,23 @@ const BookEditor: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Chip Chapitres en haut à droite, ouvre la sidebar chapitres + badge status */}
+      {/* Chip Chapitres en haut à droite, ouvre la sidebar chapitres + badge status + badge auteur */}
       <View style={{ width: '100%', alignItems: 'flex-end', marginTop: 38, marginBottom: -18, paddingRight: 18, zIndex: 10, flexDirection: 'row', justifyContent: 'flex-end' }}>
+        {isAuthor && (
+          <View style={{
+            backgroundColor: '#4FC3F7',
+            borderRadius: 14,
+            paddingVertical: 5,
+            paddingHorizontal: 16,
+            marginRight: 10,
+            alignSelf: 'flex-start',
+            minWidth: 60,
+          }}>
+            <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 13, textAlign: 'center' }}>
+              Mon livre
+            </Text>
+          </View>
+        )}
         {book?.status && (
           <View style={{
             backgroundColor: book.status === 'published' ? '#FFA94D' : (book.status === 'finished' ? '#4CAF50' : '#888'),
@@ -705,8 +721,8 @@ const BookEditor: React.FC = () => {
 
         {/* Note moyenne modernisée supprimée, déplacée dans la ligne des stats */}
 
-        {/* Champs synopsis et tags pour l'auteur (édition/publication) */}
-        {isAuthor && (
+        {/* Champs synopsis et tags pour l'auteur (édition/publication) - UNIQUEMENT si pas encore publié */}
+        {isAuthor && book?.status !== 'published' && (
           <View style={{ width: '92%', backgroundColor: '#23232a', borderRadius: 16, padding: 18, marginBottom: 18, alignSelf: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, elevation: 1 }}>
             <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 18, marginBottom: 8 }}>Synopsis</Text>
             <TextInput
@@ -720,6 +736,47 @@ const BookEditor: React.FC = () => {
               maxLength={800}
             />
             <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 16, marginBottom: 6 }}>Tags</Text>
+            
+            {/* Tags prédéfinis/catégories populaires */}
+            <Text style={{ color: '#888', fontSize: 13, marginBottom: 8 }}>Catégories populaires :</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 }}>
+              {[
+                'Roman', 'Fantasy', 'Science-fiction', 'Romance', 'Thriller', 'Mystère',
+                'Aventure', 'Drame', 'Comédie', 'Horreur', 'Historique', 'Biographie',
+                'Poésie', 'Nouvelle', 'Jeunesse', 'Young Adult'
+              ].map((category) => (
+                <TouchableOpacity
+                  key={category}
+                  onPress={() => {
+                    if (!tags.includes(category)) {
+                      setTags([...tags, category]);
+                    }
+                  }}
+                  style={{
+                    backgroundColor: tags.includes(category) ? '#FFA94D' : '#333',
+                    borderRadius: 16,
+                    paddingVertical: 6,
+                    paddingHorizontal: 12,
+                    marginRight: 8,
+                    marginBottom: 8,
+                    borderWidth: 1,
+                    borderColor: tags.includes(category) ? '#FFA94D' : '#555',
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{
+                    color: tags.includes(category) ? '#181818' : '#FFA94D',
+                    fontSize: 12,
+                    fontWeight: '600'
+                  }}>
+                    {category}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            {/* Input pour tags personnalisés */}
+            <Text style={{ color: '#888', fontSize: 13, marginBottom: 6 }}>Ou ajoutez vos propres tags :</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
               <TextInput
                 value={tagInput}
@@ -760,10 +817,42 @@ const BookEditor: React.FC = () => {
           </View>
         )}
 
+        {/* Message informatif pour l'auteur quand le livre est publié */}
+        {isAuthor && book?.status === 'published' && (
+          <View style={{ width: '92%', backgroundColor: '#232323', borderRadius: 16, padding: 18, marginBottom: 18, alignSelf: 'center', borderLeftWidth: 4, borderLeftColor: '#4FC3F7' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <Ionicons name="lock-closed" size={20} color="#4FC3F7" style={{ marginRight: 8 }} />
+              <Text style={{ color: '#4FC3F7', fontWeight: 'bold', fontSize: 16 }}>Livre publié</Text>
+            </View>
+            <Text style={{ color: '#ccc', fontSize: 14, lineHeight: 20 }}>
+              Votre livre est maintenant publié et ne peut plus être modifié. Le synopsis et les tags sont verrouillés pour maintenir l'intégrité du contenu.
+            </Text>
+          </View>
+        )}
+
         {/* Bouton principal modernisé + bouton ajout bibliothèque */}
         <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 16, marginBottom: 40, marginTop: 12 }}>
-          {/* Logique différente selon si le livre est gratuit, payant non acheté, ou payant acheté */}
-          {book && book.price && book.price > 0 ? (
+          {/* Logique différente selon si c'est l'auteur, livre gratuit, payant non acheté, ou payant acheté */}
+          {isAuthor ? (
+            // L'auteur peut toujours lire son livre
+            <TouchableOpacity
+              style={{ backgroundColor: '#FFA94D', borderRadius: 32, paddingVertical: 20, paddingHorizontal: 54, shadowColor: '#FFA94D', shadowOpacity: 0.22, shadowRadius: 12, elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+              onPress={() => {
+                // Reprendre la lecture là où l'utilisateur s'est arrêté ou commencer
+                if (readingProgress && readingProgress.position) {
+                  router.push(`/book/${bookId}/read?position=${readingProgress.position}`);
+                } else {
+                  router.push(`/book/${bookId}/read`);
+                }
+              }}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="book-outline" size={26} color="#181818" style={{ marginRight: 8 }} />
+              <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 21, letterSpacing: 0.3 }}>
+                {readingProgress && readingProgress.position ? 'Reprendre la lecture' : 'Lire mon livre'}
+              </Text>
+            </TouchableOpacity>
+          ) : book && book.price && book.price > 0 ? (
             // Livre payant
             hasPurchased ? (
               // Livre payant acheté - Permettre la lecture
@@ -818,12 +907,17 @@ const BookEditor: React.FC = () => {
               </Text>
             </TouchableOpacity>
           )}
-          {/* Bouton + ou check pour ajouter à la bibliothèque - UNIQUEMENT pour livres gratuits ou déjà achetés */}
+          {/* Bouton + ou check pour ajouter à la bibliothèque - UNIQUEMENT pour livres gratuits ou déjà achetés ET pas l'auteur */}
           {(() => {
             const auth = getAuth(app);
             const user = auth.currentUser;
             const isInLibrary = book && user && book.ownerUid === user.uid;
             const isPaidBook = book && book.price && book.price > 0;
+            
+            // Ne pas afficher le bouton pour l'auteur de son propre livre
+            if (isAuthor) {
+              return null;
+            }
             
             // Ne pas afficher le bouton pour les livres payants non achetés
             if (isPaidBook && !hasPurchased && !isInLibrary) {
