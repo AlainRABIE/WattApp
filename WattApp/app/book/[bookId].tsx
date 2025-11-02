@@ -20,7 +20,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
 import { doc, getDoc, updateDoc, serverTimestamp, setDoc, increment, collection, onSnapshot, getDocs, addDoc, query, orderBy, setDoc as setDocFirestore, deleteDoc } from 'firebase/firestore';
-import { TEMPLATES } from '../write';
 import NoteLayout from '../components/NoteLayout';
 
 import StarRating from '../components/StarRating';
@@ -210,9 +209,14 @@ const BookEditor: React.FC = () => {
 
       // Charger le template si disponible
       if (bookData.templateId) {
-        const foundTemplate = TEMPLATES.find(t => t.id === bookData.templateId);
-        if (foundTemplate) {
-          setTemplate(foundTemplate);
+        try {
+          const templateRef = doc(db, 'templates', bookData.templateId);
+          const templateSnap = await getDoc(templateRef);
+          if (templateSnap.exists()) {
+            setTemplate({ id: templateSnap.id, ...templateSnap.data() });
+          }
+        } catch (error) {
+          console.warn('Erreur lors du chargement du template:', error);
         }
       }
     } catch (error: any) {
@@ -401,6 +405,28 @@ const BookEditor: React.FC = () => {
   return (
     <View style={{ flex: 1, backgroundColor: '#18191c' }}>
       <StatusBar barStyle="light-content" />
+      
+      {/* Bouton retour vers home en haut à gauche */}
+      <View style={{ position: 'absolute', top: 38, left: 18, zIndex: 15 }}>
+        <TouchableOpacity
+          onPress={() => router.push('/home/home')}
+          activeOpacity={0.8}
+          style={{ 
+            backgroundColor: 'rgba(35,39,47,0.65)', 
+            borderRadius: 20, 
+            padding: 12, 
+            borderWidth: 1, 
+            borderColor: '#FFA94D',
+            shadowColor: '#000',
+            shadowOpacity: 0.2,
+            shadowRadius: 8,
+            elevation: 5
+          }}
+        >
+          <Ionicons name="arrow-back-outline" size={24} color="#FFA94D" />
+        </TouchableOpacity>
+      </View>
+
       {/* Chip Chapitres en haut à droite, ouvre la sidebar chapitres + badge status */}
       <View style={{ width: '100%', alignItems: 'flex-end', marginTop: 38, marginBottom: -18, paddingRight: 18, zIndex: 10, flexDirection: 'row', justifyContent: 'flex-end' }}>
         {book?.status && (
