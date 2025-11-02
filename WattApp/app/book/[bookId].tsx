@@ -288,6 +288,7 @@ const BookEditor: React.FC = () => {
         coverImage: coverImage,
         synopsis: synopsis.trim(),
         tags: tags,
+        author: user?.displayName || user?.email || 'Auteur inconnu',
         updatedAt: serverTimestamp(),
       });
 
