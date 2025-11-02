@@ -45,7 +45,8 @@ export default function RootLayout() {
     pathname.includes('/write/') ||
     pathname.includes('/read') ||
     pathname.startsWith('/community/') || // Cacher pour toutes les pages de chat communautaire
-    pathname.startsWith('/chat/') // Cacher pour toutes les pages de chat direct (DM)
+    pathname.startsWith('/chat/') || // Cacher pour toutes les pages de chat direct (DM)
+    pathname.startsWith('/payment/') // Cacher pour les pages de paiement
   );
 
   return (

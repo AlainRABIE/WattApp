@@ -21,6 +21,7 @@ import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
 import { doc, getDoc, updateDoc, serverTimestamp, setDoc, increment, collection, onSnapshot, getDocs, addDoc, query, orderBy, setDoc as setDocFirestore, deleteDoc } from 'firebase/firestore';
 import NoteLayout from '../components/NoteLayout';
+import StripeServiceDemo from '../../services/StripeServiceDemo';
 
 import StarRating from '../components/StarRating';
 import * as ImagePicker from 'expo-image-picker';
@@ -43,6 +44,7 @@ const BookEditor: React.FC = () => {
   const [replyText, setReplyText] = useState('');
   const [replies, setReplies] = useState<{ [key: string]: any[] }>({});
   const [likes, setLikes] = useState<{ [key: string]: { count: number, liked: boolean } }>({});
+  const [hasPurchased, setHasPurchased] = useState<boolean>(false);
   // Listen for likes for each comment
   useEffect(() => {
     const safeBookId = Array.isArray(bookId) ? bookId[0] : String(bookId);
@@ -169,6 +171,22 @@ const BookEditor: React.FC = () => {
   useEffect(() => {
     loadBook();
   }, [bookId]);
+
+  // Vérifier l'achat après le chargement du livre
+  useEffect(() => {
+    checkUserPurchase();
+  }, [book]);
+
+  const checkUserPurchase = async () => {
+    if (!book || !bookId || typeof bookId !== 'string') return;
+    
+    try {
+      const purchased = await StripeServiceDemo.checkPurchase(bookId);
+      setHasPurchased(purchased);
+    } catch (error) {
+      console.error('Erreur lors de la vérification d\'achat:', error);
+    }
+  };
 
   const loadBook = async () => {
     if (!bookId || typeof bookId !== 'string') {
@@ -713,13 +731,8 @@ const BookEditor: React.FC = () => {
             <TouchableOpacity
               style={{ backgroundColor: '#FFA94D', borderRadius: 32, paddingVertical: 20, paddingHorizontal: 54, shadowColor: '#FFA94D', shadowOpacity: 0.22, shadowRadius: 12, elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 10 }}
               onPress={() => {
-                Alert.alert('Achat de livre', `Acheter "${book.title}" pour ${book.price.toFixed(2)}€`, [
-                  { text: 'Annuler', style: 'cancel' },
-                  { text: 'Acheter', onPress: () => {
-                    // TODO: Intégrer le système de paiement Stripe ici
-                    Alert.alert('Paiement', 'Système de paiement bientôt disponible !');
-                  }}
-                ]);
+                // Redirection vers la page de paiement
+                (router as any).navigate(`/payment/${bookId}`);
               }}
               activeOpacity={0.85}
             >
@@ -743,10 +756,9 @@ const BookEditor: React.FC = () => {
             const user = auth.currentUser;
             const isInLibrary = book && user && book.ownerUid === user.uid;
             const isPaidBook = book && book.price && book.price > 0;
-            const isPurchased = book && user && book.purchasedBy && book.purchasedBy.includes(user.uid);
             
             // Ne pas afficher le bouton pour les livres payants non achetés
-            if (isPaidBook && !isPurchased && !isInLibrary) {
+            if (isPaidBook && !hasPurchased && !isInLibrary) {
               return null;
             }
             
@@ -796,7 +808,7 @@ const BookEditor: React.FC = () => {
                       }
                       
                       // Vérification supplémentaire : empêcher l'ajout des livres payants non achetés
-                      if (isPaidBook && !isPurchased) {
+                      if (isPaidBook && !hasPurchased) {
                         Alert.alert('Achat requis', 'Vous devez d\'abord acheter ce livre pour l\'ajouter à votre bibliothèque.');
                         return;
                       }
