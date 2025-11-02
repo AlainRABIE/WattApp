@@ -31,6 +31,15 @@ const WalletScreen: React.FC = () => {
     loadWalletBalance();
   }, []);
 
+  // Rafraîchir le solde à chaque fois qu'on navigue vers cette page
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadWalletBalance();
+    }, 2000); // Vérifier toutes les 2 secondes
+    
+    return () => clearInterval(interval);
+  }, []);
+
   const loadWalletBalance = async () => {
     try {
       const auth = getAuth(app);
@@ -78,56 +87,9 @@ const WalletScreen: React.FC = () => {
     } else if (amount >= 4.99) {
       bonus = 0.5;
     }
-    
-    const totalAmount = amount + bonus;
 
-    try {
-      setAddingFunds(true);
-      const auth = getAuth(app);
-      const user = auth.currentUser;
-      if (!user) return;
-
-      // Simulation d'un paiement (à remplacer par une vraie intégration de paiement)
-      const message = bonus > 0 
-        ? `Ajouter ${amount.toFixed(2)}€ + ${bonus.toFixed(2)}€ de bonus = ${totalAmount.toFixed(2)}€ à votre portefeuille ?`
-        : `Ajouter ${amount.toFixed(2)}€ à votre portefeuille ?`;
-        
-      Alert.alert(
-        '🎉 Offre spéciale !',
-        message,
-        [
-          { text: 'Annuler', style: 'cancel' },
-          {
-            text: 'Confirmer',
-            onPress: async () => {
-              try {
-                const userRef = doc(db, 'users', user.uid);
-                await updateDoc(userRef, {
-                  walletBalance: increment(totalAmount),
-                  lastTopUp: serverTimestamp(),
-                });
-                
-                setWalletBalance(prev => prev + totalAmount);
-                setSelectedAmount(null);
-                setCustomAmount('');
-                
-                const successMessage = bonus > 0 
-                  ? `🎉 ${totalAmount.toFixed(2)}€ ajoutés ! (${amount.toFixed(2)}€ + ${bonus.toFixed(2)}€ de bonus)`
-                  : `${amount.toFixed(2)}€ ont été ajoutés à votre portefeuille !`;
-                  
-                Alert.alert('Succès', successMessage);
-              } catch (error) {
-                Alert.alert('Erreur', 'Échec de l\'ajout des fonds');
-              }
-            }
-          }
-        ]
-      );
-    } catch (error) {
-      Alert.alert('Erreur', 'Impossible d\'ajouter les fonds');
-    } finally {
-      setAddingFunds(false);
-    }
+    // Rediriger vers la page de paiement
+    router.push(`/payment?amount=${amount}&bonus=${bonus}`);
   };
 
   const handleCustomAmountSubmit = () => {
