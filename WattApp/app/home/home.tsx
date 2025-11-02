@@ -157,10 +157,16 @@ const Home: React.FC = () => {
 													)}
 													{/* Titre */}
 													<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, marginTop: 8 }} numberOfLines={1}>{livre.title || 'Titre inconnu'}</Text>
-													{/* Statistiques fictives */}
+													{/* Auteur et Prix */}
+													<Text style={{ color: '#888', fontSize: 12, marginTop: 2 }} numberOfLines={1}>
+														par {livre.author || livre.auteur || 'Auteur inconnu'}
+													</Text>
+													{/* Prix */}
 													<View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-														<Text style={{ color: '#888', fontSize: 12, marginRight: 12 }}>👁️ 1.2K</Text>
-														<Text style={{ color: '#888', fontSize: 12 }}>⭐ 200</Text>
+														<Text style={{ color: '#FFA94D', fontSize: 14, fontWeight: 'bold' }}>
+															{livre.price && livre.price > 0 ? `${livre.price.toFixed(2)}€` : 'Gratuit'}
+														</Text>
+														<Text style={{ color: '#888', fontSize: 12, marginLeft: 8 }}>👁️ {livre.reads || 0}</Text>
 													</View>
 												</TouchableOpacity>
 											);
@@ -192,6 +198,13 @@ const Home: React.FC = () => {
 														resizeMode="cover"
 													/>
 													<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13, marginTop: 6 }} numberOfLines={2}>{livre.title || 'Titre inconnu'}</Text>
+													{/* Auteur et Prix */}
+													<Text style={{ color: '#888', fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+														par {livre.author || livre.auteur || 'Auteur inconnu'}
+													</Text>
+													<Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>
+														{livre.price && livre.price > 0 ? `${livre.price.toFixed(2)}€` : 'Gratuit'}
+													</Text>
 												</TouchableOpacity>
 											);
 										});
@@ -222,6 +235,13 @@ const Home: React.FC = () => {
 														resizeMode="cover"
 													/>
 													<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13, marginTop: 6 }} numberOfLines={2}>{livre.title || 'Titre inconnu'}</Text>
+													{/* Auteur et Prix */}
+													<Text style={{ color: '#888', fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+														par {livre.author || livre.auteur || 'Auteur inconnu'}
+													</Text>
+													<Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>
+														{livre.price && livre.price > 0 ? `${livre.price.toFixed(2)}€` : 'Gratuit'}
+													</Text>
 												</TouchableOpacity>
 											);
 										});
