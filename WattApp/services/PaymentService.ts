@@ -1,15 +1,15 @@
-// Service Stripe simplifié pour la démo
-// Simule les appels backend sans Firebase Functions
+// Service de paiement pour WattApp
+// Gère les transactions et achats de livres
 
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../constants/firebaseConfig';
-import { doc, updateDoc, arrayUnion, serverTimestamp, addDoc, collection } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, serverTimestamp, addDoc, collection, increment, getDoc, query, where, orderBy, getDocs } from 'firebase/firestore';
 
-export class StripeServiceDemo {
+export class PaymentService {
   
   /**
-   * Simuler la création d'un Payment Intent
-   * En production, ceci serait fait côté serveur
+   * Créer un Payment Intent pour un livre
+   * En production, ceci serait fait côté serveur sécurisé
    */
   static async createPaymentIntent(bookId: string, amount: number): Promise<{clientSecret: string, paymentIntentId: string}> {
     try {
@@ -25,12 +25,10 @@ export class StripeServiceDemo {
         throw new Error('Paramètres invalides');
       }
 
-      // Simuler la réponse de Stripe
-      // En production, ceci viendrait de votre backend sécurisé
-      const paymentIntentId = `pi_demo_${bookId}_${Date.now()}`;
-      const clientSecret = `${paymentIntentId}_secret_demo`;
+      // Générer un Payment Intent simulé
+      const paymentIntentId = `pi_${bookId}_${Date.now()}`;
+      const clientSecret = `${paymentIntentId}_secret`;
 
-      // Log pour le debug
       console.log('Payment Intent créé:', {
         paymentIntentId,
         bookId,
@@ -50,8 +48,8 @@ export class StripeServiceDemo {
   }
 
   /**
-   * Simuler le traitement d'un paiement réussi
-   * En production, ceci serait déclenché par les webhooks Stripe
+   * Traiter un paiement réussi
+   * Met à jour la base de données après confirmation du paiement
    */
   static async handlePaymentSuccess(bookId: string, paymentIntentId: string, amount: number): Promise<void> {
     try {
@@ -66,25 +64,26 @@ export class StripeServiceDemo {
       const bookRef = doc(db, 'books', bookId);
       await updateDoc(bookRef, {
         purchasedBy: arrayUnion(user.uid),
-        sales: (await import('firebase/firestore')).increment(1),
-        revenue: (await import('firebase/firestore')).increment(amount),
+        sales: increment(1),
+        revenue: increment(amount),
         updatedAt: serverTimestamp(),
       });
 
-      // Ajouter à l'historique d'achat de l'utilisateur
+      // Créer un document utilisateur s'il n'existe pas
       const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        purchasedBooks: arrayUnion({
-          bookId,
-          paymentIntentId,
-          amount,
-          purchaseDate: serverTimestamp(),
-          status: 'completed',
-        }),
-        updatedAt: serverTimestamp(),
-      });
+      const userSnap = await getDoc(userRef);
+      
+      if (!userSnap.exists()) {
+        // Créer le document utilisateur
+        await updateDoc(userRef, {
+          email: user.email,
+          displayName: user.displayName,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      }
 
-      // Enregistrer la transaction
+      // Enregistrer la transaction séparément
       await addDoc(collection(db, 'transactions'), {
         paymentIntentId,
         bookId,
@@ -94,6 +93,18 @@ export class StripeServiceDemo {
         status: 'completed',
         platformCommission: amount * 0.1,
         authorRevenue: amount * 0.9,
+        purchaseDate: Date.now(),
+        createdAt: serverTimestamp(),
+      });
+
+      // Ajouter l'achat à l'historique utilisateur (document séparé)
+      await addDoc(collection(db, 'user_purchases'), {
+        userId: user.uid,
+        bookId,
+        paymentIntentId,
+        amount,
+        purchaseDate: Date.now(),
+        status: 'completed',
         createdAt: serverTimestamp(),
       });
 
@@ -122,18 +133,16 @@ export class StripeServiceDemo {
         return false;
       }
 
-      // Vérifier dans Firestore si l'utilisateur figure dans purchasedBy
-      const bookRef = doc(db, 'books', bookId);
-      const bookSnap = await (await import('firebase/firestore')).getDoc(bookRef);
-      
-      if (!bookSnap.exists()) {
-        return false;
-      }
+      // Vérifier dans les transactions
+      const transactionsQuery = query(
+        collection(db, 'transactions'),
+        where('userId', '==', user.uid),
+        where('bookId', '==', bookId),
+        where('status', '==', 'completed')
+      );
 
-      const bookData = bookSnap.data();
-      const purchasedBy = bookData.purchasedBy || [];
-      
-      return purchasedBy.includes(user.uid);
+      const snapshot = await getDocs(transactionsQuery);
+      return !snapshot.empty;
 
     } catch (error) {
       console.error('Erreur checkPurchase:', error);
@@ -154,13 +163,14 @@ export class StripeServiceDemo {
       }
 
       // Récupérer les transactions de l'utilisateur
-      const transactionsQuery = (await import('firebase/firestore')).query(
+      const transactionsQuery = query(
         collection(db, 'transactions'),
-        (await import('firebase/firestore')).where('userId', '==', user.uid),
-        (await import('firebase/firestore')).orderBy('createdAt', 'desc')
+        where('userId', '==', user.uid),
+        where('status', '==', 'completed'),
+        orderBy('createdAt', 'desc')
       );
 
-      const snapshot = await (await import('firebase/firestore')).getDocs(transactionsQuery);
+      const snapshot = await getDocs(transactionsQuery);
       
       return snapshot.docs.map(doc => ({
         id: doc.id,
@@ -175,14 +185,14 @@ export class StripeServiceDemo {
 
   /**
    * Simuler le processus complet de paiement
-   * Combine createPaymentIntent + handlePaymentSuccess
+   * Version de démonstration qui simule un paiement réel
    */
   static async processPayment(bookId: string, amount: number): Promise<{success: boolean, message: string}> {
     try {
       // Étape 1: Créer le Payment Intent
       const { paymentIntentId } = await this.createPaymentIntent(bookId, amount);
       
-      // Étape 2: Simuler le délai de traitement Stripe
+      // Étape 2: Simuler le délai de traitement du paiement
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Étape 3: Traiter le paiement réussi
@@ -201,6 +211,36 @@ export class StripeServiceDemo {
       };
     }
   }
+
+  /**
+   * Obtenir les livres achetés par l'utilisateur
+   */
+  static async getUserPurchasedBooks(): Promise<string[]> {
+    try {
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+      
+      if (!user) {
+        return [];
+      }
+
+      const transactionsQuery = query(
+        collection(db, 'transactions'),
+        where('userId', '==', user.uid),
+        where('status', '==', 'completed')
+      );
+
+      const snapshot = await getDocs(transactionsQuery);
+      const bookIds = snapshot.docs.map(doc => doc.data().bookId);
+      
+      // Retourner uniquement les IDs uniques
+      return [...new Set(bookIds)];
+
+    } catch (error) {
+      console.error('Erreur getUserPurchasedBooks:', error);
+      return [];
+    }
+  }
 }
 
-export default StripeServiceDemo;
+export default PaymentService;

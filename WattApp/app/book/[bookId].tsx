@@ -21,7 +21,7 @@ import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
 import { doc, getDoc, updateDoc, serverTimestamp, setDoc, increment, collection, onSnapshot, getDocs, addDoc, query, orderBy, setDoc as setDocFirestore, deleteDoc } from 'firebase/firestore';
 import NoteLayout from '../components/NoteLayout';
-import StripeServiceDemo from '../../services/StripeServiceDemo';
+import PaymentService from '../../services/PaymentService';
 
 import StarRating from '../components/StarRating';
 import * as ImagePicker from 'expo-image-picker';
@@ -45,6 +45,8 @@ const BookEditor: React.FC = () => {
   const [replies, setReplies] = useState<{ [key: string]: any[] }>({});
   const [likes, setLikes] = useState<{ [key: string]: { count: number, liked: boolean } }>({});
   const [hasPurchased, setHasPurchased] = useState<boolean>(false);
+  const [readingProgress, setReadingProgress] = useState<any>(null);
+  
   // Listen for likes for each comment
   useEffect(() => {
     const safeBookId = Array.isArray(bookId) ? bookId[0] : String(bookId);
@@ -175,16 +177,37 @@ const BookEditor: React.FC = () => {
   // Vérifier l'achat après le chargement du livre
   useEffect(() => {
     checkUserPurchase();
+    checkReadingProgress();
   }, [book]);
 
   const checkUserPurchase = async () => {
     if (!book || !bookId || typeof bookId !== 'string') return;
     
     try {
-      const purchased = await StripeServiceDemo.checkPurchase(bookId);
+      const purchased = await PaymentService.checkPurchase(bookId);
       setHasPurchased(purchased);
     } catch (error) {
       console.error('Erreur lors de la vérification d\'achat:', error);
+    }
+  };
+
+  const checkReadingProgress = async () => {
+    if (!book || !bookId || typeof bookId !== 'string') return;
+    
+    try {
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+      if (!user) return;
+
+      // Vérifier s'il y a un progrès de lecture sauvegardé
+      const progressRef = doc(db, 'users', user.uid, 'readingProgress', bookId);
+      const progressDoc = await getDoc(progressRef);
+      
+      if (progressDoc.exists()) {
+        setReadingProgress(progressDoc.data());
+      }
+    } catch (error) {
+      console.error('Erreur lors de la vérification du progrès:', error);
     }
   };
 
@@ -608,6 +631,19 @@ const BookEditor: React.FC = () => {
         )}
         {/* Titre modernisé */}
         <Text style={{ color: '#fff', fontSize: 32, fontWeight: 'bold', textAlign: 'center', marginBottom: 4, letterSpacing: 0.5, textShadowColor: '#0008', textShadowOffset: {width: 0, height: 2}, textShadowRadius: 6, lineHeight: 38, maxWidth: 340 }} numberOfLines={2} ellipsizeMode="tail">{title}</Text>
+        
+        {/* Indicateur de progrès de lecture */}
+        {readingProgress && readingProgress.position && (hasPurchased || !book.price || book.price === 0) && (
+          <View style={{ alignItems: 'center', marginBottom: 8 }}>
+            <View style={{ backgroundColor: '#23232a', borderRadius: 12, paddingVertical: 6, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="bookmark-outline" size={16} color="#4FC3F7" style={{ marginRight: 6 }} />
+              <Text style={{ color: '#4FC3F7', fontSize: 13, fontWeight: '600' }}>
+                Progression: {Math.round((readingProgress.position / (book.body?.length || 1)) * 100)}%
+              </Text>
+            </View>
+          </View>
+        )}
+        
         {/* Auteur affiché systématiquement */}
         <Text style={{ color: '#FFA94D', fontSize: 18, fontWeight: '600', marginBottom: 20, textAlign: 'center', letterSpacing: 0.1, textShadowColor: '#0006', textShadowOffset: {width: 0, height: 1}, textShadowRadius: 3 }}>
           par {book?.author ? book.author : 'Auteur inconnu'}
@@ -725,29 +761,60 @@ const BookEditor: React.FC = () => {
 
         {/* Bouton principal modernisé + bouton ajout bibliothèque */}
         <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 16, marginBottom: 40, marginTop: 12 }}>
-          {/* Logique différente selon si le livre est gratuit ou payant */}
+          {/* Logique différente selon si le livre est gratuit, payant non acheté, ou payant acheté */}
           {book && book.price && book.price > 0 ? (
-            // Livre payant - Bouton d'achat
-            <TouchableOpacity
-              style={{ backgroundColor: '#FFA94D', borderRadius: 32, paddingVertical: 20, paddingHorizontal: 54, shadowColor: '#FFA94D', shadowOpacity: 0.22, shadowRadius: 12, elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 10 }}
-              onPress={() => {
-                // Redirection vers la page de paiement
-                (router as any).navigate(`/payment/${bookId}`);
-              }}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="card-outline" size={26} color="#181818" style={{ marginRight: 8 }} />
-              <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 21, letterSpacing: 0.3 }}>Acheter {book.price.toFixed(2)}€</Text>
-            </TouchableOpacity>
+            // Livre payant
+            hasPurchased ? (
+              // Livre payant acheté - Permettre la lecture
+              <TouchableOpacity
+                style={{ backgroundColor: '#FFA94D', borderRadius: 32, paddingVertical: 20, paddingHorizontal: 54, shadowColor: '#FFA94D', shadowOpacity: 0.22, shadowRadius: 12, elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+                onPress={() => {
+                  // Reprendre la lecture là où l'utilisateur s'est arrêté ou commencer
+                  if (readingProgress && readingProgress.position) {
+                    router.push(`/book/${bookId}/read?position=${readingProgress.position}`);
+                  } else {
+                    router.push(`/book/${bookId}/read`);
+                  }
+                }}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="book-outline" size={26} color="#181818" style={{ marginRight: 8 }} />
+                <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 21, letterSpacing: 0.3 }}>
+                  {readingProgress && readingProgress.position ? 'Reprendre la lecture' : 'Commencer la lecture'}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              // Livre payant non acheté - Bouton d'achat
+              <TouchableOpacity
+                style={{ backgroundColor: '#FFA94D', borderRadius: 32, paddingVertical: 20, paddingHorizontal: 54, shadowColor: '#FFA94D', shadowOpacity: 0.22, shadowRadius: 12, elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+                onPress={() => {
+                  // Redirection vers la page de paiement
+                  (router as any).navigate(`/payment/${bookId}`);
+                }}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="card-outline" size={26} color="#181818" style={{ marginRight: 8 }} />
+                <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 21, letterSpacing: 0.3 }}>Acheter {book.price.toFixed(2)}€</Text>
+              </TouchableOpacity>
+            )
           ) : (
             // Livre gratuit - Lecture complète
             <TouchableOpacity
               style={{ backgroundColor: '#FFA94D', borderRadius: 32, paddingVertical: 20, paddingHorizontal: 54, shadowColor: '#FFA94D', shadowOpacity: 0.22, shadowRadius: 12, elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 10 }}
-              onPress={() => router.push(`/book/${bookId}/read`)}
+              onPress={() => {
+                // Reprendre la lecture là où l'utilisateur s'est arrêté ou commencer
+                if (readingProgress && readingProgress.position) {
+                  router.push(`/book/${bookId}/read?position=${readingProgress.position}`);
+                } else {
+                  router.push(`/book/${bookId}/read`);
+                }
+              }}
               activeOpacity={0.85}
             >
               <Ionicons name="book-outline" size={26} color="#181818" style={{ marginRight: 8 }} />
-              <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 21, letterSpacing: 0.3 }}>Commencer la lecture</Text>
+              <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 21, letterSpacing: 0.3 }}>
+                {readingProgress && readingProgress.position ? 'Reprendre la lecture' : 'Commencer la lecture'}
+              </Text>
             </TouchableOpacity>
           )}
           {/* Bouton + ou check pour ajouter à la bibliothèque - UNIQUEMENT pour livres gratuits ou déjà achetés */}

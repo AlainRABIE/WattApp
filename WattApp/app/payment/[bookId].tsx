@@ -18,7 +18,7 @@ import app, { db } from '../../constants/firebaseConfig';
 import { doc, getDoc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
 import { StripeProvider, usePaymentSheet } from '@stripe/stripe-react-native';
 import { STRIPE_CONFIG } from '../../constants/stripeConfig';
-import StripeServiceDemo from '../../services/StripeServiceDemo';
+import PaymentService from '../../services/PaymentService';
 
 const PaymentScreen: React.FC = () => {
   const { bookId } = useLocalSearchParams();
@@ -26,6 +26,7 @@ const PaymentScreen: React.FC = () => {
   const [book, setBook] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'card' | 'paypal' | 'apple' | null>(null);
   const { initPaymentSheet, presentPaymentSheet } = usePaymentSheet();
 
   useEffect(() => {
@@ -102,6 +103,11 @@ const PaymentScreen: React.FC = () => {
   };
 
   const handlePayment = async () => {
+    if (!selectedPaymentMethod) {
+      Alert.alert('Méthode de paiement', 'Veuillez sélectionner une méthode de paiement');
+      return;
+    }
+
     if (!book) {
       Alert.alert('Erreur', 'Informations du livre non disponibles');
       return;
@@ -119,7 +125,7 @@ const PaymentScreen: React.FC = () => {
 
     try {
       // Version simplifiée pour la démo (sans Payment Sheet)
-      const result = await StripeServiceDemo.processPayment(book.id, book.price);
+      const result = await PaymentService.processPayment(book.id, book.price);
 
       if (result.success) {
         Alert.alert(
@@ -220,41 +226,66 @@ const PaymentScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* Information sur Stripe */}
+          {/* Méthodes de paiement */}
           <View style={styles.paymentSection}>
-            <Text style={styles.sectionTitle}>Paiement sécurisé</Text>
-            <View style={styles.stripeInfo}>
-              <View style={styles.stripeRow}>
-                <Ionicons name="shield-checkmark" size={24} color="#4CAF50" />
-                <View style={styles.stripeTextContainer}>
-                  <Text style={styles.stripeTitle}>Paiement sécurisé par Stripe</Text>
-                  <Text style={styles.stripeDesc}>
-                    Vos informations de paiement sont protégées et cryptées. 
-                    Nous n'avons pas accès à vos données bancaires.
-                  </Text>
+            <Text style={styles.sectionTitle}>Méthode de paiement</Text>
+            
+            {/* Carte bancaire */}
+            <TouchableOpacity 
+              style={[styles.paymentMethod, selectedPaymentMethod === 'card' && styles.selectedPaymentMethod]}
+              onPress={() => setSelectedPaymentMethod('card')}
+              activeOpacity={0.8}
+            >
+              <View style={styles.paymentMethodLeft}>
+                <Ionicons name="card" size={24} color="#FFA94D" />
+                <View style={styles.paymentMethodInfo}>
+                  <Text style={styles.paymentMethodTitle}>Carte bancaire</Text>
+                  <Text style={styles.paymentMethodDesc}>Visa, Mastercard, American Express</Text>
                 </View>
               </View>
-              <View style={styles.paymentMethods}>
-                <Text style={styles.acceptedTitle}>Méthodes acceptées :</Text>
-                <View style={styles.methodsRow}>
-                  <View style={styles.methodIcon}>
-                    <Ionicons name="card" size={20} color="#FFA94D" />
-                    <Text style={styles.methodText}>Visa</Text>
-                  </View>
-                  <View style={styles.methodIcon}>
-                    <Ionicons name="card" size={20} color="#FFA94D" />
-                    <Text style={styles.methodText}>Mastercard</Text>
-                  </View>
-                  <View style={styles.methodIcon}>
-                    <Ionicons name="logo-paypal" size={20} color="#FFA94D" />
-                    <Text style={styles.methodText}>PayPal</Text>
-                  </View>
-                  <View style={styles.methodIcon}>
-                    <Ionicons name="logo-apple" size={20} color="#FFA94D" />
-                    <Text style={styles.methodText}>Apple Pay</Text>
-                  </View>
+              <View style={[styles.radio, selectedPaymentMethod === 'card' && styles.radioSelected]} />
+            </TouchableOpacity>
+
+            {/* PayPal */}
+            <TouchableOpacity 
+              style={[styles.paymentMethod, selectedPaymentMethod === 'paypal' && styles.selectedPaymentMethod]}
+              onPress={() => setSelectedPaymentMethod('paypal')}
+              activeOpacity={0.8}
+            >
+              <View style={styles.paymentMethodLeft}>
+                <Ionicons name="logo-paypal" size={24} color="#FFA94D" />
+                <View style={styles.paymentMethodInfo}>
+                  <Text style={styles.paymentMethodTitle}>PayPal</Text>
+                  <Text style={styles.paymentMethodDesc}>Paiement sécurisé via PayPal</Text>
                 </View>
               </View>
+              <View style={[styles.radio, selectedPaymentMethod === 'paypal' && styles.radioSelected]} />
+            </TouchableOpacity>
+
+            {/* Apple Pay (si iOS) */}
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity 
+                style={[styles.paymentMethod, selectedPaymentMethod === 'apple' && styles.selectedPaymentMethod]}
+                onPress={() => setSelectedPaymentMethod('apple')}
+                activeOpacity={0.8}
+              >
+                <View style={styles.paymentMethodLeft}>
+                  <Ionicons name="logo-apple" size={24} color="#FFA94D" />
+                  <View style={styles.paymentMethodInfo}>
+                    <Text style={styles.paymentMethodTitle}>Apple Pay</Text>
+                    <Text style={styles.paymentMethodDesc}>Paiement rapide avec Touch/Face ID</Text>
+                  </View>
+                </View>
+                <View style={[styles.radio, selectedPaymentMethod === 'apple' && styles.radioSelected]} />
+              </TouchableOpacity>
+            )}
+
+            {/* Informations de sécurité */}
+            <View style={styles.securityInfo}>
+              <Ionicons name="shield-checkmark" size={20} color="#4CAF50" />
+              <Text style={styles.securityText}>
+                Paiement sécurisé et crypté par Stripe
+              </Text>
             </View>
           </View>
 
@@ -272,9 +303,9 @@ const PaymentScreen: React.FC = () => {
         {/* Bouton de paiement fixe */}
         <View style={styles.paymentButtonContainer}>
           <TouchableOpacity 
-            style={[styles.paymentButton, processing && styles.paymentButtonDisabled]}
+            style={[styles.paymentButton, (!selectedPaymentMethod || processing) && styles.paymentButtonDisabled]}
             onPress={handlePayment}
-            disabled={processing}
+            disabled={!selectedPaymentMethod || processing}
             activeOpacity={0.8}
           >
             {processing ? (
@@ -420,55 +451,64 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   paymentSection: {},
-  stripeInfo: {
+  paymentMethod: {
     backgroundColor: '#23232a',
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 16,
-  },
-  stripeRow: {
+    marginBottom: 12,
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  stripeTextContainer: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  stripeTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  stripeDesc: {
-    color: '#aaa',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  paymentMethods: {
-    borderTopWidth: 1,
-    borderTopColor: '#333',
-    paddingTop: 16,
-  },
-  acceptedTitle: {
-    color: '#FFA94D',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  methodsRow: {
-    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
-  methodIcon: {
+  selectedPaymentMethod: {
+    borderColor: '#FFA94D',
+    backgroundColor: '#FFA94D15',
+  },
+  paymentMethodLeft: {
+    flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  methodText: {
+  paymentMethodInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  paymentMethodTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  paymentMethodDesc: {
     color: '#aaa',
-    fontSize: 11,
-    marginTop: 4,
-    textAlign: 'center',
+    fontSize: 12,
+  },
+  radio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#666',
+    backgroundColor: 'transparent',
+  },
+  radioSelected: {
+    borderColor: '#FFA94D',
+    backgroundColor: '#FFA94D',
+  },
+  securityInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+  },
+  securityText: {
+    color: '#aaa',
+    fontSize: 13,
+    marginLeft: 8,
   },
   termsSection: {
     marginTop: 24,

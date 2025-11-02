@@ -11,7 +11,7 @@ import StarRating from '../../components/StarRating';
 
 
 const BookReadScreen: React.FC<any> = () => {
-  const { bookId, preview, previewBody } = useLocalSearchParams();
+  const { bookId, preview, previewBody, position } = useLocalSearchParams();
   const router = useRouter();
   const [book, setBook] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -69,6 +69,14 @@ const BookReadScreen: React.FC<any> = () => {
           paged.push(body.slice(i, i + charsPerPage));
         }
         setPages(paged.length ? paged : ['']);
+        
+        // Si une position de départ est spécifiée, calculer la page correspondante
+        if (position && !isPreview) {
+          const startPosition = parseInt(position.toString());
+          const charsPerPage = 1200;
+          const startPage = Math.floor(startPosition / charsPerPage);
+          setCurrentPage(Math.min(startPage, paged.length - 1));
+        }
       }
       setLoading(false);
     }).catch(() => {
@@ -110,6 +118,41 @@ const BookReadScreen: React.FC<any> = () => {
     const ratingRef = doc(db, 'books', bookId, 'ratings', user.uid);
     await setDoc(ratingRef, { rating }, { merge: true });
   };
+
+  // Sauvegarde automatique du progrès de lecture
+  const saveReadingProgress = async (pageIndex: number) => {
+    if (isPreview) return; // Ne pas sauvegarder en mode aperçu
+    
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user || !bookId || typeof bookId !== 'string') return;
+    
+    try {
+      // Calculer la position approximative dans le texte
+      const charsPerPage = 1200;
+      const position = pageIndex * charsPerPage;
+      
+      const progressRef = doc(db, 'users', user.uid, 'readingProgress', bookId);
+      await setDoc(progressRef, {
+        bookId,
+        bookTitle: book?.title || 'Livre sans titre',
+        position,
+        currentPage: pageIndex,
+        totalPages: pages.length,
+        lastReadAt: new Date().toISOString(),
+        updatedAt: new Date()
+      }, { merge: true });
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde du progrès:', error);
+    }
+  };
+
+  // Sauvegarder le progrès quand la page change
+  useEffect(() => {
+    if (currentPage > 0 || pages.length > 0) {
+      saveReadingProgress(currentPage);
+    }
+  }, [currentPage, pages.length, book]);
 
   useEffect(() => {
     return () => {
@@ -163,7 +206,7 @@ const BookReadScreen: React.FC<any> = () => {
         </View>
         <PagerView
           style={{ flex: 1, width: width, height: height }}
-          initialPage={0}
+          initialPage={currentPage}
           onPageSelected={e => setCurrentPage(e.nativeEvent.position)}
         >
           {pages.map((page, idx) => (
