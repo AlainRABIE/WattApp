@@ -360,3 +360,8 @@
 // });
 
 // export default TemplateManager;
+
+// Composant vide pour éviter les warnings de routing
+export default function TemplateManager() {
+  return null;
+}

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "WattApp",
-    "slug": "WattApp",
+    "name": "ReadRush",
+    "slug": "readrush",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "wattapp",
+    "scheme": "readrush",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

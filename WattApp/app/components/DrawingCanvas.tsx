@@ -120,6 +120,7 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(props: any, ref) {
 });
 
 export { DrawingCanvas };
+export default DrawingCanvas;
 
 const styles = StyleSheet.create({
   container: {

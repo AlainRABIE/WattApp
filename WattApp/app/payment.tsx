@@ -157,9 +157,9 @@ const PaymentScreen: React.FC = () => {
       business: "votre-email@paypal.com", // Remplacez par votre email PayPal
       amount: paymentAmount.toFixed(2),
       currency_code: "EUR",
-      item_name: `Recharge WattApp ${paymentAmount}€`,
-      return_url: "wattapp://payment-success",
-      cancel_url: "wattapp://payment-cancel",
+      item_name: `Recharge ReadRush ${paymentAmount}€`,
+      return_url: "readrush://payment-success",
+      cancel_url: "readrush://payment-cancel",
     };
 
     Alert.alert(

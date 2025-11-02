@@ -17,3 +17,6 @@ export async function getWishlistBooks() {
     .filter(doc => wishlist.includes(doc.id))
     .map(doc => ({ id: doc.id, ...doc.data() }));
 }
+
+// Export par défaut pour éviter les warnings de routing
+export default { getWishlistBooks };
