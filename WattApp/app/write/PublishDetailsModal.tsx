@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, Image, StyleSheet, Pressable } from 'react-native';
+import { Modal, View, Text, TextInput, TouchableOpacity, Image, StyleSheet, Pressable, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (cover: string, title: string, synopsis: string, price: string) => void;
+  onSubmit: (cover: string, title: string, synopsis: string, price: string, termsAcceptance: TermsAcceptance) => void;
+}
+
+interface TermsAcceptance {
+  accepted: boolean;
+  acceptedAt: Date;
+  termsVersion: string;
+  userAgent: string;
 }
 
 export default function PublishDetailsModal({ visible, onClose, onSubmit }: Props) {
@@ -15,6 +22,7 @@ export default function PublishDetailsModal({ visible, onClose, onSubmit }: Prop
   const [price, setPrice] = useState('');
   const [loading, setLoading] = useState(false);
   const [isFree, setIsFree] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const pickImage = async () => {
     setLoading(true);
@@ -28,6 +36,14 @@ export default function PublishDetailsModal({ visible, onClose, onSubmit }: Prop
     if (!result.canceled && result.assets && result.assets.length > 0) {
       setCover(result.assets[0].uri);
     }
+  };
+
+  const showFeesInfo = () => {
+    Alert.alert(
+      'Conditions générales',
+      'En publiant votre livre, vous acceptez :\n\n• Commission WattApp : 10% sur chaque vente\n• Respect des droits d\'auteur\n• Contenu conforme aux règles de la plateforme\n\nPour plus de détails, consultez nos CGU complètes.',
+      [{ text: 'J\'ai compris', style: 'default' }]
+    );
   };
 
   return (
@@ -67,7 +83,15 @@ export default function PublishDetailsModal({ visible, onClose, onSubmit }: Prop
                 placeholder="2.99"
                 placeholderTextColor="#888"
                 value={isFree ? '0' : price}
-                onChangeText={t => { setPrice(t); setIsFree(false); }}
+                onChangeText={t => { 
+                  const numValue = parseFloat(t.replace(',', '.'));
+                  if (!isNaN(numValue) && numValue > 40) {
+                    setPrice('40');
+                  } else {
+                    setPrice(t);
+                  }
+                  setIsFree(false); 
+                }}
                 keyboardType="decimal-pad"
                 maxLength={5}
                 textAlign="center"
@@ -85,8 +109,25 @@ export default function PublishDetailsModal({ visible, onClose, onSubmit }: Prop
               </TouchableOpacity>
             </View>
             <View style={styles.priceFintechUnderline} />
-            <Text style={styles.priceFintechHelper}>{isFree ? 'Ce livre sera gratuit' : 'Entre 0,50€ et 99,99€'}</Text>
+            <Text style={styles.priceFintechHelper}>{isFree ? 'Ce livre sera gratuit' : 'Entre 0,50€ et 40,00€'}</Text>
           </View>
+          
+          <TouchableOpacity 
+            style={styles.termsContainer} 
+            onPress={() => setAcceptedTerms(!acceptedTerms)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.checkbox, acceptedTerms && styles.checkboxChecked]}>
+              {acceptedTerms && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+            <Text style={styles.termsText}>
+              En publiant, j'accepte les conditions générales
+            </Text>
+            <TouchableOpacity style={styles.termsInfoIcon} onPress={showFeesInfo}>
+              <Text style={styles.infoIconText}>ⓘ</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+          
           <View style={styles.rowDark}>
             <TouchableOpacity style={styles.cancelBtnDark} onPress={onClose}>
               <Text style={styles.cancelTextDark}>Annuler</Text>
@@ -94,12 +135,24 @@ export default function PublishDetailsModal({ visible, onClose, onSubmit }: Prop
             <TouchableOpacity
               style={styles.submitBtnDark}
               onPress={() => {
-                const priceNum = parseFloat(price.replace(',', '.'));
-                if (!isFree && (isNaN(priceNum) || priceNum < 0.5 || priceNum > 99.99)) {
-                  alert('Le prix doit être compris entre 0,50€ et 99,99€');
+                if (!acceptedTerms) {
+                  alert('Vous devez accepter les conditions générales pour publier');
                   return;
                 }
-                onSubmit(cover, title, synopsis, price);
+                const priceNum = parseFloat(price.replace(',', '.'));
+                if (!isFree && (isNaN(priceNum) || priceNum < 0.5)) {
+                  alert('Le prix doit être d\'au moins 0,50€');
+                  return;
+                }
+                
+                const termsAcceptance: TermsAcceptance = {
+                  accepted: true,
+                  acceptedAt: new Date(),
+                  termsVersion: "1.0",
+                  userAgent: navigator.userAgent || 'Mobile App'
+                };
+                
+                onSubmit(cover, title, synopsis, price, termsAcceptance);
               }}
               disabled={loading || !title.trim()}
             >
@@ -303,5 +356,60 @@ const styles = StyleSheet.create({
   },
   priceFintechInputDisabled: {
     color: '#888',
+  },
+  infoIcon: {
+    marginLeft: 8,
+    backgroundColor: '#4FC3F7',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoIconText: {
+    color: '#181818',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  termsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 16,
+    paddingHorizontal: 8,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderColor: '#4FC3F7',
+    borderRadius: 4,
+    marginRight: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  checkboxChecked: {
+    backgroundColor: '#4FC3F7',
+  },
+  checkmark: {
+    color: '#181818',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  termsText: {
+    color: '#fff',
+    fontSize: 14,
+    flex: 1,
+    lineHeight: 20,
+  },
+  termsInfoIcon: {
+    marginLeft: 8,
+    backgroundColor: '#4FC3F7',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

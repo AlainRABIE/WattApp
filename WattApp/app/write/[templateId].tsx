@@ -258,13 +258,15 @@ const TemplateEditor: React.FC = () => {
               <PublishDetailsModal
                 visible={showPublishModal}
                 onClose={() => setShowPublishModal(false)}
-                onSubmit={async (cover, title, synopsis, price) => {
+                onSubmit={async (cover, title, synopsis, price, termsAcceptance) => {
                   setShowPublishModal(false);
                   try {
                     const auth = getAuth(app);
                     const user = auth.currentUser;
                     if (!user) throw new Error('Utilisateur non authentifié');
                     if (!title.trim()) throw new Error('Le titre est obligatoire');
+                    
+                    // Données du livre avec acceptation des conditions
                     const docData = {
                       title: title || '(Sans titre)',
                       body: '',
@@ -282,8 +284,29 @@ const TemplateEditor: React.FC = () => {
                       reads: 0,
                       status: 'published',
                       price: price ? parseFloat(price) : 0,
+                      // Données d'acceptation des conditions (Option C - partie 1)
+                      termsAcceptedAt: serverTimestamp(),
+                      termsVersion: termsAcceptance.termsVersion,
                     };
-                    await addDoc(collection(db, 'books'), docData);
+                    
+                    // Créer le livre
+                    const bookRef = await addDoc(collection(db, 'books'), docData);
+                    
+                    // Option C - partie 2: Collection séparée pour audit légal
+                    const termsAuditData = {
+                      userId: user.uid,
+                      bookId: bookRef.id,
+                      accepted: termsAcceptance.accepted,
+                      acceptedAt: serverTimestamp(),
+                      termsVersion: termsAcceptance.termsVersion,
+                      userAgent: termsAcceptance.userAgent,
+                      bookTitle: title,
+                      bookPrice: price ? parseFloat(price) : 0,
+                    };
+                    
+                    // Stocker dans collection d'audit séparée
+                    await addDoc(collection(db, 'termsAcceptanceAudit'), termsAuditData);
+                    
                     Alert.alert('Publié', 'Votre document a été publié !');
                   } catch (e) {
                     let msg = '';
