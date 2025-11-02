@@ -139,7 +139,7 @@ const Home: React.FC = () => {
 														 >
 															 <Ionicons name="wallet-outline" size={20} color="#FFA94D" />
 															 <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 14, marginLeft: 6 }}>
-																 {walletBalance.toFixed(2)}€
+																 {String(walletBalance.toFixed(2))}€
 															 </Text>
 														 </TouchableOpacity>
 														 
@@ -196,9 +196,9 @@ const Home: React.FC = () => {
 													{/* Prix */}
 													<View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
 														<Text style={{ color: '#FFA94D', fontSize: 14, fontWeight: 'bold' }}>
-															{livre.price && livre.price > 0 ? `${livre.price.toFixed(2)}€` : 'Gratuit'}
+															{livre.price && livre.price > 0 ? `${String(livre.price.toFixed(2))}€` : 'Gratuit'}
 														</Text>
-														<Text style={{ color: '#888', fontSize: 12, marginLeft: 8 }}>👁️ {livre.reads || 0}</Text>
+														<Text style={{ color: '#888', fontSize: 12, marginLeft: 8 }}>👁️ {String(livre.reads || 0)}</Text>
 													</View>
 												</TouchableOpacity>
 											);
@@ -235,7 +235,7 @@ const Home: React.FC = () => {
 														par {livre.author || livre.auteur || 'Auteur inconnu'}
 													</Text>
 													<Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>
-														{livre.price && livre.price > 0 ? `${livre.price.toFixed(2)}€` : 'Gratuit'}
+														{livre.price && livre.price > 0 ? `${String(livre.price.toFixed(2))}€` : 'Gratuit'}
 													</Text>
 												</TouchableOpacity>
 											);
@@ -272,7 +272,7 @@ const Home: React.FC = () => {
 														par {livre.author || livre.auteur || 'Auteur inconnu'}
 													</Text>
 													<Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>
-														{livre.price && livre.price > 0 ? `${livre.price.toFixed(2)}€` : 'Gratuit'}
+														{livre.price && livre.price > 0 ? `${String(livre.price.toFixed(2))}€` : 'Gratuit'}
 													</Text>
 												</TouchableOpacity>
 											);

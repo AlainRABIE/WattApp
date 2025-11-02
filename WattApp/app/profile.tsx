@@ -90,7 +90,7 @@ const Profile: React.FC = () => {
   }
 
   const renderWork = ({ item }: { item: any }) => (
-    <TouchableOpacity style={styles.workCard} key={item.id} onPress={() => router.push(`../book/${item.id}`)}>
+    <TouchableOpacity style={styles.workCard} key={String(item.id)} onPress={() => router.push(`../book/${item.id}`)}>
       {item.coverImage ? (
         <Image source={{ uri: item.coverImage }} style={styles.workCover} />
       ) : (
@@ -240,7 +240,7 @@ const Profile: React.FC = () => {
             const name = (displayName || email || 'User') as string;
             const len = name.trim().includes(' ') ? 2 : 1;
             return (
-              <Image source={{ uri: photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&length=${len}&background=FFA94D&color=181818&size=128` }} style={styles.avatarLarge} />
+              <Image source={{ uri: photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&length=${String(len)}&background=FFA94D&color=181818&size=128` }} style={styles.avatarLarge} />
             );
           })()}
         </TouchableOpacity>
@@ -263,15 +263,15 @@ const Profile: React.FC = () => {
       <View style={styles.rowBetween}>
         <View style={styles.statsRowSmall}>
           <View style={styles.statBoxSmall}>
-            <Text style={styles.statNumber}>{worksCount ?? '-'}</Text>
+            <Text style={styles.statNumber}>{String(worksCount ?? '-')}</Text>
             <Text style={styles.statLabel}>Œuvres</Text>
           </View>
           <View style={styles.statBoxSmall}>
-            <Text style={styles.statNumber}>{followersCount ?? '-'}</Text>
+            <Text style={styles.statNumber}>{String(followersCount ?? '-')}</Text>
             <Text style={styles.statLabel}>Abonnés</Text>
           </View>
           <View style={styles.statBoxSmall}>
-            <Text style={styles.statNumber}>{friendsCount ?? '-'}</Text>
+            <Text style={styles.statNumber}>{String(friendsCount ?? '-')}</Text>
             <Text style={styles.statLabel}>Amis</Text>
           </View>
         </View>
@@ -295,7 +295,7 @@ const Profile: React.FC = () => {
           <FlatList
             horizontal
             data={works}
-            keyExtractor={(i) => i.id}
+            keyExtractor={(i) => String(i.id)}
             renderItem={renderWork}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingVertical: 8 }}
@@ -311,7 +311,7 @@ const Profile: React.FC = () => {
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {recentReads.map(r => (
-              <View key={r.id} style={styles.workCard}>
+              <View key={String(r.id)} style={styles.workCard}>
                 <Image source={{ uri: r.couverture || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80' }} style={styles.workCover} />
                 <Text style={styles.workTitle} numberOfLines={2}>{r.titre || 'Titre'}</Text>
               </View>
