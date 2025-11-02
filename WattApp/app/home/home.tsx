@@ -19,6 +19,7 @@ const Home: React.FC = () => {
 	const [email, setEmail] = useState('');
 	const [displayName, setDisplayName] = useState('');
 	const [photoURL, setPhotoURL] = useState<string | null>(null);
+	const [walletBalance, setWalletBalance] = useState<number>(0);
 
 	// compute a fallback avatar URL based on the loaded user name so Home matches Profile
 	const nameForAvatar = (displayName || email || 'User') as string;
@@ -74,7 +75,6 @@ const Home: React.FC = () => {
 			setDisplayName(user.displayName || '');
 			if (user.photoURL) {
 				setPhotoURL(user.photoURL);
-				return;
 			}
 			// fallback: look up in Firestore users collection where uid == user.uid
 			try {
@@ -83,6 +83,12 @@ const Home: React.FC = () => {
 				if (!snap.empty) {
 					const data = snap.docs[0].data();
 					if (data && data.photoURL) setPhotoURL(data.photoURL);
+					// Charger le solde du portefeuille
+					if (data && typeof data.walletBalance === 'number') {
+						setWalletBalance(data.walletBalance);
+					} else {
+						setWalletBalance(0);
+					}
 				}
 			} catch (err) {
 				console.warn('Failed to fetch user photo from Firestore', err);
@@ -108,18 +114,44 @@ const Home: React.FC = () => {
 		return (
 			<View style={{ flex: 1, backgroundColor: '#181818' }}>
 				<StatusBar barStyle="light-content" />
-								 {/* Logo amis à gauche et avatar profil à droite */}
+								 {/* Logo amis à gauche et portefeuille + avatar profil à droite */}
 								 <View style={{ position: 'absolute', top: 48, left: 18, right: 18, zIndex: 100, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
 													 <TouchableOpacity onPress={() => router.push('/friends')} activeOpacity={0.8} style={{ backgroundColor: '#232323', borderRadius: 22, padding: 6 }}>
 														 <Ionicons name="people" size={28} color="#FFA94D" />
 													 </TouchableOpacity>
-									 <TouchableOpacity onPress={() => router.push('/profile')} activeOpacity={0.8}>
-										 <Image
-											 source={{ uri: photoURL || avatarUrl }}
-											 style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#FFA94D', backgroundColor: '#232323' }}
-											 resizeMode="cover"
-										 />
-									 </TouchableOpacity>
+													 
+													 {/* Section droite : Portefeuille + Avatar */}
+													 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+														 {/* Portefeuille */}
+														 <TouchableOpacity 
+															 onPress={() => router.push('/wallet')} 
+															 activeOpacity={0.8} 
+															 style={{ 
+																 backgroundColor: '#232323', 
+																 borderRadius: 20, 
+																 paddingHorizontal: 14, 
+																 paddingVertical: 8, 
+																 flexDirection: 'row', 
+																 alignItems: 'center',
+																 borderWidth: 1,
+																 borderColor: '#FFA94D'
+															 }}
+														 >
+															 <Ionicons name="wallet-outline" size={20} color="#FFA94D" />
+															 <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 14, marginLeft: 6 }}>
+																 {walletBalance.toFixed(2)}€
+															 </Text>
+														 </TouchableOpacity>
+														 
+														 {/* Avatar profil */}
+														 <TouchableOpacity onPress={() => router.push('/profile')} activeOpacity={0.8}>
+															 <Image
+																 source={{ uri: photoURL || avatarUrl }}
+																 style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#FFA94D', backgroundColor: '#232323' }}
+																 resizeMode="cover"
+															 />
+														 </TouchableOpacity>
+													 </View>
 								 </View>
 				<ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 60, paddingBottom: 120 }}>
 						{/* Carrousel principal */}
