@@ -674,14 +674,36 @@ const BookEditor: React.FC = () => {
 
         {/* Bouton principal modernisé + bouton ajout bibliothèque */}
         <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 16, marginBottom: 40, marginTop: 12 }}>
-          <TouchableOpacity
-            style={{ backgroundColor: '#FFA94D', borderRadius: 32, paddingVertical: 20, paddingHorizontal: 54, shadowColor: '#FFA94D', shadowOpacity: 0.22, shadowRadius: 12, elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 10 }}
-            onPress={() => router.push(`/book/${bookId}/read`)}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="book-outline" size={26} color="#181818" style={{ marginRight: 8 }} />
-            <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 21, letterSpacing: 0.3 }}>Commencer la lecture</Text>
-          </TouchableOpacity>
+          {/* Logique différente selon si le livre est gratuit ou payant */}
+          {book && book.price && book.price > 0 ? (
+            // Livre payant - Afficher aperçu des 3 premières lignes avec le template
+            <TouchableOpacity
+              style={{ backgroundColor: '#4FC3F7', borderRadius: 32, paddingVertical: 20, paddingHorizontal: 54, shadowColor: '#4FC3F7', shadowOpacity: 0.22, shadowRadius: 12, elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+              onPress={() => {
+                // Créer un livre temporaire avec seulement les 3 premières lignes
+                const bodyText = book.body || '';
+                const lines = bodyText.split('\n').filter((line: string) => line.trim() !== '');
+                const previewBody = lines.slice(0, 3).join('\n') + '\n\n--- Fin de l\'aperçu ---\n\nAchetez le livre pour lire la suite !';
+                
+                // Navigation vers la page de lecture avec un paramètre preview
+                router.push(`/book/${bookId}/read?preview=true&previewBody=${encodeURIComponent(previewBody)}`);
+              }}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="eye-outline" size={26} color="#181818" style={{ marginRight: 8 }} />
+              <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 21, letterSpacing: 0.3 }}>Aperçu ({book.price.toFixed(2)}€)</Text>
+            </TouchableOpacity>
+          ) : (
+            // Livre gratuit - Lecture complète
+            <TouchableOpacity
+              style={{ backgroundColor: '#FFA94D', borderRadius: 32, paddingVertical: 20, paddingHorizontal: 54, shadowColor: '#FFA94D', shadowOpacity: 0.22, shadowRadius: 12, elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+              onPress={() => router.push(`/book/${bookId}/read`)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="book-outline" size={26} color="#181818" style={{ marginRight: 8 }} />
+              <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 21, letterSpacing: 0.3 }}>Commencer la lecture</Text>
+            </TouchableOpacity>
+          )}
           {/* Bouton + ou check pour ajouter à la bibliothèque */}
           {(() => {
             const auth = getAuth(app);

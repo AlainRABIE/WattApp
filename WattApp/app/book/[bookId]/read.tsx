@@ -11,7 +11,7 @@ import StarRating from '../../components/StarRating';
 
 
 const BookReadScreen: React.FC<any> = () => {
-  const { bookId } = useLocalSearchParams();
+  const { bookId, preview, previewBody } = useLocalSearchParams();
   const router = useRouter();
   const [book, setBook] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -24,14 +24,16 @@ const BookReadScreen: React.FC<any> = () => {
   const [userRating, setUserRating] = useState(0);
   const [avgRating, setAvgRating] = useState(0);
   const [ratingCount, setRatingCount] = useState(0);
+  // Mode aperçu
+  const isPreview = preview === 'true';
 
 
-  // Incrémente le nombre de vues à chaque ouverture
+  // Incrémente le nombre de vues à chaque ouverture (sauf en mode aperçu)
   useEffect(() => {
-    if (!bookId || typeof bookId !== 'string') return;
+    if (!bookId || typeof bookId !== 'string' || isPreview) return;
     const bookRef = doc(db, 'books', bookId);
     updateDoc(bookRef, { reads: increment(1) }).catch(() => {});
-  }, [bookId]);
+  }, [bookId, isPreview]);
 
   // Charge le livre et découpe en pages
   useEffect(() => {
@@ -51,7 +53,16 @@ const BookReadScreen: React.FC<any> = () => {
       } else {
         const data = { id: docSnap.id, ...(docSnap.data() as any) };
         setBook(data);
-        const body: string = (data.body || '').toString();
+        
+        // Utiliser le contenu d'aperçu si en mode preview, sinon le contenu complet
+        let body: string;
+        if (isPreview && previewBody) {
+          body = Array.isArray(previewBody) ? previewBody[0] : previewBody;
+          body = decodeURIComponent(body);
+        } else {
+          body = (data.body || '').toString();
+        }
+        
         const charsPerPage = 1200;
         const paged: string[] = [];
         for (let i = 0; i < body.length; i += charsPerPage) {
@@ -141,7 +152,14 @@ const BookReadScreen: React.FC<any> = () => {
       <TouchableOpacity activeOpacity={1} style={{ flex: 1 }} onPress={handleToggleBack}>
         {/* Titre en haut, gris, centré */}
         <View style={{ width: '100%', alignItems: 'center', marginTop: 32, marginBottom: 8, position: 'absolute', top: 0, left: 0, zIndex: 20 }} pointerEvents="none">
-          <Text style={{ color: '#aaa', fontSize: 18, fontWeight: 'bold', textAlign: 'center' }}>{book.title}</Text>
+          <Text style={{ color: '#aaa', fontSize: 18, fontWeight: 'bold', textAlign: 'center' }}>
+            {isPreview ? `Aperçu - ${book.title}` : book.title}
+          </Text>
+          {isPreview && (
+            <View style={{ backgroundColor: '#4FC3F7', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 4, marginTop: 4 }}>
+              <Text style={{ color: '#181818', fontSize: 12, fontWeight: 'bold' }}>MODE APERÇU</Text>
+            </View>
+          )}
         </View>
         <PagerView
           style={{ flex: 1, width: width, height: height }}
