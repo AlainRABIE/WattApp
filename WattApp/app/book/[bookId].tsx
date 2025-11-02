@@ -518,7 +518,40 @@ const BookEditor: React.FC = () => {
         {/* ...existing code... */}
         {coverImage && (
           <View style={{ alignItems: 'center', width: '100%', marginTop: 28, marginBottom: 38, borderRadius: 32, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 16, elevation: 8 }}>
-            <Image source={{ uri: coverImage }} style={{ width: 240, height: 340, borderRadius: 28 }} />
+            <View style={{ position: 'relative' }}>
+              <Image source={{ uri: coverImage }} style={{ width: 240, height: 340, borderRadius: 28 }} />
+              {/* Œil d'aperçu en haut à droite de la couverture - UNIQUEMENT pour les livres payants */}
+              {book && book.price && book.price > 0 && (
+                <TouchableOpacity 
+                  style={{ 
+                    position: 'absolute',
+                    top: 12,
+                    right: 12,
+                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    borderRadius: 20,
+                    width: 40,
+                    height: 40,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    shadowColor: '#4FC3F7',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.4,
+                    shadowRadius: 6,
+                    elevation: 6,
+                  }} 
+                  onPress={() => {
+                    // Livre payant - aperçu des 3 premières lignes
+                    const bodyText = book.body || '';
+                    const lines = bodyText.split('\n').filter((line: string) => line.trim() !== '');
+                    const previewBody = lines.slice(0, 3).join('\n') + '\n\n--- Fin de l\'aperçu ---\n\nAchetez le livre pour lire la suite !';
+                    router.push(`/book/${bookId}/read?preview=true&previewBody=${encodeURIComponent(previewBody)}`);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="eye" size={22} color="#4FC3F7" />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         )}
 
@@ -676,22 +709,22 @@ const BookEditor: React.FC = () => {
         <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 16, marginBottom: 40, marginTop: 12 }}>
           {/* Logique différente selon si le livre est gratuit ou payant */}
           {book && book.price && book.price > 0 ? (
-            // Livre payant - Afficher aperçu des 3 premières lignes avec le template
+            // Livre payant - Bouton d'achat
             <TouchableOpacity
-              style={{ backgroundColor: '#4FC3F7', borderRadius: 32, paddingVertical: 20, paddingHorizontal: 54, shadowColor: '#4FC3F7', shadowOpacity: 0.22, shadowRadius: 12, elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+              style={{ backgroundColor: '#FFA94D', borderRadius: 32, paddingVertical: 20, paddingHorizontal: 54, shadowColor: '#FFA94D', shadowOpacity: 0.22, shadowRadius: 12, elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 10 }}
               onPress={() => {
-                // Créer un livre temporaire avec seulement les 3 premières lignes
-                const bodyText = book.body || '';
-                const lines = bodyText.split('\n').filter((line: string) => line.trim() !== '');
-                const previewBody = lines.slice(0, 3).join('\n') + '\n\n--- Fin de l\'aperçu ---\n\nAchetez le livre pour lire la suite !';
-                
-                // Navigation vers la page de lecture avec un paramètre preview
-                router.push(`/book/${bookId}/read?preview=true&previewBody=${encodeURIComponent(previewBody)}`);
+                Alert.alert('Achat de livre', `Acheter "${book.title}" pour ${book.price.toFixed(2)}€`, [
+                  { text: 'Annuler', style: 'cancel' },
+                  { text: 'Acheter', onPress: () => {
+                    // TODO: Intégrer le système de paiement Stripe ici
+                    Alert.alert('Paiement', 'Système de paiement bientôt disponible !');
+                  }}
+                ]);
               }}
               activeOpacity={0.85}
             >
-              <Ionicons name="eye-outline" size={26} color="#181818" style={{ marginRight: 8 }} />
-              <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 21, letterSpacing: 0.3 }}>Aperçu ({book.price.toFixed(2)}€)</Text>
+              <Ionicons name="card-outline" size={26} color="#181818" style={{ marginRight: 8 }} />
+              <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 21, letterSpacing: 0.3 }}>Acheter {book.price.toFixed(2)}€</Text>
             </TouchableOpacity>
           ) : (
             // Livre gratuit - Lecture complète
@@ -704,11 +737,19 @@ const BookEditor: React.FC = () => {
               <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 21, letterSpacing: 0.3 }}>Commencer la lecture</Text>
             </TouchableOpacity>
           )}
-          {/* Bouton + ou check pour ajouter à la bibliothèque */}
+          {/* Bouton + ou check pour ajouter à la bibliothèque - UNIQUEMENT pour livres gratuits ou déjà achetés */}
           {(() => {
             const auth = getAuth(app);
             const user = auth.currentUser;
             const isInLibrary = book && user && book.ownerUid === user.uid;
+            const isPaidBook = book && book.price && book.price > 0;
+            const isPurchased = book && user && book.purchasedBy && book.purchasedBy.includes(user.uid);
+            
+            // Ne pas afficher le bouton pour les livres payants non achetés
+            if (isPaidBook && !isPurchased && !isInLibrary) {
+              return null;
+            }
+            
             if (isInLibrary) {
               return (
                 <TouchableOpacity
@@ -753,6 +794,13 @@ const BookEditor: React.FC = () => {
                         Alert.alert('Erreur', 'Vous devez être connecté pour ajouter ce livre.');
                         return;
                       }
+                      
+                      // Vérification supplémentaire : empêcher l'ajout des livres payants non achetés
+                      if (isPaidBook && !isPurchased) {
+                        Alert.alert('Achat requis', 'Vous devez d\'abord acheter ce livre pour l\'ajouter à votre bibliothèque.');
+                        return;
+                      }
+                      
                       const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
                       const bookRef = doc(db, 'books', book.id);
                       await setDoc(bookRef, {

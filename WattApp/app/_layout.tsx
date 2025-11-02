@@ -5,9 +5,11 @@ import type { StackCardInterpolationProps } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { StripeProvider } from '@stripe/stripe-react-native';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import BottomNav from './components/BottomNav';
+import { STRIPE_CONFIG } from '../constants/stripeConfig';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -47,21 +49,23 @@ export default function RootLayout() {
   );
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        {/* Hide headers globally so pages don't show route names like "home/home" */}
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            ...customTransition,
-          }}
-        >
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-        </Stack>
-        {showBottomNav ? <BottomNav /> : null}
-        <StatusBar style="auto" />
-      </ThemeProvider>
-    </GestureHandlerRootView>
+    <StripeProvider publishableKey={STRIPE_CONFIG.PUBLISHABLE_KEY}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          {/* Hide headers globally so pages don't show route names like "home/home" */}
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              ...customTransition,
+            }}
+          >
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+          </Stack>
+          {showBottomNav ? <BottomNav /> : null}
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </GestureHandlerRootView>
+    </StripeProvider>
   );
 }
