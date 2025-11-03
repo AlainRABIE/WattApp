@@ -297,13 +297,31 @@ const Library: React.FC = () => {
   // Gérer l'extraction réussie des pages
   const handlePagesExtracted = async (pageUris: string[], totalPages: number) => {
     try {
-      if (!pendingBookData) return;
+      if (!pendingBookData) {
+        console.error('❌ Données du livre manquantes');
+        return;
+      }
 
       const { bookId, title, pdfUri, customCoverUri } = pendingBookData;
 
-      // Utiliser le service natif pour télécharger et stocker le PDF avec les pages
+      // Diagnostic des données
+      console.log('📱 Données reçues pour finalisation:', {
+        bookId,
+        title,
+        pdfUri,
+        customCoverUri,
+        totalPages,
+        pagesExtracted: pageUris.length
+      });
+
+      // Vérifier que l'URI du PDF existe
+      if (!pdfUri) {
+        throw new Error('URI du PDF manquante');
+      }
+
+      // Utiliser le service natif pour copier et stocker le PDF avec les pages
       console.log('Stockage local du PDF avec pages extraites...');
-      const localBookData = await NativePDFService.downloadPDFLocally(
+      const localBookData = await NativePDFService.saveLocalPDF(
         pdfUri,
         bookId,
         title,
@@ -337,7 +355,16 @@ const Library: React.FC = () => {
       );
     } catch (error) {
       console.error('Erreur lors de la finalisation:', error);
-      handleExtractionError('Impossible de finaliser l\'importation');
+      
+      // Diagnostic détaillé de l'erreur
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.log('📱 Erreur détaillée:', {
+        error: errorMessage,
+        pendingBookData,
+        type: typeof error
+      });
+      
+      handleExtractionError(`Impossible de finaliser l'importation: ${errorMessage}`);
     }
   };
 

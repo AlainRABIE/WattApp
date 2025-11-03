@@ -83,6 +83,66 @@ export class NativePDFService {
   }
 
   /**
+   * Copie un PDF local (depuis DocumentPicker) vers le stockage de l'app
+   */
+  static async saveLocalPDF(
+    localPdfUri: string,
+    bookId: string,
+    title: string,
+    customCoverUri?: string
+  ): Promise<PDFBookData> {
+    try {
+      await this.ensureDirectories();
+
+      console.log('📱 Copie du PDF local vers le stockage app...');
+      console.log('📱 Source:', localPdfUri);
+
+      // Copier le PDF depuis l'URI local vers notre dossier
+      const pdfFileName = `${bookId}.pdf`;
+      const localPdfPath = `${this.PDFS_DIR}${pdfFileName}`;
+
+      console.log('📱 Destination:', localPdfPath);
+
+      // Utiliser copyAsync pour les fichiers locaux
+      await FileSystem.copyAsync({
+        from: localPdfUri,
+        to: localPdfPath
+      });
+
+      // Vérifier que la copie a réussi
+      const fileInfo = await FileSystem.getInfoAsync(localPdfPath);
+      if (!fileInfo.exists) {
+        throw new Error('Échec de la copie du PDF local');
+      }
+
+      console.log('📱 PDF copié avec succès, taille:', fileInfo.size);
+
+      // Générer ou copier l'image de couverture
+      let coverImagePath: string | undefined;
+      
+      if (customCoverUri) {
+        // L'utilisateur a fourni une couverture personnalisée
+        coverImagePath = await this.saveCoverImage(customCoverUri, bookId);
+      } else {
+        // Générer une couverture par défaut (icône PDF)
+        coverImagePath = await this.generateDefaultCover(bookId, title);
+      }
+
+      return {
+        id: bookId,
+        title,
+        filePath: localPdfPath, // URI locale du PDF
+        coverImagePath,
+        downloadedAt: Date.now(),
+        fileSize: fileInfo.size || 0
+      };
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde PDF local:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Sauvegarde une image de couverture personnalisée
    */
   private static async saveCoverImage(coverUri: string, bookId: string): Promise<string> {
