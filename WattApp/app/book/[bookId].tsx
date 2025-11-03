@@ -615,42 +615,6 @@ const BookEditor: React.FC = () => {
             </View>
           </View>
         )}
-
-        {/* Section Synopsis modernisée */}
-        {book?.synopsis && (
-          <View style={{ width: '92%', flexDirection: 'row', backgroundColor: '#23232a', borderRadius: 16, padding: 18, marginBottom: 18, alignSelf: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, elevation: 1, alignItems: 'flex-start', justifyContent: 'space-between' }}>
-            <View style={{ flex: 1, marginRight: 12 }}>
-              <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 18, marginBottom: 8 }}>Synopsis</Text>
-              <Text style={{ color: '#ccc', fontSize: 15, fontStyle: 'italic', lineHeight: 22 }}>{book.synopsis}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Section Tags séparée */}
-        {book?.tags && Array.isArray(book.tags) && book.tags.length > 0 && (
-          <View style={{ width: '92%', backgroundColor: '#23232a', borderRadius: 16, padding: 18, marginBottom: 18, alignSelf: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, elevation: 1 }}>
-            <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 18, marginBottom: 12 }}>Tags</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
-              {book.tags.map((tag: string, idx: number) => (
-                <View
-                  key={idx}
-                  style={{
-                    backgroundColor: '#18191c',
-                    borderRadius: 12,
-                    paddingVertical: 6,
-                    paddingHorizontal: 12,
-                    marginRight: 8,
-                    marginBottom: 8,
-                    borderWidth: 1,
-                    borderColor: '#FFA94D',
-                  }}
-                >
-                  <Text style={{ color: '#FFA94D', fontSize: 13, fontWeight: '600', letterSpacing: 0.2 }}>{tag}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
         {/* Titre modernisé */}
         <Text style={{ color: '#fff', fontSize: 32, fontWeight: 'bold', textAlign: 'center', marginBottom: 4, letterSpacing: 0.5, textShadowColor: '#0008', textShadowOffset: {width: 0, height: 2}, textShadowRadius: 6, lineHeight: 38, maxWidth: 340 }} numberOfLines={2} ellipsizeMode="tail">{book?.title || 'Titre non disponible'}</Text>
         
