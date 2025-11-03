@@ -27,6 +27,7 @@ import StarRating from '../components/StarRating';
 import * as ImagePicker from 'expo-image-picker';
 import { POPULAR_CATEGORIES } from '../../constants/bookCategories';
 import { TagService, TagStats } from '../../services/TagService';
+import { ShareModal } from '../components/ShareModal';
 
 const BookEditor: React.FC = () => {
   const [showChapters, setShowChapters] = useState(false);
@@ -47,6 +48,7 @@ const BookEditor: React.FC = () => {
   const [replies, setReplies] = useState<{ [key: string]: any[] }>({});
   const [likes, setLikes] = useState<{ [key: string]: { count: number, liked: boolean } }>({});
   const [hasPurchased, setHasPurchased] = useState<boolean>(false);
+  const [shareModalVisible, setShareModalVisible] = useState<boolean>(false);
   const [readingProgress, setReadingProgress] = useState<any>(null);
   
   // Listen for likes for each comment
@@ -498,8 +500,8 @@ const BookEditor: React.FC = () => {
             alignSelf: 'flex-start',
             minWidth: 60,
           }}>
-            <Text style={{ color: book.status === 'published' ? '#18191c' : '#fff', fontWeight: 'bold', fontSize: 13, textAlign: 'center', textTransform: 'capitalize' }}>
-              {book.status === 'published' ? 'Publié' : (book.status === 'finished' ? 'Fini' : book.status)}
+            <Text style={{ color: book?.status === 'published' ? '#18191c' : '#fff', fontWeight: 'bold', fontSize: 13, textAlign: 'center', textTransform: 'capitalize' }}>
+              {book?.status === 'published' ? 'Publié' : (book?.status === 'finished' ? 'Fini' : book?.status || 'En cours')}
             </Text>
           </View>
         )}
@@ -518,7 +520,7 @@ const BookEditor: React.FC = () => {
           </Text>
           {book?.status === 'finished' || !(book?.chapters && book.chapters > 0) ? null : (
             <Text style={{ color: '#FFA94D', fontSize: 13, marginLeft: 4 }}>
-              {book.chapters === 1 ? 'chapitre' : 'chapitres'}
+              {book?.chapters === 1 ? 'chapitre' : 'chapitres'}
             </Text>
           )}
         </TouchableOpacity>
@@ -575,10 +577,10 @@ const BookEditor: React.FC = () => {
 
   <ScrollView contentContainerStyle={{ alignItems: 'center', paddingBottom: 60 }}>
         {/* ...existing code... */}
-        {coverImage && (
+        {(book?.cover || book?.coverImage) && (
           <View style={{ alignItems: 'center', width: '100%', marginTop: 28, marginBottom: 38, borderRadius: 32, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 16, elevation: 8 }}>
             <View style={{ position: 'relative' }}>
-              <Image source={{ uri: coverImage }} style={{ width: 240, height: 340, borderRadius: 28 }} />
+              <Image source={{ uri: book?.cover || book?.coverImage }} style={{ width: 240, height: 340, borderRadius: 28 }} />
               {/* Œil d'aperçu en haut à droite de la couverture - UNIQUEMENT pour les livres payants */}
               {book && book.price && book.price > 0 && (
                 <TouchableOpacity 
@@ -650,7 +652,7 @@ const BookEditor: React.FC = () => {
           </View>
         )}
         {/* Titre modernisé */}
-        <Text style={{ color: '#fff', fontSize: 32, fontWeight: 'bold', textAlign: 'center', marginBottom: 4, letterSpacing: 0.5, textShadowColor: '#0008', textShadowOffset: {width: 0, height: 2}, textShadowRadius: 6, lineHeight: 38, maxWidth: 340 }} numberOfLines={2} ellipsizeMode="tail">{title}</Text>
+        <Text style={{ color: '#fff', fontSize: 32, fontWeight: 'bold', textAlign: 'center', marginBottom: 4, letterSpacing: 0.5, textShadowColor: '#0008', textShadowOffset: {width: 0, height: 2}, textShadowRadius: 6, lineHeight: 38, maxWidth: 340 }} numberOfLines={2} ellipsizeMode="tail">{book?.title || 'Titre non disponible'}</Text>
         
         {/* Indicateur de progrès de lecture */}
         {readingProgress && readingProgress.position && (hasPurchased || !book.price || book.price === 0) && (
@@ -658,7 +660,7 @@ const BookEditor: React.FC = () => {
             <View style={{ backgroundColor: '#23232a', borderRadius: 12, paddingVertical: 6, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' }}>
               <Ionicons name="bookmark-outline" size={16} color="#4FC3F7" style={{ marginRight: 6 }} />
               <Text style={{ color: '#4FC3F7', fontSize: 13, fontWeight: '600' }}>
-                Progression: {Math.round((readingProgress.position / (book.body?.length || 1)) * 100)}%
+                Progression: {Math.round(((readingProgress.position || 0) / (book.body?.length || 1)) * 100)}%
               </Text>
             </View>
           </View>
@@ -693,7 +695,7 @@ const BookEditor: React.FC = () => {
           </View>
           <View style={{ alignItems: 'center', flexDirection: 'row', backgroundColor: '#23232a', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 18, marginHorizontal: 4 }}>
             <Ionicons name="star" size={20} color="#FFA94D" style={{ marginRight: 6 }} />
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{avgRating.toFixed(1)}</Text>
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{Number(avgRating || 0).toFixed(1)}</Text>
             <Text style={{ color: '#888', fontSize: 13, marginLeft: 4 }}>/ 5</Text>
           </View>
         </View>
@@ -758,24 +760,24 @@ const BookEditor: React.FC = () => {
                 <TouchableOpacity
                   key={category}
                   onPress={() => {
-                    if (!tags.includes(category)) {
-                      setTags([...tags, category]);
+                    if (!tags || !tags.includes(category)) {
+                      setTags([...(tags || []), category]);
                     }
                   }}
                   style={{
-                    backgroundColor: tags.includes(category) ? '#FFA94D' : '#333',
+                    backgroundColor: (tags || []).includes(category) ? '#FFA94D' : '#333',
                     borderRadius: 16,
                     paddingVertical: 6,
                     paddingHorizontal: 12,
                     marginRight: 8,
                     marginBottom: 8,
                     borderWidth: 1,
-                    borderColor: tags.includes(category) ? '#FFA94D' : '#555',
+                    borderColor: (tags || []).includes(category) ? '#FFA94D' : '#555',
                   }}
                   activeOpacity={0.7}
                 >
                   <Text style={{
-                    color: tags.includes(category) ? '#181818' : '#FFA94D',
+                    color: (tags || []).includes(category) ? '#181818' : '#FFA94D',
                     fontSize: 12,
                     fontWeight: '600'
                   }}>
@@ -787,10 +789,10 @@ const BookEditor: React.FC = () => {
             
             {/* Input pour tags personnalisés */}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 4 }}>
-              {tags.map((tag, idx) => (
+              {(tags || []).map((tag, idx) => (
                 <View key={idx} style={{ backgroundColor: '#18191c', borderRadius: 8, paddingVertical: 3, paddingHorizontal: 10, marginRight: 6, marginBottom: 6, minHeight: 22, flexDirection: 'row', alignItems: 'center' }}>
                   <Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: '500', letterSpacing: 0.1 }}>{tag}</Text>
-                  <TouchableOpacity onPress={() => setTags(tags.filter((t, i) => i !== idx))} style={{ marginLeft: 6 }}>
+                  <TouchableOpacity onPress={() => setTags((tags || []).filter((t, i) => i !== idx))} style={{ marginLeft: 6 }}>
                     <Ionicons name="close-circle" size={16} color="#FFA94D" />
                   </TouchableOpacity>
                 </View>
@@ -867,7 +869,9 @@ const BookEditor: React.FC = () => {
                 activeOpacity={0.85}
               >
                 <Ionicons name="card-outline" size={26} color="#181818" style={{ marginRight: 8 }} />
-                <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 21, letterSpacing: 0.3 }}>Acheter {(book.price || 0).toFixed(2)}€</Text>
+                <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 21, letterSpacing: 0.3 }}>
+                  Acheter {book?.price ? Number(book.price).toFixed(2) : '0.00'}€
+                </Text>
               </TouchableOpacity>
             )
           ) : (
@@ -891,16 +895,11 @@ const BookEditor: React.FC = () => {
             </TouchableOpacity>
           )}
           {/* Bouton + ou check pour ajouter à la bibliothèque - UNIQUEMENT pour livres gratuits ou déjà achetés ET pas l'auteur */}
-          {(() => {
+          {!isAuthor && (() => {
             const auth = getAuth(app);
             const user = auth.currentUser;
             const isInLibrary = book && user && book.ownerUid === user.uid;
             const isPaidBook = book && book.price && book.price > 0;
-            
-            // Ne pas afficher le bouton pour l'auteur de son propre livre
-            if (isAuthor) {
-              return null;
-            }
             
             // Ne pas afficher le bouton pour les livres payants non achetés
             if (isPaidBook && !hasPurchased && !isInLibrary) {
@@ -914,7 +913,7 @@ const BookEditor: React.FC = () => {
                   onPress={async () => {
                     Alert.alert(
                       'Supprimer ce livre',
-                      `Voulez-vous vraiment supprimer "${book.title || book.titre}" de votre bibliothèque ?`,
+                      `Voulez-vous vraiment supprimer "${book?.title || book?.titre || 'ce livre'}" de votre bibliothèque ?`,
                       [
                         { text: 'Annuler', style: 'cancel' },
                         {
@@ -967,7 +966,7 @@ const BookEditor: React.FC = () => {
                         addedAt: serverTimestamp(),
                       }, { merge: true });
                       setBook((prev: any) => prev ? { ...prev, ownerUid: user.uid } : prev);
-                      Alert.alert('Ajouté', `Le livre "${book.title || book.titre}" a été ajouté à votre bibliothèque !`);
+                      Alert.alert('Ajouté', `Le livre "${book?.title || book?.titre || 'ce livre'}" a été ajouté à votre bibliothèque !`);
                     } catch (e) {
                       Alert.alert('Erreur', 'Impossible d\'ajouter le livre.');
                     }
@@ -980,6 +979,30 @@ const BookEditor: React.FC = () => {
             }
           })()}
         </View>
+
+        {/* Bouton de partage */}
+        <View style={{ width: '92%', marginTop: 16, alignItems: 'center' }}>
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#333',
+              borderRadius: 25,
+              paddingVertical: 12,
+              paddingHorizontal: 30,
+              flexDirection: 'row',
+              alignItems: 'center',
+              borderWidth: 1,
+              borderColor: '#FFA94D',
+            }}
+            onPress={() => setShareModalVisible(true)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="share-outline" size={20} color="#FFA94D" style={{ marginRight: 8 }} />
+            <Text style={{ color: '#FFA94D', fontWeight: '600', fontSize: 16 }}>
+              Partager ce livre
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Section Avis/Commentaires modernisée */}
         <View style={{ width: '92%', marginTop: 8, marginBottom: 32 }}>
           <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 19, marginBottom: 14, letterSpacing: 0.2 }}>Avis & Commentaires</Text>
@@ -1001,14 +1024,16 @@ const BookEditor: React.FC = () => {
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                     {/* Avatar/Initiale */}
                     <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#FFA94D33', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-                      <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 14 }}>{(c.user || '?').charAt(0).toUpperCase()}</Text>
+                      <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 14 }}>{String(c.user || '?').charAt(0).toUpperCase()}</Text>
                     </View>
                     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 14 }}>{c.user}</Text>
-                      <Text style={{ color: '#888', fontSize: 11, marginLeft: 8 }}>{c.createdAt ? `${new Date(c.createdAt).toLocaleDateString()} à ${new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}</Text>
+                      <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 14 }}>{String(c.user || 'Utilisateur')}</Text>
+                      <Text style={{ color: '#888', fontSize: 11, marginLeft: 8 }}>
+                        {c.createdAt ? `${new Date(c.createdAt).toLocaleDateString()} à ${new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+                      </Text>
                     </View>
                   </View>
-                  <Text style={{ color: '#fff', fontSize: 15, lineHeight: 21, marginBottom: 8, marginLeft: 2 }}>{c.comment}</Text>
+                  <Text style={{ color: '#fff', fontSize: 15, lineHeight: 21, marginBottom: 8, marginLeft: 2 }}>{String(c.comment || '')}</Text>
                   {/* Barre d’actions */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
                     <TouchableOpacity
@@ -1030,7 +1055,7 @@ const BookEditor: React.FC = () => {
                     >
                       <Ionicons name={likes[String(ratingDocId)]?.liked ? 'heart' : 'heart-outline'} size={18} color={likes[String(ratingDocId)]?.liked ? '#FF4D6D' : '#888'} style={{ marginRight: 5 }} />
                       <Text style={{ color: '#888', fontSize: 13 }}>
-                        {likes[String(ratingDocId)]?.count > 0 ? String(likes[String(ratingDocId)]?.count) : ''}
+                        {(likes[String(ratingDocId)]?.count || 0) > 0 ? String(likes[String(ratingDocId)]?.count || 0) : ''}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => setReplyingTo(ratingDocId)} style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -1088,19 +1113,19 @@ const BookEditor: React.FC = () => {
                       {replies[ratingDocId].map((r, ridx) => (
                         <View key={String(ridx)} style={{ backgroundColor: '#23272f', borderRadius: 8, padding: 8, marginBottom: 4, borderLeftWidth: 2, borderLeftColor: '#4FC3F7' }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 1 }}>
-                            <Text style={{ color: '#4FC3F7', fontWeight: 'bold', fontSize: 12 }}>{r.user}</Text>
+                            <Text style={{ color: '#4FC3F7', fontWeight: 'bold', fontSize: 12 }}>{String(r.user || 'Utilisateur')}</Text>
                             {r.createdAt && (
                               <Text style={{ color: '#888', marginLeft: 6, fontSize: 10 }}>
                                 {new Date(r.createdAt).toLocaleDateString()} {new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </Text>
                             )}
                           </View>
-                          <Text style={{ color: '#fff', fontSize: 13 }}>{r.text}</Text>
+                          <Text style={{ color: '#fff', fontSize: 13 }}>{String(r.text || '')}</Text>
                         </View>
                       ))}
                     </View>
                   )}
-                  {String(idx) < String(comments.length - 1) && (
+                  {idx < comments.length - 1 && (
                     <View style={{ height: 1, backgroundColor: '#222', marginTop: 12, borderRadius: 1 }} />
                   )}
                 </View>
@@ -1141,6 +1166,18 @@ const BookEditor: React.FC = () => {
           </View>
         )}
       </ScrollView>
+
+      {/* Modal de partage */}
+      {shareModalVisible && (
+        <ShareModal
+          visible={shareModalVisible}
+          onClose={() => setShareModalVisible(false)}
+          bookId={bookId as string}
+          bookTitle={book?.title || ''}
+          bookCover={book?.cover || book?.coverImage || ''}
+          bookAuthor={book?.author || ''}
+        />
+      )}
     </View>
   );
   }
