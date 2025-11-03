@@ -7,7 +7,7 @@ import { POPULAR_CATEGORIES } from '../../constants/bookCategories';
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (cover: string, title: string, synopsis: string, price: string, tags: string[], termsAcceptance: TermsAcceptance) => void;
+  onSubmit: (cover: string, title: string, synopsis: string, price: string, tags: string[], termsAcceptance: TermsAcceptance, isPrivate: boolean) => void;
 }
 
 interface TermsAcceptance {
@@ -27,6 +27,7 @@ export default function PublishDetailsModal({ visible, onClose, onSubmit }: Prop
   const [loading, setLoading] = useState(false);
   const [isFree, setIsFree] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [isPrivate, setIsPrivate] = useState(false);
 
   const pickImage = async () => {
     setLoading(true);
@@ -197,6 +198,48 @@ export default function PublishDetailsModal({ visible, onClose, onSubmit }: Prop
               <Text style={styles.priceFintechHelper}>{isFree ? 'Ce livre sera gratuit' : 'Entre 0,50€ et 40,00€'}</Text>
             </View>
             
+            {/* Section Visibilité */}
+            <View style={styles.visibilitySection}>
+              <Text style={styles.visibilityTitle}>Visibilité du livre</Text>
+              <View style={styles.visibilityOptions}>
+                <TouchableOpacity
+                  style={[styles.visibilityOption, !isPrivate && styles.visibilityOptionActive]}
+                  onPress={() => setIsPrivate(false)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.radioButton, !isPrivate && styles.radioButtonActive]}>
+                    {!isPrivate && <View style={styles.radioButtonInner} />}
+                  </View>
+                  <View style={styles.visibilityOptionText}>
+                    <Text style={[styles.visibilityLabel, !isPrivate && styles.visibilityLabelActive]}>
+                      Public
+                    </Text>
+                    <Text style={styles.visibilityDescription}>
+                      Visible par tous les utilisateurs
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.visibilityOption, isPrivate && styles.visibilityOptionActive]}
+                  onPress={() => setIsPrivate(true)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.radioButton, isPrivate && styles.radioButtonActive]}>
+                    {isPrivate && <View style={styles.radioButtonInner} />}
+                  </View>
+                  <View style={styles.visibilityOptionText}>
+                    <Text style={[styles.visibilityLabel, isPrivate && styles.visibilityLabelActive]}>
+                      Privé
+                    </Text>
+                    <Text style={styles.visibilityDescription}>
+                      Visible uniquement par vous
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+            
             {/* Conditions générales */}
             <TouchableOpacity 
               style={styles.termsContainer} 
@@ -251,7 +294,7 @@ export default function PublishDetailsModal({ visible, onClose, onSubmit }: Prop
                   userAgent: navigator.userAgent || 'Mobile App'
                 };
                 
-                onSubmit(cover, title, synopsis, price, tags, termsAcceptance);
+                onSubmit(cover, title, synopsis, price, tags, termsAcceptance, isPrivate);
               }}
               disabled={loading || !title.trim()}
             >
@@ -585,5 +628,71 @@ const styles = StyleSheet.create({
     color: '#181818',
     fontSize: 16,
     fontWeight: '600',
+  },
+  
+  // Styles pour la section visibilité
+  visibilitySection: {
+    marginVertical: 15,
+    paddingHorizontal: 4,
+  },
+  visibilityTitle: {
+    color: '#FFA94D',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  visibilityOptions: {
+    flexDirection: 'column',
+    gap: 10,
+  },
+  visibilityOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#232323',
+    borderRadius: 12,
+    padding: 15,
+    borderWidth: 2,
+    borderColor: '#333',
+  },
+  visibilityOptionActive: {
+    borderColor: '#FFA94D',
+    backgroundColor: '#2A2A2A',
+  },
+  radioButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#666',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  radioButtonActive: {
+    borderColor: '#FFA94D',
+  },
+  radioButtonInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FFA94D',
+  },
+  visibilityOptionText: {
+    flex: 1,
+  },
+  visibilityLabel: {
+    color: '#ccc',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  visibilityLabelActive: {
+    color: '#FFA94D',
+  },
+  visibilityDescription: {
+    color: '#888',
+    fontSize: 12,
+    lineHeight: 16,
   },
 });

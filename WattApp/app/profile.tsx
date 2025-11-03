@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Linking } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 // use legacy API for readAsStringAsync fallback (avoids the runtime deprecation error on SDK54)
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { getAuth, updateProfile } from 'firebase/auth';
 import app, { db, storage } from '../constants/firebaseConfig';
-import { collection, query, where, getDocs, getCountFromServer, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, getCountFromServer, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, uploadString, getDownloadURL } from 'firebase/storage';
 import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
+import { ThemeSelector } from './components/ThemeSelector';
+import { useTheme } from '../hooks/useTheme';
 
 const Profile: React.FC = () => {
   const router = useRouter();
@@ -24,6 +27,9 @@ const Profile: React.FC = () => {
   const [works, setWorks] = useState<any[]>([]);
   const [recentReads, setRecentReads] = useState<any[]>([]);
   const [uploading, setUploading] = useState<boolean>(false);
+  const [playlists, setPlaylists] = useState<any[]>([]);
+  const [showThemeSelector, setShowThemeSelector] = useState(false);
+  const { theme } = useTheme();
   // Exemples en dur pour preview
 
   useEffect(() => {
@@ -84,6 +90,15 @@ const Profile: React.FC = () => {
       } catch (e) {
         console.warn('No reads collection or failed to load reads', e);
       }
+
+      // Récupère les playlists de l'utilisateur
+      try {
+        const qPlaylists = query(collection(db, 'playlists'), where('uid', '==', user.uid));
+        const snapPlaylists = await getDocs(qPlaylists);
+        setPlaylists(snapPlaylists.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (e) {
+        console.warn('No playlists collection or failed to load playlists', e);
+      }
     } catch (err) {
       console.warn('Profile load error', err);
     }
@@ -101,6 +116,164 @@ const Profile: React.FC = () => {
       <Text style={styles.workTitle} numberOfLines={2}>{item.title ? item.title : 'Sans titre'}</Text>
     </TouchableOpacity>
   );
+
+  const addPlaylist = () => {
+    Alert.alert(
+      'Ajouter une playlist',
+      'Choisissez le type de playlist à ajouter :',
+      [
+        { text: 'Spotify', onPress: () => addPlaylistByType('spotify') },
+        { text: 'Apple Music', onPress: () => addPlaylistByType('apple') },
+        { text: 'YouTube Music', onPress: () => addPlaylistByType('youtube') },
+        { text: 'Deezer', onPress: () => addPlaylistByType('deezer') },
+        { text: 'Annuler', style: 'cancel' }
+      ]
+    );
+  };
+
+  const addPlaylistByType = async (platform: string) => {
+    Alert.prompt(
+      `Ajouter une playlist ${platform.charAt(0).toUpperCase() + platform.slice(1)}`,
+      'Collez le lien de votre playlist :',
+      async (url) => {
+        if (!url || !url.trim()) return;
+        
+        try {
+          const auth = getAuth(app);
+          const user = auth.currentUser;
+          if (!user) return;
+
+          // Extraire le nom de la playlist depuis l'URL ou demander à l'utilisateur
+          const playlistName = await new Promise<string>((resolve) => {
+            Alert.prompt(
+              'Nom de la playlist',
+              'Donnez un nom à votre playlist :',
+              (name) => resolve(name || `Ma playlist ${platform}`)
+            );
+          });
+
+          const newPlaylist = {
+            uid: user.uid,
+            name: playlistName,
+            platform,
+            url: url.trim(),
+            createdAt: new Date(),
+            icon: getPlaylistIcon(platform),
+            isPrivate: false // Par défaut public
+          };
+
+          await addDoc(collection(db, 'playlists'), newPlaylist);
+          
+          // Recharger les playlists
+          const qPlaylists = query(collection(db, 'playlists'), where('uid', '==', user.uid));
+          const snapPlaylists = await getDocs(qPlaylists);
+          setPlaylists(snapPlaylists.docs.map(d => ({ id: d.id, ...d.data() })));
+          
+          Alert.alert('Succès', 'Playlist ajoutée avec succès !');
+        } catch (error) {
+          console.error('Erreur lors de l\'ajout de la playlist:', error);
+          Alert.alert('Erreur', 'Impossible d\'ajouter la playlist.');
+        }
+      }
+    );
+  };
+
+  const getPlaylistIcon = (platform: string) => {
+    switch (platform) {
+      case 'spotify': return 'https://upload.wikimedia.org/wikipedia/commons/8/84/Spotify_icon.svg';
+      case 'apple': return 'https://upload.wikimedia.org/wikipedia/commons/5/5f/Apple_Music_icon.svg';
+      case 'youtube': return 'https://upload.wikimedia.org/wikipedia/commons/6/6a/Youtube_Music_icon.svg';
+      case 'deezer': return 'https://upload.wikimedia.org/wikipedia/commons/3/3d/Deezer_logo.svg';
+      default: return 'https://upload.wikimedia.org/wikipedia/commons/8/84/Spotify_icon.svg';
+    }
+  };
+
+  const renderPlatformIcon = (platform: string, iconName: string) => {
+    if (platform === 'apple' || platform === 'spotify' || platform === 'youtube' || platform === 'deezer') {
+      return (
+        <Image 
+          source={{ uri: iconName }} 
+          style={styles.playlistIconImage}
+          resizeMode="contain"
+        />
+      );
+    } else {
+      return (
+        <Ionicons 
+          name={iconName as any} 
+          size={32}
+          color="#FFA94D"
+          style={styles.playlistIconImage}
+        />
+      );
+    }
+  };
+
+  const getPlatformColor = (platform: string) => {
+    switch (platform) {
+      case 'spotify': return '#1DB954';
+      case 'apple': return '#FA243C';
+      case 'youtube': return '#FF0000';
+      case 'deezer': return '#A238FF';
+      default: return '#FFA94D';
+    }
+  };
+
+  const openPlaylist = async (playlist: any) => {
+    try {
+      const supported = await Linking.canOpenURL(playlist.url);
+      if (supported) {
+        await Linking.openURL(playlist.url);
+      } else {
+        Alert.alert('Erreur', 'Impossible d\'ouvrir cette playlist.');
+      }
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible d\'ouvrir cette playlist.');
+    }
+  };
+
+  const deletePlaylist = (playlistId: string) => {
+    Alert.alert(
+      'Supprimer la playlist',
+      'Êtes-vous sûr de vouloir supprimer cette playlist ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { 
+          text: 'Supprimer', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await updateDoc(doc(db, 'playlists', playlistId), { deleted: true });
+              setPlaylists(playlists.filter(p => p.id !== playlistId));
+              Alert.alert('Succès', 'Playlist supprimée !');
+            } catch (error) {
+              Alert.alert('Erreur', 'Impossible de supprimer la playlist.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const togglePlaylistVisibility = async (playlistId: string, currentPrivateState: boolean) => {
+    try {
+      await updateDoc(doc(db, 'playlists', playlistId), { 
+        isPrivate: !currentPrivateState 
+      });
+      
+      // Mettre à jour l'état local
+      setPlaylists(playlists.map(p => 
+        p.id === playlistId 
+          ? { ...p, isPrivate: !currentPrivateState }
+          : p
+      ));
+      
+      const statusText = !currentPrivateState ? 'privée' : 'publique';
+      Alert.alert('Succès', `Playlist maintenant ${statusText} !`);
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible de modifier la visibilité.');
+    }
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -283,6 +456,10 @@ const Profile: React.FC = () => {
           <TouchableOpacity style={styles.secondaryButtonSmall} onPress={() => router.push('/write')}>
             <Text style={styles.secondaryText}>Commencer à écrire</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.themeButtonSmall} onPress={() => setShowThemeSelector(true)}>
+            <Ionicons name="color-palette" size={16} color="#FFA94D" style={{ marginRight: 8 }} />
+            <Text style={styles.themeButtonText}>Thèmes</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -319,6 +496,59 @@ const Profile: React.FC = () => {
           </ScrollView>
         )}
       </View>
+
+      {/* Section Playlists */}
+      <View style={[styles.section, { marginTop: 15 }]}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Mes playlists</Text>
+          <TouchableOpacity style={styles.addPlaylistBtn} onPress={addPlaylist}>
+            <Text style={styles.addPlaylistText}>+ Ajouter</Text>
+          </TouchableOpacity>
+        </View>
+        
+        {playlists.length === 0 ? (
+          <View style={styles.emptyPlaylistContainer}>
+            <Text style={styles.placeholder}>Aucune playlist ajoutée.</Text>
+            <Text style={styles.placeholderSubtext}>
+              Ajoutez vos playlists Spotify, Apple Music, YouTube Music ou Deezer pour les écouter pendant la lecture.
+            </Text>
+          </View>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.playlistsContainer}>
+            {playlists.map((playlist) => (
+              <View key={playlist.id} style={styles.playlistCard}>
+                <TouchableOpacity 
+                  style={styles.playlistMain}
+                  onPress={() => openPlaylist(playlist)}
+                  onLongPress={() => deletePlaylist(playlist.id)}
+                >
+                  <View style={styles.playlistHeader}>
+                    <TouchableOpacity
+                      style={styles.lockButton}
+                      onPress={() => togglePlaylistVisibility(playlist.id, playlist.isPrivate)}
+                    >
+                      <Text style={styles.lockIcon}>
+                        {playlist.isPrivate ? '🔒' : '🌐'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  
+                  <View style={styles.playlistIconContainer}>
+                    {renderPlatformIcon(playlist.platform, playlist.icon)}
+                    <View style={[styles.platformBadge, { backgroundColor: getPlatformColor(playlist.platform) }]}>
+                      <Text style={styles.platformText}>{playlist.platform.toUpperCase()}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.playlistName} numberOfLines={2}>{playlist.name}</Text>
+                  <Text style={styles.playlistPlatform}>
+                    {playlist.isPrivate ? 'Privée' : 'Publique'} • Appuyez pour ouvrir
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
+        )}
+      </View>
       {/* Bouton de déconnexion */}
       <TouchableOpacity
         style={{
@@ -342,6 +572,12 @@ const Profile: React.FC = () => {
       </TouchableOpacity>
       {/* Espace pour éviter le chevauchement avec la barre de navigation */}
       <View style={{ height: 80 }} />
+
+      {/* Sélecteur de thèmes */}
+      <ThemeSelector 
+        visible={showThemeSelector}
+        onClose={() => setShowThemeSelector(false)}
+      />
     </ScrollView>
   );
 };
@@ -447,6 +683,126 @@ const styles = StyleSheet.create({
   workCard: { width: 120, marginRight: 12, alignItems: 'center' },
   workCover: { width: 100, height: 150, borderRadius: 8, backgroundColor: '#232323' },
   workTitle: { color: '#fff', fontSize: 13, marginTop: 6, textAlign: 'center' },
+  
+  // Styles pour les playlists
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  addPlaylistBtn: {
+    backgroundColor: '#FFA94D',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+  },
+  addPlaylistText: {
+    color: '#181818',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  emptyPlaylistContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  placeholderSubtext: {
+    color: '#666',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  playlistsContainer: {
+    paddingVertical: 8,
+  },
+  playlistCard: {
+    width: 160,
+    marginRight: 15,
+  },
+  playlistMain: {
+    backgroundColor: '#232323',
+    borderRadius: 12,
+    padding: 15,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  playlistIconContainer: {
+    alignItems: 'center',
+    marginBottom: 10,
+    position: 'relative',
+  },
+  playlistIcon: {
+    fontSize: 30,
+    marginBottom: 8,
+  },
+  playlistIconImage: {
+    width: 32,
+    height: 32,
+    marginBottom: 8,
+    alignSelf: 'center',
+  },
+  platformBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    position: 'absolute',
+    bottom: -5,
+    right: -15,
+  },
+  platformText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+  playlistName: {
+    color: '#FFA94D',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 5,
+  },
+  playlistPlatform: {
+    color: '#888',
+    fontSize: 10,
+    textAlign: 'center',
+  },
+  playlistHeader: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 1,
+  },
+  lockButton: {
+    backgroundColor: 'rgba(24, 24, 24, 0.8)',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FFA94D',
+  },
+  lockIcon: {
+    fontSize: 14,
+  },
+  themeButtonSmall: {
+    borderColor: '#FFA94D',
+    borderWidth: 1,
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 160,
+    marginTop: 8,
+    flexDirection: 'row',
+  },
+  themeButtonText: {
+    color: '#FFA94D',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
 
 export default Profile;
