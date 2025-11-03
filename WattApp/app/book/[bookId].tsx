@@ -622,30 +622,6 @@ const BookEditor: React.FC = () => {
               <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 18, marginBottom: 8 }}>Synopsis</Text>
               <Text style={{ color: '#ccc', fontSize: 15, fontStyle: 'italic', lineHeight: 22 }}>{book.synopsis}</Text>
             </View>
-            {book?.tags && Array.isArray(book.tags) && book.tags.length > 0 && (
-              <View style={{ flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0, maxWidth: 120 }}>
-                <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 14, marginBottom: 6, alignSelf: 'flex-end' }}>Tags</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  {book.tags.map((tag: string, idx: number) => (
-                    <View
-                      key={idx}
-                      style={{
-                        backgroundColor: '#18191c',
-                        borderRadius: 8,
-                        paddingVertical: 3,
-                        paddingHorizontal: 10,
-                        marginLeft: 4,
-                        marginBottom: 6,
-                        minHeight: 22,
-                        alignSelf: 'flex-end',
-                      }}
-                    >
-                      <Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: '500', letterSpacing: 0.1 }}>{tag}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
           </View>
         )}
         {/* Titre modernisé */}
@@ -827,6 +803,7 @@ const BookEditor: React.FC = () => {
                   router.push(`/book/${bookId}/read?position=${readingProgress.position}`);
                 } else {
                   router.push(`/book/${bookId}/read`);
+
                 }
               }}
               activeOpacity={0.85}

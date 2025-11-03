@@ -47,7 +47,7 @@ const Home: React.FC = () => {
 		const titre = item.title || 'Titre inconnu';
 		// Pas de champ auteur dans Firestore, on affiche "Auteur inconnu"
 		const auteur = item.auteur || 'Auteur inconnu';
-		const tags = Array.isArray(item.tags) ? item.tags : [];
+
 		return (
 			<View key={item.id} style={isTablet ? styles.livreCardTablet : styles.livreCardHorizontal}>
 				<View style={isTablet ? styles.livreImageBoxTablet : styles.livreImageBoxHorizontal}>
@@ -55,13 +55,6 @@ const Home: React.FC = () => {
 				</View>
 				<Text style={styles.livreTitre}>{titre}</Text>
 				<Text style={styles.livreAuteur}>par {auteur}</Text>
-				<View style={styles.tagsRow}>
-					{tags.map((tag: string) => (
-						<View key={tag} style={styles.tagBox}>
-							<Text style={styles.tagText}>{tag}</Text>
-						</View>
-					))}
-				</View>
 			</View>
 		);
 	};
@@ -111,214 +104,185 @@ const Home: React.FC = () => {
 		loadBooks();
 	}, []);
 
-		return (
-			<View style={{ flex: 1, backgroundColor: '#181818' }}>
-				<StatusBar barStyle="light-content" />
-								 {/* Logo amis à gauche et portefeuille + avatar profil à droite */}
-								 <View style={{ position: 'absolute', top: 48, left: 18, right: 18, zIndex: 100, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-													 <TouchableOpacity onPress={() => router.push('/friends')} activeOpacity={0.8} style={{ backgroundColor: '#232323', borderRadius: 22, padding: 6 }}>
-														 <Ionicons name="people" size={28} color="#FFA94D" />
-													 </TouchableOpacity>
-													 
-													 {/* Section droite : Portefeuille + Avatar */}
-													 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-														 {/* Portefeuille */}
-														 <TouchableOpacity 
-															 onPress={() => router.push('/wallet')} 
-															 activeOpacity={0.8} 
-															 style={{ 
-																 backgroundColor: '#232323', 
-																 borderRadius: 20, 
-																 paddingHorizontal: 14, 
-																 paddingVertical: 8, 
-																 flexDirection: 'row', 
-																 alignItems: 'center',
-																 borderWidth: 1,
-																 borderColor: '#FFA94D'
-															 }}
-														 >
-															 <Ionicons name="wallet-outline" size={20} color="#FFA94D" />
-															 <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 14, marginLeft: 6 }}>
-																 {String(walletBalance.toFixed(2))}€
-															 </Text>
-														 </TouchableOpacity>
-														 
-														 {/* Avatar profil */}
-														 <TouchableOpacity onPress={() => router.push('/profile')} activeOpacity={0.8}>
-															 <Image
-																 source={{ uri: photoURL || avatarUrl }}
-																 style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#FFA94D', backgroundColor: '#232323' }}
-																 resizeMode="cover"
-															 />
-														 </TouchableOpacity>
-													 </View>
-								 </View>
-				<ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 60, paddingBottom: 120 }}>
-						{/* Carrousel principal */}
-						<Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 20, marginTop: 28, marginLeft: 18, marginBottom: 8 }}>À la une</Text>
-						<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 18, paddingRight: 18 }}>
-									{(() => {
-										if (loadingBooks) return <Text style={styles.placeholder}>Chargement...</Text>;
-										if (books.length === 0) return <Text style={styles.placeholder}>Aucun livre trouvé.</Text>;
-										// Utilisé pour éviter les doublons
-										const usedIds = new Set();
-										return books.map(livre => {
-											if (usedIds.has(livre.id)) return null;
-											usedIds.add(livre.id);
-											return (
-												<TouchableOpacity
-													key={livre.id}
-													style={{ width: 100, marginRight: 14 }}
-													activeOpacity={0.8}
-													onPress={() => router.push(`/book/${livre.id}`)}
-												>
-													<Image
-														source={{ uri: livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
-														style={{ width: 100, height: 150, borderRadius: 8, backgroundColor: '#232323' }}
-														resizeMode="cover"
-													/>
-													{/* Badge de genre */}
-													{Array.isArray(livre.tags) && livre.tags.length > 0 && (
-														<View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 }}>
-															{livre.tags.map((tag: string) => (
-																<View key={tag} style={{ backgroundColor: '#232323', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 2, marginRight: 6, marginBottom: 2 }}>
-																	<Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: 'bold' }}>{tag.toUpperCase()}</Text>
-																</View>
-															))}
-														</View>
-													)}
-													{/* Titre */}
-													<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, marginTop: 8 }} numberOfLines={1}>{livre.title || 'Titre inconnu'}</Text>
-													{/* Auteur et Prix */}
-													<Text style={{ color: '#888', fontSize: 12, marginTop: 2 }} numberOfLines={1}>
-														par {livre.author || livre.auteur || 'Auteur inconnu'}
-													</Text>
-													{/* Prix */}
-													<View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-														<Text style={{ color: '#FFA94D', fontSize: 14, fontWeight: 'bold' }}>
-															{livre.price && livre.price > 0 ? `${String(livre.price.toFixed(2))}€` : 'Gratuit'}
-														</Text>
-														<Text style={{ color: '#888', fontSize: 12, marginLeft: 8 }}>👁️ {String(livre.reads || 0)}</Text>
-													</View>
-												</TouchableOpacity>
-											);
-										});
-									})()}
-						</ScrollView>
+	return (
+		<View style={{ flex: 1, backgroundColor: '#181818' }}>
+			<StatusBar barStyle="light-content" />
+			{/* Logo amis à gauche et portefeuille + avatar profil à droite */}
+			<View style={{ position: 'absolute', top: 48, left: 18, right: 18, zIndex: 100, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+				<TouchableOpacity onPress={() => router.push('/friends')} activeOpacity={0.8} style={{ backgroundColor: '#232323', borderRadius: 22, padding: 6 }}>
+					<Ionicons name="people" size={28} color="#FFA94D" />
+				</TouchableOpacity>
 
-						{/* Section Explorer */}
-						<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 18, marginTop: 28, marginLeft: 18, marginBottom: 8 }}>Explorer</Text>
-						<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 18, paddingRight: 18 }}>
-									{(() => {
-										if (loadingBooks) return <Text style={styles.placeholder}>Chargement...</Text>;
-										if (books.length === 0) return <Text style={styles.placeholder}>Aucun livre trouvé.</Text>;
-										// Utilisé pour éviter les doublons
-										const usedIds = new Set();
-										return books.slice(0, 6).map(livre => {
-											if (usedIds.has(livre.id)) return null;
-											usedIds.add(livre.id);
-											return (
-												<TouchableOpacity
-													key={livre.id + '-explore'}
-													style={{ width: 80, marginRight: 10 }}
-													activeOpacity={0.8}
-													onPress={() => router.push(`/book/${livre.id}`)}
-												>
-													<Image
-														source={{ uri: livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
-														style={{ width: 80, height: 120, borderRadius: 8, backgroundColor: '#232323' }}
-														resizeMode="cover"
-													/>
-													<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13, marginTop: 6 }} numberOfLines={2}>{livre.title || 'Titre inconnu'}</Text>
-													{/* Auteur et Prix */}
-													<Text style={{ color: '#888', fontSize: 11, marginTop: 2 }} numberOfLines={1}>
-														par {livre.author || livre.auteur || 'Auteur inconnu'}
-													</Text>
-													<Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>
-														{livre.price && livre.price > 0 ? `${String(livre.price.toFixed(2))}€` : 'Gratuit'}
-													</Text>
-												</TouchableOpacity>
-											);
-										});
-									})()}
-						</ScrollView>
+				{/* Section droite : Portefeuille + Avatar */}
+				<View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+					{/* Portefeuille */}
+					<TouchableOpacity
+						onPress={() => router.push('/wallet')}
+						activeOpacity={0.8}
+						style={{
+							backgroundColor: '#232323',
+							borderRadius: 20,
+							paddingHorizontal: 14,
+							paddingVertical: 8,
+							flexDirection: 'row',
+							alignItems: 'center',
+							borderWidth: 1,
+							borderColor: '#FFA94D'
+						}}
+					>
+						<Ionicons name="wallet-outline" size={20} color="#FFA94D" />
+						<Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 14, marginLeft: 6 }}>
+							{String(walletBalance.toFixed(2))}€
+						</Text>
+					</TouchableOpacity>
 
-						{/* Section Vos auteurs suivis */}
-						<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 18, marginTop: 28, marginLeft: 18, marginBottom: 8 }}>Vos auteurs suivis</Text>
-						<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 18, paddingRight: 18 }}>
-									{(() => {
-										if (loadingBooks) return <Text style={styles.placeholder}>Chargement...</Text>;
-										if (books.length === 0) return <Text style={styles.placeholder}>Aucun livre trouvé.</Text>;
-										// Utilisé pour éviter les doublons
-										const usedIds = new Set();
-										return books.slice(3, 9).map(livre => {
-											if (usedIds.has(livre.id)) return null;
-											usedIds.add(livre.id);
-											return (
-												<TouchableOpacity
-													key={livre.id + '-auteur'}
-													style={{ width: 80, marginRight: 10 }}
-													activeOpacity={0.8}
-													onPress={() => router.push(`/book/${livre.id}`)}
-												>
-													<Image
-														source={{ uri: livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
-														style={{ width: 80, height: 120, borderRadius: 8, backgroundColor: '#232323' }}
-														resizeMode="cover"
-													/>
-													<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13, marginTop: 6 }} numberOfLines={2}>{livre.title || 'Titre inconnu'}</Text>
-													{/* Auteur et Prix */}
-													<Text style={{ color: '#888', fontSize: 11, marginTop: 2 }} numberOfLines={1}>
-														par {livre.author || livre.auteur || 'Auteur inconnu'}
-													</Text>
-													<Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>
-														{livre.price && livre.price > 0 ? `${String(livre.price.toFixed(2))}€` : 'Gratuit'}
-													</Text>
-												</TouchableOpacity>
-											);
-										});
-									})()}
-						</ScrollView>
-					</ScrollView>
+					{/* Avatar profil */}
+					<TouchableOpacity onPress={() => router.push('/profile')} activeOpacity={0.8}>
+						<Image
+							source={{ uri: photoURL || avatarUrl }}
+							style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#FFA94D', backgroundColor: '#232323' }}
+							resizeMode="cover"
+						/>
+					</TouchableOpacity>
+				</View>
+			</View>
+			<ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 60, paddingBottom: 120 }}>
+				{/* Carrousel principal */}
+				<Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 20, marginTop: 28, marginLeft: 18, marginBottom: 8 }}>À la une</Text>
+				<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 18, paddingRight: 18 }}>
+					{(() => {
+						if (loadingBooks) return <Text style={styles.placeholder}>Chargement...</Text>;
+						if (books.length === 0) return <Text style={styles.placeholder}>Aucun livre trouvé.</Text>;
+						// Utilisé pour éviter les doublons
+						const usedIds = new Set();
+						return books.map(livre => {
+							if (usedIds.has(livre.id)) return null;
+							usedIds.add(livre.id);
+							return (
+								<TouchableOpacity
+									key={livre.id}
+									style={{ width: 100, marginRight: 14 }}
+									activeOpacity={0.8}
+									onPress={() => router.push(`/book/${livre.id}`)}
+								>
+									<Image
+										source={{ uri: livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
+										style={{ width: 100, height: 150, borderRadius: 8, backgroundColor: '#232323' }}
+										resizeMode="cover"
+									/>
+									{/* Badge de genre */}
+									
+									{/* Titre */}
+									<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, marginTop: 8 }} numberOfLines={1}>{livre.title || 'Titre inconnu'}</Text>
+									{/* Auteur et Prix */}
+									<Text style={{ color: '#888', fontSize: 12, marginTop: 2 }} numberOfLines={1}>
+										par {livre.author || livre.auteur || 'Auteur inconnu'}
+									</Text>
+									{/* Prix */}
+									<View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+										<Text style={{ color: '#FFA94D', fontSize: 14, fontWeight: 'bold' }}>
+											{livre.price && livre.price > 0 ? `${String(livre.price.toFixed(2))}€` : 'Gratuit'}
+										</Text>
+										<Text style={{ color: '#888', fontSize: 12, marginLeft: 8 }}>👁️ {String(livre.reads || 0)}</Text>
+									</View>
+								</TouchableOpacity>
+							);
+						});
+					})()}
+				</ScrollView>
+
+				{/* Section Explorer */}
+				<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 18, marginTop: 28, marginLeft: 18, marginBottom: 8 }}>Explorer</Text>
+				<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 18, paddingRight: 18 }}>
+					{(() => {
+						if (loadingBooks) return <Text style={styles.placeholder}>Chargement...</Text>;
+						if (books.length === 0) return <Text style={styles.placeholder}>Aucun livre trouvé.</Text>;
+						// Utilisé pour éviter les doublons
+						const usedIds = new Set();
+						return books.slice(0, 6).map(livre => {
+							if (usedIds.has(livre.id)) return null;
+							usedIds.add(livre.id);
+							return (
+								<TouchableOpacity
+									key={livre.id + '-explore'}
+									style={{ width: 80, marginRight: 10 }}
+									activeOpacity={0.8}
+									onPress={() => router.push(`/book/${livre.id}`)}
+								>
+									<Image
+										source={{ uri: livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
+										style={{ width: 80, height: 120, borderRadius: 8, backgroundColor: '#232323' }}
+										resizeMode="cover"
+									/>
+									<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13, marginTop: 6 }} numberOfLines={2}>{livre.title || 'Titre inconnu'}</Text>
+									{/* Auteur et Prix */}
+									<Text style={{ color: '#888', fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+										par {livre.author || livre.auteur || 'Auteur inconnu'}
+									</Text>
+									<Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>
+										{livre.price && livre.price > 0 ? `${String(livre.price.toFixed(2))}€` : 'Gratuit'}
+									</Text>
+								</TouchableOpacity>
+							);
+						});
+					})()}
+				</ScrollView>
+
+				{/* Section Vos auteurs suivis */}
+				<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 18, marginTop: 28, marginLeft: 18, marginBottom: 8 }}>Vos auteurs suivis</Text>
+				<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 18, paddingRight: 18 }}>
+					{(() => {
+						if (loadingBooks) return <Text style={styles.placeholder}>Chargement...</Text>;
+						if (books.length === 0) return <Text style={styles.placeholder}>Aucun livre trouvé.</Text>;
+						// Utilisé pour éviter les doublons
+						const usedIds = new Set();
+						return books.slice(3, 9).map(livre => {
+							if (usedIds.has(livre.id)) return null;
+							usedIds.add(livre.id);
+							return (
+								<TouchableOpacity
+									key={livre.id + '-auteur'}
+									style={{ width: 80, marginRight: 10 }}
+									activeOpacity={0.8}
+									onPress={() => router.push(`/book/${livre.id}`)}
+								>
+									<Image
+										source={{ uri: livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
+										style={{ width: 80, height: 120, borderRadius: 8, backgroundColor: '#232323' }}
+										resizeMode="cover"
+									/>
+									<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13, marginTop: 6 }} numberOfLines={2}>{livre.title || 'Titre inconnu'}</Text>
+									{/* Auteur et Prix */}
+									<Text style={{ color: '#888', fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+										par {livre.author || livre.auteur || 'Auteur inconnu'}
+									</Text>
+									<Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>
+										{livre.price && livre.price > 0 ? `${String(livre.price.toFixed(2))}€` : 'Gratuit'}
+									</Text>
+								</TouchableOpacity>
+							);
+						});
+					})()}
+				</ScrollView>
+			</ScrollView>
 		</View>
 	);
 };
 
 const styles = StyleSheet.create({
-				avatar: {
-					width: 50,
-					height: 50,
-					borderRadius: 25,
-					borderWidth: 2,
-					borderColor: '#FFA94D',
-					backgroundColor: '#181818',
-				},
-	tagsRow: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		justifyContent: 'center',
-		marginTop: 4,
-	},
-	tagBox: {
-		backgroundColor: '#181818',
-		borderRadius: 12,
-		paddingHorizontal: 8,
-		paddingVertical: 2,
-		marginHorizontal: 2,
-		marginVertical: 2,
-		borderWidth: 1,
+	avatar: {
+		width: 50,
+		height: 50,
+		borderRadius: 25,
+		borderWidth: 2,
 		borderColor: '#FFA94D',
+		backgroundColor: '#181818',
 	},
-	tagText: {
-		color: '#FFA94D',
-		fontSize: 12,
-		fontWeight: 'bold',
+	livreCardHorizontal: {
+		marginRight: 18,
+		width: 120,
+		alignItems: 'center',
 	},
-		livreCardHorizontal: {
-			marginRight: 18,
-			width: 120,
-			alignItems: 'center',
-		},
 	livreImageBoxHorizontal: {
 		width: 80,
 		height: 120,
@@ -429,68 +393,68 @@ const styles = StyleSheet.create({
 		marginTop: 30,
 		alignItems: 'center',
 	},
-			infoText: {
-				color: '#FFA94D',
-				fontSize: 16,
-				marginBottom: 8,
-			},
-			sectionTitle: {
-				fontSize: 22,
-				fontWeight: 'bold',
-				color: '#FFA94D',
-				marginTop: 18,
-				marginBottom: 8,
-				alignSelf: 'flex-start',
-			},
-			sectionBox: {
-				backgroundColor: '#232323',
-				borderRadius: 10,
-				padding: 16,
-				width: '100%',
-				marginBottom: 10,
-				minHeight: 60,
-			},
-			placeholder: {
-				color: '#888',
-				fontSize: 16,
-				fontStyle: 'italic',
-			},
-			livreCardTablet: {
-				marginRight: 24,
-				width: 180,
-				alignItems: 'flex-start',
-			},
-			livreImageBoxTablet: {
-				width: 140,
-				height: 200,
-				borderRadius: 10,
-				overflow: 'hidden',
-				backgroundColor: '#181818',
-				marginBottom: 12,
-			},
-			livreImageTablet: {
-				width: '100%',
-				height: '100%',
-				resizeMode: 'cover',
-			},
-			sectionBoxTablet: {
-				padding: 24,
-				borderRadius: 14,
-			},
-			userButtonContainer: {
-				position: 'absolute',
-				top: 80,
-				right: 12,
-				zIndex: 120,
-			},
-			userButtonImage: {
-				width: 44,
-				height: 44,
-				borderRadius: 22,
-				borderWidth: 2,
-				borderColor: '#FFA94D',
-				backgroundColor: '#181818',
-			},
+	infoText: {
+		color: '#FFA94D',
+		fontSize: 16,
+		marginBottom: 8,
+	},
+	sectionTitle: {
+		fontSize: 22,
+		fontWeight: 'bold',
+		color: '#FFA94D',
+		marginTop: 18,
+		marginBottom: 8,
+		alignSelf: 'flex-start',
+	},
+	sectionBox: {
+		backgroundColor: '#232323',
+		borderRadius: 10,
+		padding: 16,
+		width: '100%',
+		marginBottom: 10,
+		minHeight: 60,
+	},
+	placeholder: {
+		color: '#888',
+		fontSize: 16,
+		fontStyle: 'italic',
+	},
+	livreCardTablet: {
+		marginRight: 24,
+		width: 180,
+		alignItems: 'flex-start',
+	},
+	livreImageBoxTablet: {
+		width: 140,
+		height: 200,
+		borderRadius: 10,
+		overflow: 'hidden',
+		backgroundColor: '#181818',
+		marginBottom: 12,
+	},
+	livreImageTablet: {
+		width: '100%',
+		height: '100%',
+		resizeMode: 'cover',
+	},
+	sectionBoxTablet: {
+		padding: 24,
+		borderRadius: 14,
+	},
+	userButtonContainer: {
+		position: 'absolute',
+		top: 80,
+		right: 12,
+		zIndex: 120,
+	},
+	userButtonImage: {
+		width: 44,
+		height: 44,
+		borderRadius: 22,
+		borderWidth: 2,
+		borderColor: '#FFA94D',
+		backgroundColor: '#181818',
+	},
 });
 
 export default Home;
