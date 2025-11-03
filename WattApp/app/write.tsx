@@ -5,6 +5,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import app, { db } from '../constants/firebaseConfig';
 import { collection, getDocs, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import BookSelector from './components/BookSelector';
 
 const CATEGORIES = [
   'Roman', 'Manga', 'Poésie', 'Nouvelle', 'Fiche lecture', 'Bullet Journal', 'Note', 'Autre', 'imported'
@@ -242,6 +244,34 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     textAlign: 'center',
   },
+  // Styles pour les boutons d'actions
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    borderRadius: 12,
+    gap: 8,
+  },
+  chapterButton: {
+    backgroundColor: '#4FC3F7',
+  },
+  templateButton: {
+    backgroundColor: '#FFA94D',
+  },
+  actionButtonText: {
+    color: '#181818',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 });
 
 export default function WriteScreen() {
@@ -252,6 +282,10 @@ export default function WriteScreen() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [previewModal, setPreviewModal] = useState<{visible: boolean, item?: any}>({visible: false});
+  
+  // États pour la sélection de livre pour nouveau chapitre
+  const [showBookSelector, setShowBookSelector] = useState(false);
+  const [selectedBook, setSelectedBook] = useState<any>(null);
 
   // Charger les templates Firestore filtrés par catégorie
   useEffect(() => {
@@ -388,6 +422,28 @@ export default function WriteScreen() {
         )}
         {renderPreviewModal()}
       </View>
+      
+      {/* Boutons d'actions rapides */}
+      <View style={styles.actionButtonsContainer}>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.chapterButton]}
+          activeOpacity={0.85}
+          onPress={() => setShowBookSelector(true)}
+        >
+          <Ionicons name="add-circle-outline" size={20} color="#181818" />
+          <Text style={styles.actionButtonText}>Nouveau chapitre</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.actionButton, styles.templateButton]}
+          activeOpacity={0.85}
+          onPress={() => setModalVisible(true)}
+        >
+          <Ionicons name="document-outline" size={20} color="#181818" />
+          <Text style={styles.actionButtonText}>Nouveau template</Text>
+        </TouchableOpacity>
+      </View>
+      
       {/* Bouton flottant pour ajouter un template */}
       <TouchableOpacity
         style={styles.fab}
@@ -427,6 +483,18 @@ export default function WriteScreen() {
           </View>
         </Pressable>
       </Modal>
+      
+      {/* Sélecteur de livre pour nouveau chapitre */}
+      <BookSelector
+        visible={showBookSelector}
+        onClose={() => setShowBookSelector(false)}
+        onSelectBook={(book) => {
+          setSelectedBook(book);
+          // Rediriger vers la page d'écriture de chapitre avec l'ID du livre
+          router.push(`/write/chapter/${book.id}`);
+        }}
+        title="Sélectionner un livre"
+      />
     </SafeAreaView>
   );
 }

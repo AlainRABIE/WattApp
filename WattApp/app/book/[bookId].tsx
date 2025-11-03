@@ -48,6 +48,10 @@ const BookEditor: React.FC = () => {
   const [replies, setReplies] = useState<{ [key: string]: any[] }>({});
   const [likes, setLikes] = useState<{ [key: string]: { count: number, liked: boolean } }>({});
   const [hasPurchased, setHasPurchased] = useState<boolean>(false);
+  
+  // États pour les chapitres
+  const [chapters, setChapters] = useState<any[]>([]);
+  const [loadingChapters, setLoadingChapters] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState<boolean>(false);
   const [readingProgress, setReadingProgress] = useState<any>(null);
   
@@ -412,12 +416,43 @@ const BookEditor: React.FC = () => {
   };
 
 
-  // Liste des chapitres (mock si pas de vraie data)
-  const chapters = book?.chaptersList || [
-    { id: 1, title: 'Chapitre 1', cover: book?.coverImage },
-    { id: 2, title: 'Chapitre 2', cover: book?.coverImage },
-    { id: 3, title: 'Chapitre 3', cover: book?.coverImage },
-  ];
+  // Fonction pour charger les chapitres depuis Firebase
+  const loadChapters = async () => {
+    if (!bookId || typeof bookId !== 'string') return;
+    
+    setLoadingChapters(true);
+    try {
+      const chaptersRef = collection(db, 'books', bookId, 'chapters');
+      const chaptersQuery = query(chaptersRef, orderBy('chapterNumber', 'asc'));
+      const chaptersSnapshot = await getDocs(chaptersQuery);
+      
+      const chaptersData = chaptersSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        cover: book?.coverImage || book?.cover,
+      }));
+      
+      setChapters(chaptersData);
+    } catch (error) {
+      console.error('Erreur lors du chargement des chapitres:', error);
+      // En cas d'erreur, utiliser les chapitres mock
+      const mockChapters = book?.chaptersList || [
+        { id: 1, title: 'Chapitre 1', cover: book?.coverImage },
+        { id: 2, title: 'Chapitre 2', cover: book?.coverImage },
+        { id: 3, title: 'Chapitre 3', cover: book?.coverImage },
+      ];
+      setChapters(mockChapters);
+    } finally {
+      setLoadingChapters(false);
+    }
+  };
+
+  // Charger les chapitres quand le livre est chargé
+  useEffect(() => {
+    if (book && showChapters) {
+      loadChapters();
+    }
+  }, [book, showChapters]);
 
   // Animation sidebar chapitres : slide in/out depuis la droite
   useEffect(() => {
@@ -556,18 +591,91 @@ const BookEditor: React.FC = () => {
               <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: '#FFA94D55', marginBottom: 8 }} />
               <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 18 }}>Chapitres</Text>
             </View>
-            <FlatList
-              data={chapters}
-              keyExtractor={item => String(item.id)}
-              renderItem={({ item }) => (
-                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, borderRadius: 12, backgroundColor: '#18191c', padding: 10 }}>
-                  <Image source={{ uri: item.cover }} style={{ width: 48, height: 64, borderRadius: 8, marginRight: 14, backgroundColor: '#333' }} />
-                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>{item.title}</Text>
-                </TouchableOpacity>
-              )}
-              showsVerticalScrollIndicator={false}
-              style={{ maxHeight: 340 }}
-            />
+            
+            {loadingChapters ? (
+              <View style={{ alignItems: 'center', justifyContent: 'center', height: 200 }}>
+                <ActivityIndicator size="large" color="#FFA94D" />
+                <Text style={{ color: '#888', marginTop: 10 }}>Chargement des chapitres...</Text>
+              </View>
+            ) : chapters.length === 0 ? (
+              <View style={{ alignItems: 'center', justifyContent: 'center', height: 200 }}>
+                <Ionicons name="book-outline" size={48} color="#666" />
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold', marginTop: 10 }}>Aucun chapitre</Text>
+                <Text style={{ color: '#888', fontSize: 14, marginTop: 5, textAlign: 'center' }}>
+                  Ce livre n'a pas encore de chapitres.
+                </Text>
+                {isAuthor && (
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#FFA94D',
+                      borderRadius: 20,
+                      paddingVertical: 8,
+                      paddingHorizontal: 16,
+                      marginTop: 15,
+                    }}
+                    onPress={() => {
+                      setShowChapters(false);
+                      router.push(`/write/chapter/${bookId}`);
+                    }}
+                  >
+                    <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 14 }}>
+                      Créer le premier chapitre
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : (
+              <FlatList
+                data={chapters}
+                keyExtractor={item => String(item.id)}
+                renderItem={({ item, index }) => (
+                  <TouchableOpacity 
+                    style={{ 
+                      flexDirection: 'row', 
+                      alignItems: 'center', 
+                      marginBottom: 16, 
+                      borderRadius: 12, 
+                      backgroundColor: '#18191c', 
+                      padding: 10 
+                    }}
+                    onPress={() => {
+                      // Navigation vers le chapitre spécifique
+                      if (item.content) {
+                        // Si le chapitre a du contenu, naviguer vers sa lecture
+                        router.push(`/book/${bookId}/chapter/${item.id}`);
+                      } else {
+                        // Sinon, aller à la lecture générale du livre
+                        router.push(`/book/${bookId}/read`);
+                      }
+                      setShowChapters(false);
+                    }}
+                  >
+                    <Image 
+                      source={{ uri: item.cover || book?.coverImage || 'https://via.placeholder.com/48x64' }} 
+                      style={{ width: 48, height: 64, borderRadius: 8, marginRight: 14, backgroundColor: '#333' }} 
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold', marginBottom: 4 }}>
+                        {item.title || `Chapitre ${index + 1}`}
+                      </Text>
+                      {item.chapterNumber && (
+                        <Text style={{ color: '#888', fontSize: 12 }}>
+                          Chapitre {item.chapterNumber}
+                        </Text>
+                      )}
+                      {item.content && (
+                        <Text style={{ color: '#666', fontSize: 11, marginTop: 2 }} numberOfLines={2}>
+                          {item.content.substring(0, 100)}...
+                        </Text>
+                      )}
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#666" />
+                  </TouchableOpacity>
+                )}
+                showsVerticalScrollIndicator={false}
+                style={{ maxHeight: 340 }}
+              />
+            )}
             <TouchableOpacity onPress={() => setShowChapters(false)} style={{ alignSelf: 'center', marginTop: 10, padding: 10 }}>
               <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 16 }}>Fermer</Text>
             </TouchableOpacity>
@@ -943,6 +1051,33 @@ const BookEditor: React.FC = () => {
             }
           })()}
         </View>
+
+        {/* Bouton pour créer un nouveau chapitre - UNIQUEMENT pour l'auteur */}
+        {isAuthor && (
+          <View style={{ width: '92%', marginTop: 16, alignItems: 'center' }}>
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#4FC3F7',
+                borderRadius: 25,
+                paddingVertical: 12,
+                paddingHorizontal: 30,
+                flexDirection: 'row',
+                alignItems: 'center',
+                shadowColor: '#4FC3F7',
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 4,
+              }}
+              onPress={() => router.push(`/write/chapter/${bookId}`)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="add-circle-outline" size={20} color="#181818" style={{ marginRight: 8 }} />
+              <Text style={{ color: '#181818', fontWeight: '600', fontSize: 16 }}>
+                Ajouter un chapitre
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Bouton de partage */}
         <View style={{ width: '92%', marginTop: 16, alignItems: 'center' }}>
