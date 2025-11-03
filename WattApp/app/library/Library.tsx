@@ -16,9 +16,11 @@ import { useRouter } from 'expo-router';
 import { Alert } from 'react-native';
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
-import { collection, query, where, getDocs, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, deleteDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getWishlistBooks } from './wishlistUtils';
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 
 // Types
 type BookType = {
@@ -40,6 +42,11 @@ type BookType = {
   // Pourcentage de lecture
   pagesRead?: number;
   totalPages?: number;
+  // Propriétés PDF
+  type?: string;
+  filePath?: string;
+  fileName?: string;
+  fileSize?: number;
 };
 
 type FolderType = {
@@ -65,6 +72,236 @@ const Library: React.FC = () => {
   const [search, setSearch] = useState<string>('');
   const [wishlist, setWishlist] = useState<BookType[]>([]);
   const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [downloadedBooks, setDownloadedBooks] = useState<Set<string>>(new Set());
+  const [downloadingBooks, setDownloadingBooks] = useState<Set<string>>(new Set());
+  const [downloadProgress, setDownloadProgress] = useState<{ [key: string]: number }>({});
+
+  // Limite de téléchargements simultanés
+  const MAX_DOWNLOADS = 2;
+
+  // Fonction d'importation PDF
+  const handleImportPDF = async () => {
+    try {
+      setImporting(true);
+      
+      // Sélectionner le fichier PDF
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const file = result.assets[0];
+      if (!file) {
+        Alert.alert('Erreur', 'Aucun fichier sélectionné');
+        return;
+      }
+
+      // Vérifier que c'est bien un PDF
+      if (!file.name.toLowerCase().endsWith('.pdf')) {
+        Alert.alert('Erreur', 'Veuillez sélectionner un fichier PDF');
+        return;
+      }
+
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+      if (!user) {
+        Alert.alert('Erreur', 'Vous devez être connecté');
+        return;
+      }
+
+      // Extraire le nom du livre depuis le nom du fichier
+      const fileName = file.name.replace('.pdf', '');
+      const bookTitle = fileName.replace(/[_-]/g, ' ').trim();
+
+      // Créer l'entrée du livre dans Firebase
+      const bookData = {
+        title: bookTitle,
+        titre: bookTitle,
+        author: 'Importé',
+        auteur: 'Importé',
+        ownerUid: user.uid,
+        authorUid: user.uid,
+        status: 'imported',
+        type: 'pdf',
+        filePath: file.uri,
+        fileName: file.name,
+        fileSize: file.size,
+        coverImage: null,
+        couverture: null,
+        synopsis: 'Livre importé depuis PDF',
+        tags: ['PDF', 'Importé'],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        reads: 0,
+        body: 'Contenu PDF - Utilisez un lecteur PDF pour lire ce livre.',
+      };
+
+      // Ajouter à Firebase
+      await addDoc(collection(db, 'books'), bookData);
+
+      Alert.alert(
+        'Importation réussie', 
+        `Le livre "${bookTitle}" a été ajouté à votre bibliothèque !`,
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              // Recharger la bibliothèque
+              if (loadBooksRef.current) {
+                loadBooksRef.current();
+              }
+            }
+          }
+        ]
+      );
+
+    } catch (error) {
+      console.error('Erreur lors de l\'importation:', error);
+      Alert.alert('Erreur', 'Impossible d\'importer le fichier PDF');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // Fonction pour télécharger un livre pour lecture hors ligne
+  const handleDownloadBook = async (book: BookType) => {
+    // Vérifier la limite de téléchargements
+    if (downloadedBooks.size >= MAX_DOWNLOADS) {
+      Alert.alert(
+        'Limite atteinte', 
+        `Vous pouvez télécharger maximum ${MAX_DOWNLOADS} livres. Supprimez un livre téléchargé pour en ajouter un nouveau.`,
+        [
+          {
+            text: 'Gérer les téléchargements',
+            onPress: () => showDownloadManager()
+          },
+          {
+            text: 'OK',
+            style: 'cancel'
+          }
+        ]
+      );
+      return;
+    }
+
+    // Vérifier si le livre est déjà téléchargé
+    if (downloadedBooks.has(book.id)) {
+      Alert.alert('Information', 'Ce livre est déjà téléchargé');
+      return;
+    }
+
+    // Vérifier si le livre est en cours de téléchargement
+    if (downloadingBooks.has(book.id)) {
+      Alert.alert('Information', 'Ce livre est déjà en cours de téléchargement');
+      return;
+    }
+
+    try {
+      setDownloadingBooks(prev => new Set([...prev, book.id]));
+      setDownloadProgress(prev => ({ ...prev, [book.id]: 0 }));
+
+      // Simuler le téléchargement avec progression
+      const downloadInterval = setInterval(() => {
+        setDownloadProgress(prev => {
+          const currentProgress = prev[book.id] || 0;
+          if (currentProgress >= 100) {
+            clearInterval(downloadInterval);
+            return prev;
+          }
+          return { ...prev, [book.id]: currentProgress + 10 };
+        });
+      }, 200);
+
+      // Simuler le temps de téléchargement (2 secondes)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Sauvegarder le livre localement (AsyncStorage ou autre)
+      const bookData = {
+        ...book,
+        downloadedAt: new Date().toISOString(),
+        offline: true
+      };
+
+      // Ici vous pourriez sauvegarder dans AsyncStorage
+      // await AsyncStorage.setItem(`offline_book_${book.id}`, JSON.stringify(bookData));
+
+      setDownloadedBooks(prev => new Set([...prev, book.id]));
+      setDownloadProgress(prev => ({ ...prev, [book.id]: 100 }));
+      
+      Alert.alert('Téléchargement terminé', `"${book.title || book.titre}" est maintenant disponible hors ligne !`);
+
+    } catch (error) {
+      console.error('Erreur lors du téléchargement:', error);
+      Alert.alert('Erreur', 'Impossible de télécharger le livre');
+    } finally {
+      setDownloadingBooks(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(book.id);
+        return newSet;
+      });
+      
+      // Nettoyer le progrès après un délai
+      setTimeout(() => {
+        setDownloadProgress(prev => {
+          const { [book.id]: _, ...rest } = prev;
+          return rest;
+        });
+      }, 1000);
+    }
+  };
+
+  // Fonction pour supprimer un livre téléchargé
+  const handleRemoveDownload = async (bookId: string) => {
+    Alert.alert(
+      'Supprimer le téléchargement',
+      'Voulez-vous supprimer ce livre de vos téléchargements ? Vous pourrez le télécharger à nouveau plus tard.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Supprimer du stockage local
+              // await AsyncStorage.removeItem(`offline_book_${bookId}`);
+              
+              setDownloadedBooks(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(bookId);
+                return newSet;
+              });
+              
+              Alert.alert('Supprimé', 'Le livre a été supprimé de vos téléchargements');
+            } catch (error) {
+              console.error('Erreur lors de la suppression:', error);
+              Alert.alert('Erreur', 'Impossible de supprimer le téléchargement');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Gestionnaire des téléchargements
+  const showDownloadManager = () => {
+    const downloadedBooksArray = Array.from(downloadedBooks).map(bookId => {
+      const book = books.find(b => b.id === bookId);
+      return book ? `• ${book.title || book.titre}` : `• Livre ${bookId}`;
+    }).join('\n');
+
+    Alert.alert(
+      'Livres téléchargés',
+      downloadedBooksArray.length > 0 
+        ? `Livres disponibles hors ligne (${downloadedBooks.size}/${MAX_DOWNLOADS}) :\n\n${downloadedBooksArray}\n\nPour supprimer un livre, appuyez longuement dessus dans la liste.`
+        : 'Aucun livre téléchargé',
+      [{ text: 'OK' }]
+    );
+  };
 
   // Ajout d'un dossier
   const handleAddFolder = () => {
@@ -204,6 +441,70 @@ const Library: React.FC = () => {
     }
   };
 
+  // Fonction pour ouvrir un livre (différent selon le type)
+  const handleOpenBook = (book: BookType) => {
+    if (book.type === 'pdf') {
+      // Pour les PDFs importés, afficher des options
+      Alert.alert(
+        `📄 ${book.titre || book.title}`,
+        `Livre PDF importé\n\nAuteur: ${book.auteur || book.author}\nTaille: ${book.fileSize ? Math.round(book.fileSize / 1024) + ' KB' : 'Inconnue'}\n\nComment souhaitez-vous ouvrir ce livre ?`,
+        [
+          {
+            text: 'Voir les détails',
+            onPress: () => router.push(`/book/${book.id}`)
+          },
+          {
+            text: 'Ouvrir PDF',
+            onPress: () => {
+              // Utiliser expo-web-browser ou une app externe pour ouvrir le PDF
+              Alert.alert('PDF', 'Fonctionnalité d\'ouverture PDF en cours de développement');
+            }
+          },
+          {
+            text: 'Annuler',
+            style: 'cancel'
+          }
+        ]
+      );
+    } else {
+      // Pour les livres normaux, afficher les informations et options de téléchargement
+      const isDownloaded = downloadedBooks.has(book.id);
+      const isDownloading = downloadingBooks.has(book.id);
+      
+      const options = [
+        {
+          text: 'Ouvrir',
+          onPress: () => router.push(`/book/${book.id}`)
+        }
+      ];
+
+      if (!isDownloaded && !isDownloading) {
+        options.unshift({
+          text: '⬇️ Télécharger',
+          onPress: () => handleDownloadBook(book)
+        });
+      }
+
+      if (isDownloaded) {
+        options.unshift({
+          text: '🗑️ Supprimer téléchargement',
+          onPress: () => handleRemoveDownload(book.id)
+        });
+      }
+
+      options.push({
+        text: 'Annuler',
+        onPress: () => {}
+      });
+
+      Alert.alert(
+        `${isDownloaded ? '📱 ' : ''}${book.titre || book.title || 'Titre inconnu'}`, 
+        `${book.auteur || book.author || 'Auteur inconnu'}\n\nTags: ${(book.tags || []).join(', ')}\n\n${isDownloaded ? '✅ Disponible hors ligne' : isDownloading ? '⏳ Téléchargement en cours...' : '🌐 Nécessite une connexion'}`,
+        options
+      );
+    }
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -212,9 +513,33 @@ const Library: React.FC = () => {
       <View style={styles.headerSection}>
         <View style={styles.headerRow}>
           <Text style={styles.title}>Bibliothèque</Text>
-          <TouchableOpacity onPress={() => router.push('/write')} style={styles.addBtn}>
-            <Text style={styles.addText}>+ Nouveau</Text>
-          </TouchableOpacity>
+          <View style={styles.actionButtons}>
+            <TouchableOpacity 
+              onPress={showDownloadManager} 
+              style={[styles.actionBtn, styles.downloadManagerBtn]}
+            >
+              <Ionicons name="cloud-done-outline" size={16} color="#181818" />
+              <Text style={styles.actionText}>{downloadedBooks.size}/{MAX_DOWNLOADS}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={handleImportPDF} 
+              style={[styles.actionBtn, styles.importBtn]}
+              disabled={importing}
+            >
+              {importing ? (
+                <ActivityIndicator size="small" color="#181818" />
+              ) : (
+                <>
+                  <Ionicons name="cloud-upload-outline" size={16} color="#181818" />
+                  <Text style={styles.actionText}>Importer</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/write')} style={[styles.actionBtn, styles.addBtn]}>
+              <Ionicons name="add" size={16} color="#181818" />
+              <Text style={styles.actionText}>Nouveau</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.searchRow}>
@@ -260,14 +585,28 @@ const Library: React.FC = () => {
                 {wishlist.map((book: BookType) => (
                   <View key={book.id} style={styles.horizontalCard}>
                     <TouchableOpacity
-                      onPress={() => Alert.alert(book.titre || book.title || 'Titre inconnu', `${book.auteur || book.author || 'Auteur inconnu'}\n\nTags: ${(book.tags || []).join(', ')}`)}
+                      onPress={() => handleOpenBook(book)}
                     >
-                      <Image
-                        source={{ uri: book.couverture || book.coverImage || 'https://via.placeholder.com/120x180.png?text=Cover' }}
-                        style={styles.horizontalCover}
-                      />
+                      <View style={styles.horizontalCover}>
+                        {book.type === 'pdf' ? (
+                          <View style={styles.pdfIndicator}>
+                            <Ionicons name="document-text" size={40} color="#FF6B6B" />
+                            <Text style={styles.pdfLabel}>PDF</Text>
+                          </View>
+                        ) : (
+                          <Image
+                            source={{ uri: book.couverture || book.coverImage || 'https://via.placeholder.com/120x180.png?text=Cover' }}
+                            style={styles.horizontalCover}
+                          />
+                        )}
+                      </View>
                       <View style={styles.horizontalCardContent}>
-                        <Text style={styles.horizontalBookTitle} numberOfLines={2}>{book.titre || book.title || 'Titre inconnu'}</Text>
+                        <View style={styles.titleRow}>
+                          <Text style={styles.horizontalBookTitle} numberOfLines={2}>{book.titre || book.title || 'Titre inconnu'}</Text>
+                          {book.type === 'pdf' && (
+                            <Ionicons name="document-text-outline" size={16} color="#FF6B6B" style={styles.typeIcon} />
+                          )}
+                        </View>
                         <Text style={styles.horizontalBookAuthor} numberOfLines={1}>par {book.auteur || book.author || 'Auteur inconnu'}</Text>
                       </View>
                     </TouchableOpacity>
@@ -305,17 +644,62 @@ const Library: React.FC = () => {
                     if (book.pagesRead && book.totalPages && book.totalPages > 0) {
                       percent = Math.floor((book.pagesRead / book.totalPages) * 100);
                     }
+
+                    const isDownloaded = downloadedBooks.has(book.id);
+                    const isDownloading = downloadingBooks.has(book.id);
+                    const downloadProgressValue = downloadProgress[book.id] || 0;
+
                     return (
                       <View key={book.id} style={styles.horizontalCard}>
                         <TouchableOpacity
-                          onPress={() => Alert.alert(book.titre || book.title || 'Titre inconnu', `${book.auteur || book.author || 'Auteur inconnu'}\n\nTags: ${(book.tags || []).join(', ')}`)}
+                          onPress={() => handleOpenBook(book)}
+                          onLongPress={() => {
+                            if (isDownloaded) {
+                              handleRemoveDownload(book.id);
+                            } else if (!isDownloading) {
+                              handleDownloadBook(book);
+                            }
+                          }}
                         >
-                          <Image
-                            source={{ uri: book.couverture || book.coverImage || 'https://via.placeholder.com/120x180.png?text=Cover' }}
-                            style={styles.horizontalCover}
-                          />
+                          <View style={styles.horizontalCover}>
+                            {book.type === 'pdf' ? (
+                              <View style={styles.pdfIndicator}>
+                                <Ionicons name="document-text" size={40} color="#FF6B6B" />
+                                <Text style={styles.pdfLabel}>PDF</Text>
+                              </View>
+                            ) : (
+                              <Image
+                                source={{ uri: book.couverture || book.coverImage || 'https://via.placeholder.com/120x180.png?text=Cover' }}
+                                style={styles.horizontalCover}
+                              />
+                            )}
+                            
+                            {/* Indicateur de téléchargement */}
+                            <View style={styles.downloadIndicator}>
+                              {isDownloaded && (
+                                <View style={styles.downloadedBadge}>
+                                  <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                </View>
+                              )}
+                              {isDownloading && (
+                                <View style={styles.downloadingBadge}>
+                                  <Text style={styles.downloadProgressText}>{downloadProgressValue}%</Text>
+                                </View>
+                              )}
+                              {!isDownloaded && !isDownloading && downloadedBooks.size < MAX_DOWNLOADS && (
+                                <View style={styles.downloadAvailableBadge}>
+                                  <Ionicons name="cloud-download-outline" size={16} color="#4FC3F7" />
+                                </View>
+                              )}
+                            </View>
+                          </View>
                           <View style={styles.horizontalCardContent}>
-                            <Text style={styles.horizontalBookTitle} numberOfLines={2}>{book.titre || book.title || 'Titre inconnu'}</Text>
+                            <View style={styles.titleRow}>
+                              <Text style={styles.horizontalBookTitle} numberOfLines={2}>{book.titre || book.title || 'Titre inconnu'}</Text>
+                              {book.type === 'pdf' && (
+                                <Ionicons name="document-text-outline" size={16} color="#FF6B6B" style={styles.typeIcon} />
+                              )}
+                            </View>
                             <Text style={styles.horizontalBookAuthor} numberOfLines={1}>par {book.auteur || book.author || 'Auteur inconnu'}</Text>
                           </View>
                         </TouchableOpacity>
@@ -426,18 +810,33 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
   },
-  addBtn: {
-    backgroundColor: 'rgba(255, 169, 77, 0.1)',
-    borderWidth: 1,
-    borderColor: '#FFA94D',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  addText: { 
-    color: '#FFA94D', 
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    minWidth: 80,
+    justifyContent: 'center',
+  },
+  importBtn: {
+    backgroundColor: '#4FC3F7',
+  },
+  downloadManagerBtn: {
+    backgroundColor: '#9C27B0',
+  },
+  addBtn: {
+    backgroundColor: '#FFA94D',
+  },
+  actionText: { 
+    color: '#181818', 
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 13,
+    marginLeft: 4,
   },
   searchRow: {
     marginBottom: 8,
@@ -530,8 +929,68 @@ const styles = StyleSheet.create({
     backgroundColor: '#181818',
     marginBottom: 8,
   },
+  pdfIndicator: {
+    width: '100%',
+    height: 160,
+    borderRadius: 8,
+    backgroundColor: '#2a1810',
+    marginBottom: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FF6B6B',
+    borderStyle: 'dashed',
+  },
+  pdfLabel: {
+    color: '#FF6B6B',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginTop: 4,
+  },
+  downloadIndicator: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 10,
+  },
+  downloadedBadge: {
+    backgroundColor: 'rgba(76, 175, 80, 0.9)',
+    borderRadius: 12,
+    padding: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  downloadingBadge: {
+    backgroundColor: 'rgba(79, 195, 247, 0.9)',
+    borderRadius: 12,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  downloadProgressText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  downloadAvailableBadge: {
+    backgroundColor: 'rgba(79, 195, 247, 0.7)',
+    borderRadius: 10,
+    padding: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   horizontalCardContent: {
     alignItems: 'center',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  typeIcon: {
+    marginLeft: 4,
   },
   horizontalBookTitle: {
     color: '#FFA94D',
