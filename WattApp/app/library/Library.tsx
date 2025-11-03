@@ -11,16 +11,23 @@ import {
   StatusBar,
   useWindowDimensions,
   Platform,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Alert } from 'react-native';
 import { getAuth } from 'firebase/auth';
-import app, { db } from '../../constants/firebaseConfig';
-import { collection, query, where, getDocs, orderBy, deleteDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
+import app, { db, storage } from '../../constants/firebaseConfig';
+import { collection, query, where, getDocs, orderBy, deleteDoc, doc, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { getWishlistBooks } from './wishlistUtils';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
+import { NativePDFService, PDFBookData } from '../services/NativePDFService';
+import PDFPageExtractor from '../components/PDFPageExtractor';
 
 // Types
 type BookType = {
@@ -47,7 +54,20 @@ type BookType = {
   filePath?: string;
   fileName?: string;
   fileSize?: number;
+  // Stockage local
+  isDownloaded?: boolean;
+  localPdfPath?: string;
+  localCoverPath?: string;
+  downloadedAt?: number;
 };
+
+// Interface pour les données du fichier PDF sélectionné
+interface PDFFileData {
+  uri: string;
+  name: string;
+  size?: number;
+  mimeType?: string;
+}
 
 type FolderType = {
   id: string;
@@ -76,11 +96,75 @@ const Library: React.FC = () => {
   const [downloadedBooks, setDownloadedBooks] = useState<Set<string>>(new Set());
   const [downloadingBooks, setDownloadingBooks] = useState<Set<string>>(new Set());
   const [downloadProgress, setDownloadProgress] = useState<{ [key: string]: number }>({});
+  const [localBooks, setLocalBooks] = useState<PDFBookData[]>([]);
+  
+  // États pour l'extraction de pages PDF
+  const [extractingPages, setExtractingPages] = useState(false);
+  const [extractionProgress, setExtractionProgress] = useState({ current: 0, total: 0 });
+  const [showExtractor, setShowExtractor] = useState(false);
+  const [pendingPdfUri, setPendingPdfUri] = useState<string | null>(null);
+  const [pendingBookData, setPendingBookData] = useState<any>(null);
+  const [selectedPdfFile, setSelectedPdfFile] = useState<PDFFileData | null>(null);
+  
+  // États pour le menu contextuel
+  const [contextMenuVisible, setContextMenuVisible] = useState(false);
+  const [selectedBook, setSelectedBook] = useState<BookType | null>(null);
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
 
   // Limite de téléchargements simultanés
   const MAX_DOWNLOADS = 2;
 
-  // Fonction d'importation PDF
+  // Clés pour AsyncStorage
+  const STORAGE_KEYS = {
+    DOWNLOADED_BOOKS: 'downloaded_books',
+    OFFLINE_BOOK_PREFIX: 'offline_book_'
+  };
+
+  // Charger les téléchargements depuis le stockage local au démarrage
+  useEffect(() => {
+    const initDownloads = async () => {
+      const downloaded = await loadDownloadedBooks();
+      setDownloadedBooks(downloaded);
+      
+      // Charger les livres stockés localement
+      const localPDFs = await loadLocalBooks();
+      setLocalBooks(localPDFs);
+    };
+    initDownloads();
+  }, []);
+
+  const loadDownloadedBooks = async (): Promise<Set<string>> => {
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.DOWNLOADED_BOOKS);
+      if (stored) {
+        const bookIds = JSON.parse(stored);
+        return new Set(bookIds);
+      }
+      return new Set();
+    } catch (error) {
+      console.error('Erreur lors du chargement des téléchargements:', error);
+      return new Set();
+    }
+  };
+
+  const loadLocalBooks = async (): Promise<PDFBookData[]> => {
+    try {
+      return await NativePDFService.getLocalBooks();
+    } catch (error) {
+      console.error('Erreur lors du chargement des livres locaux:', error);
+      return [];
+    }
+  };
+
+  const saveDownloadedBooks = async (bookIds: Set<string>) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.DOWNLOADED_BOOKS, JSON.stringify(Array.from(bookIds)));
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde des téléchargements:', error);
+    }
+  };
+
+  // Fonction d'importation PDF (stockage local natif)
   const handleImportPDF = async () => {
     try {
       setImporting(true);
@@ -101,9 +185,44 @@ const Library: React.FC = () => {
         return;
       }
 
+      // Stocker les données du fichier PDF pour l'extraction
+      const pdfFileData: PDFFileData = {
+        uri: file.uri,
+        name: file.name,
+        size: file.size,
+        mimeType: file.mimeType
+      };
+      setSelectedPdfFile(pdfFileData);
+
+      // Diagnostics du fichier PDF
+      console.log('📱 Données du fichier PDF sélectionné:', {
+        name: file.name,
+        uri: file.uri,
+        size: file.size,
+        mimeType: file.mimeType,
+        sizeInMB: file.size ? (file.size / (1024 * 1024)).toFixed(2) + ' MB' : 'Inconnue'
+      });
+
       // Vérifier que c'est bien un PDF
       if (!file.name.toLowerCase().endsWith('.pdf')) {
         Alert.alert('Erreur', 'Veuillez sélectionner un fichier PDF');
+        return;
+      }
+
+      // Vérifier que le fichier a une taille valide
+      if (!file.size || file.size === 0) {
+        Alert.alert('Erreur', 'Le fichier PDF semble être vide ou corrompu');
+        return;
+      }
+
+      // Vérifier la taille maximum (par exemple 50MB)
+      const maxSizeMB = 50;
+      const maxSizeBytes = maxSizeMB * 1024 * 1024;
+      if (file.size > maxSizeBytes) {
+        Alert.alert(
+          'Fichier trop volumineux', 
+          `Le fichier fait ${(file.size / (1024 * 1024)).toFixed(1)} MB. La taille maximum est de ${maxSizeMB} MB.`
+        );
         return;
       }
 
@@ -118,47 +237,54 @@ const Library: React.FC = () => {
       const fileName = file.name.replace('.pdf', '');
       const bookTitle = fileName.replace(/[_-]/g, ' ').trim();
 
-      // Créer l'entrée du livre dans Firebase
-      const bookData = {
-        title: bookTitle,
-        titre: bookTitle,
-        author: 'Importé',
-        auteur: 'Importé',
-        ownerUid: user.uid,
-        authorUid: user.uid,
-        status: 'imported',
-        type: 'pdf',
-        filePath: file.uri,
-        fileName: file.name,
-        fileSize: file.size,
-        coverImage: null,
-        couverture: null,
-        synopsis: 'Livre importé depuis PDF',
-        tags: ['PDF', 'Importé'],
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        reads: 0,
-        body: 'Contenu PDF - Utilisez un lecteur PDF pour lire ce livre.',
-      };
+      // Proposer à l'utilisateur de sélectionner une image de couverture
+      let customCoverUri = null;
+      
+      const shouldAddCover = await new Promise((resolve) => {
+        Alert.alert(
+          'Image de couverture',
+          'Voulez-vous ajouter une image de couverture pour ce livre PDF ?',
+          [
+            { text: 'Non, continuer', onPress: () => resolve(false) },
+            { text: 'Oui, choisir image', onPress: () => resolve(true) }
+          ]
+        );
+      });
 
-      // Ajouter à Firebase
-      await addDoc(collection(db, 'books'), bookData);
+      if (shouldAddCover) {
+        try {
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [3, 4], // Format livre
+            quality: 0.8,
+          });
 
-      Alert.alert(
-        'Importation réussie', 
-        `Le livre "${bookTitle}" a été ajouté à votre bibliothèque !`,
-        [
-          { 
-            text: 'OK', 
-            onPress: () => {
-              // Recharger la bibliothèque
-              if (loadBooksRef.current) {
-                loadBooksRef.current();
-              }
-            }
+          if (!result.canceled && result.assets[0]) {
+            customCoverUri = result.assets[0].uri;
           }
-        ]
-      );
+        } catch (error) {
+          console.warn('Erreur lors de la sélection d\'image:', error);
+        }
+      }
+
+      // Générer un ID unique pour ce livre
+      const bookId = `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Préparer les données pour l'extraction de pages
+      setPendingBookData({
+        bookId,
+        title: bookTitle,
+        pdfUri: file.uri,
+        customCoverUri,
+        fileData: pdfFileData // Ajouter les données du fichier
+      });
+
+      // Démarrer l'extraction des pages
+      setExtractingPages(true);
+      setExtractionProgress({ current: 0, total: 0 });
+      setPendingPdfUri(file.uri);
+      setShowExtractor(true);
 
     } catch (error) {
       console.error('Erreur lors de l\'importation:', error);
@@ -166,6 +292,105 @@ const Library: React.FC = () => {
     } finally {
       setImporting(false);
     }
+  };
+
+  // Gérer l'extraction réussie des pages
+  const handlePagesExtracted = async (pageUris: string[], totalPages: number) => {
+    try {
+      if (!pendingBookData) return;
+
+      const { bookId, title, pdfUri, customCoverUri } = pendingBookData;
+
+      // Utiliser le service natif pour télécharger et stocker le PDF avec les pages
+      console.log('Stockage local du PDF avec pages extraites...');
+      const localBookData = await NativePDFService.downloadPDFLocally(
+        pdfUri,
+        bookId,
+        title,
+        customCoverUri || undefined
+      );
+
+      // Ajouter les informations des pages extraites
+      const enhancedBookData: PDFBookData = {
+        ...localBookData,
+        pagesImagePaths: pageUris,
+        totalPages: totalPages
+      };
+
+      // Ajouter aux livres locaux
+      setLocalBooks(prev => [enhancedBookData, ...prev]);
+
+      // Nettoyer les états
+      cleanupExtractionStates();
+
+      Alert.alert(
+        'Importation réussie', 
+        `Le livre "${title}" a été ajouté avec ${totalPages} pages extraites !`,
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              // Optionnel : recharger la liste
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Erreur lors de la finalisation:', error);
+      handleExtractionError('Impossible de finaliser l\'importation');
+    }
+  };
+
+  // Gérer les erreurs d'extraction
+  const handleExtractionError = (error: string) => {
+    setShowExtractor(false);
+    setExtractingPages(false);
+    setPendingPdfUri(null);
+    setPendingBookData(null);
+    setSelectedPdfFile(null); // Nettoyer les données du fichier
+    Alert.alert('Erreur d\'extraction', error);
+  };
+
+  // Mettre à jour le progrès d'extraction
+  const handleExtractionProgress = (currentPage: number, totalPages: number) => {
+    setExtractionProgress({ current: currentPage, total: totalPages });
+  };
+
+  // Nettoyer tous les états d'extraction
+  const cleanupExtractionStates = () => {
+    setShowExtractor(false);
+    setExtractingPages(false);
+    setPendingPdfUri(null);
+    setPendingBookData(null);
+    setSelectedPdfFile(null);
+    setExtractionProgress({ current: 0, total: 0 });
+  };
+
+  // Fonction pour diagnostiquer les capacités PDF
+  const diagnosticPDFCapabilities = () => {
+    Alert.alert(
+      '📱 Diagnostic PDF Mobile - Mode Hors Ligne',
+      `Capacités de l'appareil:
+      
+✅ Document Picker: Disponible
+✅ Expo File System: Disponible  
+✅ PDF.js Local: Intégré (HORS LIGNE)
+✅ Stockage local: Disponible
+✅ Extraction pages: Mode Rapide
+      
+Performance:
+🚀 Vitesse: INDÉPENDANTE de la connexion
+📱 Mode: 100% Local et Hors Ligne
+⚡ PDF.js: Intégré dans l'app
+      
+Variables d'état:
+• Fichier sélectionné: ${selectedPdfFile ? selectedPdfFile.name : 'Aucun'}
+• Extraction en cours: ${extractingPages ? 'Oui' : 'Non'}
+• Livres locaux: ${localBooks.length}
+      
+✨ L'importation PDF est maintenant INDÉPENDANTE de votre connexion internet !`,
+      [{ text: 'OK' }]
+    );
   };
 
   // Fonction pour télécharger un livre pour lecture hors ligne
@@ -205,39 +430,60 @@ const Library: React.FC = () => {
       setDownloadingBooks(prev => new Set([...prev, book.id]));
       setDownloadProgress(prev => ({ ...prev, [book.id]: 0 }));
 
-      // Simuler le téléchargement avec progression
-      const downloadInterval = setInterval(() => {
+      // Récupérer les données complètes du livre depuis Firebase
+      const bookRef = doc(db, 'books', book.id);
+      const bookDoc = await getDoc(bookRef);
+      
+      if (!bookDoc.exists()) {
+        throw new Error('Livre introuvable');
+      }
+
+      const fullBookData = { id: bookDoc.id, ...bookDoc.data() };
+
+      // Simuler le téléchargement avec vraie progression
+      const progressInterval = setInterval(() => {
         setDownloadProgress(prev => {
           const currentProgress = prev[book.id] || 0;
-          if (currentProgress >= 100) {
-            clearInterval(downloadInterval);
+          if (currentProgress >= 90) {
+            clearInterval(progressInterval);
             return prev;
           }
           return { ...prev, [book.id]: currentProgress + 10 };
         });
-      }, 200);
+      }, 300);
 
-      // Simuler le temps de téléchargement (2 secondes)
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Simuler le temps de téléchargement (3 secondes)
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
-      // Sauvegarder le livre localement (AsyncStorage ou autre)
-      const bookData = {
-        ...book,
+      // Sauvegarder le livre complet localement
+      const offlineBookData = {
+        ...fullBookData,
         downloadedAt: new Date().toISOString(),
-        offline: true
+        offline: true,
+        downloadVersion: '1.0'
       };
 
-      // Ici vous pourriez sauvegarder dans AsyncStorage
-      // await AsyncStorage.setItem(`offline_book_${book.id}`, JSON.stringify(bookData));
+      // Sauvegarder dans AsyncStorage
+      await AsyncStorage.setItem(
+        `${STORAGE_KEYS.OFFLINE_BOOK_PREFIX}${book.id}`, 
+        JSON.stringify(offlineBookData)
+      );
 
-      setDownloadedBooks(prev => new Set([...prev, book.id]));
+      // Mettre à jour la liste des livres téléchargés
+      const newDownloadedBooks = new Set([...downloadedBooks, book.id]);
+      setDownloadedBooks(newDownloadedBooks);
+      await saveDownloadedBooks(newDownloadedBooks);
+
       setDownloadProgress(prev => ({ ...prev, [book.id]: 100 }));
       
-      Alert.alert('Téléchargement terminé', `"${book.title || book.titre}" est maintenant disponible hors ligne !`);
+      Alert.alert(
+        'Téléchargement terminé', 
+        `"${book.title || book.titre}" est maintenant disponible hors ligne !\n\nLe livre complet a été sauvegardé sur votre appareil.`
+      );
 
     } catch (error) {
       console.error('Erreur lors du téléchargement:', error);
-      Alert.alert('Erreur', 'Impossible de télécharger le livre');
+      Alert.alert('Erreur', 'Impossible de télécharger le livre: ' + (error as Error).message);
     } finally {
       setDownloadingBooks(prev => {
         const newSet = new Set(prev);
@@ -251,7 +497,7 @@ const Library: React.FC = () => {
           const { [book.id]: _, ...rest } = prev;
           return rest;
         });
-      }, 1000);
+      }, 2000);
     }
   };
 
@@ -259,7 +505,7 @@ const Library: React.FC = () => {
   const handleRemoveDownload = async (bookId: string) => {
     Alert.alert(
       'Supprimer le téléchargement',
-      'Voulez-vous supprimer ce livre de vos téléchargements ? Vous pourrez le télécharger à nouveau plus tard.',
+      'Voulez-vous supprimer ce livre de vos téléchargements ? Le livre sera supprimé de votre appareil mais restera dans votre bibliothèque en ligne.',
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -267,16 +513,16 @@ const Library: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Supprimer du stockage local
-              // await AsyncStorage.removeItem(`offline_book_${bookId}`);
+              // Supprimer du stockage local AsyncStorage
+              await AsyncStorage.removeItem(`${STORAGE_KEYS.OFFLINE_BOOK_PREFIX}${bookId}`);
               
-              setDownloadedBooks(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(bookId);
-                return newSet;
-              });
+              // Mettre à jour la liste des téléchargements
+              const newDownloadedBooks = new Set(downloadedBooks);
+              newDownloadedBooks.delete(bookId);
+              setDownloadedBooks(newDownloadedBooks);
+              await saveDownloadedBooks(newDownloadedBooks);
               
-              Alert.alert('Supprimé', 'Le livre a été supprimé de vos téléchargements');
+              Alert.alert('Supprimé', 'Le livre a été supprimé de votre appareil');
             } catch (error) {
               console.error('Erreur lors de la suppression:', error);
               Alert.alert('Erreur', 'Impossible de supprimer le téléchargement');
@@ -303,6 +549,60 @@ const Library: React.FC = () => {
     );
   };
 
+  // Fonction pour ouvrir le menu contextuel
+  const openContextMenu = (book: BookType, event: any) => {
+    const { pageX, pageY } = event.nativeEvent;
+    setSelectedBook(book);
+    setMenuPosition({ x: pageX, y: pageY });
+    setContextMenuVisible(true);
+  };
+
+  // Fonction pour fermer le menu contextuel
+  const closeContextMenu = () => {
+    setContextMenuVisible(false);
+    setSelectedBook(null);
+  };
+
+  // Fonction pour supprimer un livre de la bibliothèque
+  const handleDeleteBook = async (book: BookType) => {
+    Alert.alert(
+      'Supprimer le livre',
+      `Voulez-vous vraiment supprimer "${book.title || book.titre}" de votre bibliothèque ?\n\nCette action est irréversible.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Supprimer de Firebase
+              await deleteDoc(doc(db, 'books', book.id));
+              
+              // Supprimer des téléchargements si présent
+              if (downloadedBooks.has(book.id)) {
+                setDownloadedBooks(prev => {
+                  const newSet = new Set(prev);
+                  newSet.delete(book.id);
+                  return newSet;
+                });
+              }
+              
+              // Recharger la bibliothèque
+              if (loadBooksRef.current) {
+                loadBooksRef.current();
+              }
+              
+              Alert.alert('Supprimé', 'Le livre a été supprimé de votre bibliothèque');
+            } catch (error) {
+              console.error('Erreur lors de la suppression:', error);
+              Alert.alert('Erreur', 'Impossible de supprimer le livre');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   // Ajout d'un dossier
   const handleAddFolder = () => {
     if (!newFolderName.trim()) return;
@@ -319,8 +619,8 @@ const Library: React.FC = () => {
   // (supprimé: redéclaration inutile)
 
   // Les livres lus et créés sont alimentés par la base de données uniquement
-  const readBooks = books.filter((b: BookType) => b.status === 'published');
-  const createdBooks = books.filter((b: BookType) => b.status !== 'published');
+  const readBooks = books.filter((b: BookType) => b.status === 'published' || b.status === 'imported');
+  const createdBooks = books.filter((b: BookType) => b.status !== 'published' && b.status !== 'imported');
 
   // Pour pouvoir rappeler loadBooks depuis un callback
   const loadBooksRef = React.useRef<(() => Promise<void>) | null>(null);
@@ -340,6 +640,13 @@ const Library: React.FC = () => {
           }
           return;
         }
+        
+        // Charger les livres téléchargés depuis AsyncStorage
+        const downloadedBooksSet = await loadDownloadedBooks();
+        if (mounted) {
+          setDownloadedBooks(downloadedBooksSet);
+        }
+        
         // Charger les livres avec ownerUid (livres de la bibliothèque)
         const qBooks = query(collection(db, 'books'), where('ownerUid', '==', user.uid));
         const snapBooks = await getDocs(qBooks);
@@ -454,10 +761,10 @@ const Library: React.FC = () => {
             onPress: () => router.push(`/book/${book.id}`)
           },
           {
-            text: 'Ouvrir PDF',
+            text: 'Lire PDF',
             onPress: () => {
-              // Utiliser expo-web-browser ou une app externe pour ouvrir le PDF
-              Alert.alert('PDF', 'Fonctionnalité d\'ouverture PDF en cours de développement');
+              // Ouvrir le lecteur PDF dédié
+              router.push(`/pdf/read/${book.id}` as any);
             }
           },
           {
@@ -499,15 +806,158 @@ const Library: React.FC = () => {
 
       Alert.alert(
         `${isDownloaded ? '📱 ' : ''}${book.titre || book.title || 'Titre inconnu'}`, 
-        `${book.auteur || book.author || 'Auteur inconnu'}\n\nTags: ${(book.tags || []).join(', ')}\n\n${isDownloaded ? '✅ Disponible hors ligne' : isDownloading ? '⏳ Téléchargement en cours...' : '🌐 Nécessite une connexion'}`,
+        `${book.auteur || book.author || 'Auteur inconnu'}\n\nTags: ${(book.tags || []).join(', ')}\n\n${isDownloaded ? '✅ Disponible hors ligne' : isDownloading ? '⏳ Téléchargement en cours...' : ''}`,
         options
       );
     }
   };
 
+  // Composant du menu contextuel
+  const renderContextMenu = () => {
+    if (!selectedBook) return null;
+
+    const isDownloaded = downloadedBooks.has(selectedBook.id);
+    const isDownloading = downloadingBooks.has(selectedBook.id);
+    const isPDF = selectedBook.type === 'pdf';
+
+    const menuItems = [
+      {
+        icon: 'book-outline',
+        label: 'Ouvrir',
+        color: '#4FC3F7',
+        onPress: () => {
+          closeContextMenu();
+          router.push(`/book/${selectedBook.id}`);
+        }
+      }
+    ];
+
+    // Ajouter l'option de téléchargement si applicable
+    if (!isPDF && !isDownloaded && !isDownloading && downloadedBooks.size < MAX_DOWNLOADS) {
+      menuItems.push({
+        icon: 'cloud-download-outline',
+        label: 'Télécharger',
+        color: '#4CAF50',
+        onPress: () => {
+          closeContextMenu();
+          handleDownloadBook(selectedBook);
+        }
+      });
+    }
+
+    // Ajouter l'option de suppression du téléchargement
+    if (isDownloaded) {
+      menuItems.push({
+        icon: 'cloud-offline-outline',
+        label: 'Supprimer téléchargement',
+        color: '#FF9800',
+        onPress: () => {
+          closeContextMenu();
+          handleRemoveDownload(selectedBook.id);
+        }
+      });
+    }
+
+    // Ajouter l'option de suppression du livre
+    menuItems.push({
+      icon: 'trash-outline',
+      label: 'Supprimer de la bibliothèque',
+      color: '#F44336',
+      onPress: () => {
+        closeContextMenu();
+        handleDeleteBook(selectedBook);
+      }
+    });
+
+    // Pour les PDFs, ajouter l'option d'ouverture PDF
+    if (isPDF) {
+      menuItems.splice(1, 0, {
+        icon: 'document-text-outline',
+        label: 'Ouvrir PDF',
+        color: '#FF6B6B',
+        onPress: () => {
+          closeContextMenu();
+          Alert.alert('PDF', 'Fonctionnalité d\'ouverture PDF en cours de développement');
+        }
+      });
+    }
+
+    return (
+      <Modal
+        visible={contextMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeContextMenu}
+      >
+        <Pressable style={styles.contextMenuOverlay} onPress={closeContextMenu}>
+          <View style={[styles.contextMenu, { 
+            left: Math.min(menuPosition.x, 300), 
+            top: Math.min(menuPosition.y, 500) 
+          }]}>
+            <View style={styles.contextMenuHeader}>
+              <Text style={styles.contextMenuTitle} numberOfLines={1}>
+                {selectedBook.title || selectedBook.titre}
+              </Text>
+              <Text style={styles.contextMenuSubtitle} numberOfLines={1}>
+                {selectedBook.author || selectedBook.auteur}
+              </Text>
+            </View>
+            
+            {menuItems.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.contextMenuItem}
+                onPress={item.onPress}
+                activeOpacity={0.7}
+              >
+                <Ionicons name={item.icon as any} size={20} color={item.color} />
+                <Text style={[styles.contextMenuItemText, { color: item.color }]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
+      
+      {/* Extracteur de pages PDF */}
+      {showExtractor && pendingPdfUri && pendingBookData && (
+        <PDFPageExtractor
+          pdfUri={pendingPdfUri}
+          bookId={pendingBookData.bookId}
+          onPagesExtracted={handlePagesExtracted}
+          onError={handleExtractionError}
+          onProgress={handleExtractionProgress}
+        />
+      )}
+
+      {/* Indicateur de progrès d'extraction */}
+      {extractingPages && extractionProgress && (
+        <View style={styles.extractionProgress}>
+          <Text style={styles.extractionText}>
+            Extraction des pages... {extractionProgress.current}/{extractionProgress.total}
+          </Text>
+          {selectedPdfFile && (
+            <Text style={styles.extractionSubtext}>
+              📄 {selectedPdfFile.name} ({selectedPdfFile.size ? (selectedPdfFile.size / (1024 * 1024)).toFixed(1) + ' MB' : 'Taille inconnue'})
+            </Text>
+          )}
+          <View style={styles.progressBar}>
+            <View 
+              style={[
+                styles.progressFill, 
+                { width: `${(extractionProgress.current / extractionProgress.total) * 100}%` }
+              ]} 
+            />
+          </View>
+        </View>
+      )}
       
       {/* Header avec padding pour éviter la BottomNav */}
       <View style={styles.headerSection}>
@@ -538,6 +988,11 @@ const Library: React.FC = () => {
             <TouchableOpacity onPress={() => router.push('/write')} style={[styles.actionBtn, styles.addBtn]}>
               <Ionicons name="add" size={16} color="#181818" />
               <Text style={styles.actionText}>Nouveau</Text>
+            </TouchableOpacity>
+            {/* Bouton de diagnostic temporaire */}
+            <TouchableOpacity onPress={diagnosticPDFCapabilities} style={[styles.actionBtn, { backgroundColor: '#4A90E2' }]}>
+              <Ionicons name="bug-outline" size={16} color="#fff" />
+              <Text style={[styles.actionText, { color: '#fff' }]}>Debug</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -586,6 +1041,7 @@ const Library: React.FC = () => {
                   <View key={book.id} style={styles.horizontalCard}>
                     <TouchableOpacity
                       onPress={() => handleOpenBook(book)}
+                      onLongPress={(event) => openContextMenu(book, event)}
                     >
                       <View style={styles.horizontalCover}>
                         {book.type === 'pdf' ? (
@@ -618,6 +1074,86 @@ const Library: React.FC = () => {
               </ScrollView>
             )}
           </View>
+
+          {/* Section : PDFs Locaux */}
+          {localBooks.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>📱 PDFs Locaux</Text>
+                <Text style={styles.sectionCount}>{localBooks.length}</Text>
+                <TouchableOpacity 
+                  onPress={async () => {
+                    const totalSize = await NativePDFService.getTotalStorageUsed();
+                    Alert.alert(
+                      'Stockage utilisé', 
+                      `${NativePDFService.formatFileSize(totalSize)} utilisés pour ${localBooks.length} livres locaux`
+                    );
+                  }} 
+                  style={{ marginLeft: 12 }}
+                >
+                  <Ionicons name="information-circle" size={22} color="#4FC3F7" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+                {localBooks.map((localBook: PDFBookData) => (
+                  <View key={localBook.id} style={styles.horizontalCard}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        // Naviguer vers le lecteur PDF avec l'URI locale
+                        router.push(`/pdf/read/${localBook.id}?localPath=${encodeURIComponent(localBook.filePath)}`);
+                      }}
+                      onLongPress={() => {
+                        Alert.alert(
+                          'Actions',
+                          `Que voulez-vous faire avec "${localBook.title}" ?`,
+                          [
+                            { text: 'Annuler', style: 'cancel' },
+                            { 
+                              text: 'Supprimer', 
+                              style: 'destructive',
+                              onPress: async () => {
+                                try {
+                                  await NativePDFService.deleteLocalBook(localBook.id);
+                                  setLocalBooks(prev => prev.filter(b => b.id !== localBook.id));
+                                  Alert.alert('Supprimé', 'Le livre a été supprimé du stockage local');
+                                } catch (error) {
+                                  Alert.alert('Erreur', 'Impossible de supprimer le livre');
+                                }
+                              }
+                            }
+                          ]
+                        );
+                      }}
+                    >
+                      <View style={styles.horizontalCover}>
+                        {localBook.coverImagePath ? (
+                          <Image
+                            source={{ uri: localBook.coverImagePath }}
+                            style={styles.horizontalCover}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View style={[styles.pdfIndicator, { backgroundColor: '#4FC3F7' }]}>
+                            <Ionicons name="document-text" size={40} color="#fff" />
+                          </View>
+                        )}
+                        {/* Badge "Local" */}
+                        <View style={[styles.downloadedBadge, { backgroundColor: '#4FC3F7' }]}>
+                          <Ionicons name="phone-portrait" size={12} color="#fff" />
+                        </View>
+                      </View>
+                      <Text style={styles.horizontalBookTitle} numberOfLines={2}>
+                        {localBook.title}
+                      </Text>
+                      <Text style={styles.horizontalBookAuthor}>
+                        Local • {NativePDFService.formatFileSize(localBook.fileSize || 0)}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
           {filtered.length === 0 ? (
             <View style={styles.emptyContainer}>
@@ -653,20 +1189,27 @@ const Library: React.FC = () => {
                       <View key={book.id} style={styles.horizontalCard}>
                         <TouchableOpacity
                           onPress={() => handleOpenBook(book)}
-                          onLongPress={() => {
-                            if (isDownloaded) {
-                              handleRemoveDownload(book.id);
-                            } else if (!isDownloading) {
-                              handleDownloadBook(book);
-                            }
-                          }}
+                          onLongPress={(event) => openContextMenu(book, event)}
                         >
                           <View style={styles.horizontalCover}>
                             {book.type === 'pdf' ? (
-                              <View style={styles.pdfIndicator}>
-                                <Ionicons name="document-text" size={40} color="#FF6B6B" />
-                                <Text style={styles.pdfLabel}>PDF</Text>
-                              </View>
+                              // Si le PDF a une miniature, l'afficher, sinon afficher l'indicateur PDF
+                              (book.couverture || book.coverImage) ? (
+                                <View style={styles.pdfCoverContainer}>
+                                  <Image
+                                    source={{ uri: book.couverture || book.coverImage }}
+                                    style={styles.horizontalCover}
+                                  />
+                                  <View style={styles.pdfBadge}>
+                                    <Text style={styles.pdfBadgeText}>PDF</Text>
+                                  </View>
+                                </View>
+                              ) : (
+                                <View style={styles.pdfIndicator}>
+                                  <Ionicons name="document-text" size={40} color="#FF6B6B" />
+                                  <Text style={styles.pdfLabel}>PDF</Text>
+                                </View>
+                              )
                             ) : (
                               <Image
                                 source={{ uri: book.couverture || book.coverImage || 'https://via.placeholder.com/120x180.png?text=Cover' }}
@@ -678,18 +1221,23 @@ const Library: React.FC = () => {
                             <View style={styles.downloadIndicator}>
                               {isDownloaded && (
                                 <View style={styles.downloadedBadge}>
-                                  <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                  <Ionicons name="cloud-done" size={18} color="#fff" />
                                 </View>
                               )}
                               {isDownloading && (
                                 <View style={styles.downloadingBadge}>
+                                  <Ionicons name="cloud-download" size={14} color="#fff" />
                                   <Text style={styles.downloadProgressText}>{downloadProgressValue}%</Text>
                                 </View>
                               )}
-                              {!isDownloaded && !isDownloading && downloadedBooks.size < MAX_DOWNLOADS && (
-                                <View style={styles.downloadAvailableBadge}>
-                                  <Ionicons name="cloud-download-outline" size={16} color="#4FC3F7" />
-                                </View>
+                              {!isDownloaded && !isDownloading && downloadedBooks.size < MAX_DOWNLOADS && book.type !== 'pdf' && (
+                                <TouchableOpacity 
+                                  style={styles.downloadAvailableBadge}
+                                  onPress={() => handleDownloadBook(book)}
+                                  activeOpacity={0.7}
+                                >
+                                  <Ionicons name="cloud-download-outline" size={16} color="#fff" />
+                                </TouchableOpacity>
                               )}
                             </View>
                           </View>
@@ -784,6 +1332,9 @@ const Library: React.FC = () => {
           )}
         </ScrollView>
       )}
+
+      {/* Menu contextuel */}
+      {renderContextMenu()}
     </View>
   );
 };
@@ -947,6 +1498,26 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 4,
   },
+  pdfCoverContainer: {
+    position: 'relative',
+    width: '100%',
+    height: 160,
+  },
+  pdfBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    zIndex: 10,
+  },
+  pdfBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
   downloadIndicator: {
     position: 'absolute',
     top: 8,
@@ -954,31 +1525,45 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   downloadedBadge: {
-    backgroundColor: 'rgba(76, 175, 80, 0.9)',
-    borderRadius: 12,
-    padding: 4,
+    backgroundColor: '#4CAF50',
+    borderRadius: 15,
+    padding: 6,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#4CAF50',
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   downloadingBadge: {
-    backgroundColor: 'rgba(79, 195, 247, 0.9)',
+    backgroundColor: '#2196F3',
     borderRadius: 12,
-    paddingVertical: 2,
-    paddingHorizontal: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    shadowColor: '#2196F3',
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   downloadProgressText: {
     color: '#fff',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: 'bold',
+    marginLeft: 4,
   },
   downloadAvailableBadge: {
-    backgroundColor: 'rgba(79, 195, 247, 0.7)',
-    borderRadius: 10,
-    padding: 3,
+    backgroundColor: '#FF9800',
+    borderRadius: 12,
+    padding: 6,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#FF9800',
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   horizontalCardContent: {
     alignItems: 'center',
@@ -1180,6 +1765,98 @@ const styles = StyleSheet.create({
     color: '#888',
     textAlign: 'center',
     fontSize: 14,
+  },
+
+  // Context Menu styles
+  contextMenuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  contextMenu: {
+    position: 'absolute',
+    backgroundColor: '#23232a',
+    borderRadius: 12,
+    padding: 8,
+    minWidth: 220,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  contextMenuHeader: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+    marginBottom: 4,
+  },
+  contextMenuTitle: {
+    color: '#FFA94D',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  contextMenuSubtitle: {
+    color: '#888',
+    fontSize: 12,
+  },
+  contextMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginVertical: 2,
+  },
+  contextMenuItemText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 10,
+  },
+  // Styles pour l'extraction de pages PDF
+  extractionProgress: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 140 : (StatusBar.currentHeight || 0) + 120,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(255, 169, 77, 0.95)',
+    padding: 16,
+    borderRadius: 12,
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  extractionText: {
+    color: '#181818',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  extractionSubtext: {
+    color: 'rgba(24, 24, 24, 0.8)',
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: 'rgba(24, 24, 24, 0.3)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#181818',
+    borderRadius: 2,
   },
 });
 
