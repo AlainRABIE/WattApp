@@ -289,7 +289,6 @@ const BookEditor: React.FC = () => {
         title: title.trim() || '(Sans titre)',
         body: body.trim(),
         coverImage: coverImage,
-        synopsis: synopsis.trim(),
         tags: tags,
         author: user?.displayName || user?.email || 'Auteur inconnu',
         updatedAt: serverTimestamp(),
@@ -624,6 +623,32 @@ const BookEditor: React.FC = () => {
             </View>
           </View>
         )}
+
+        {/* Section Tags séparée */}
+        {book?.tags && Array.isArray(book.tags) && book.tags.length > 0 && (
+          <View style={{ width: '92%', backgroundColor: '#23232a', borderRadius: 16, padding: 18, marginBottom: 18, alignSelf: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, elevation: 1 }}>
+            <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 18, marginBottom: 12 }}>Tags</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+              {book.tags.map((tag: string, idx: number) => (
+                <View
+                  key={idx}
+                  style={{
+                    backgroundColor: '#18191c',
+                    borderRadius: 12,
+                    paddingVertical: 6,
+                    paddingHorizontal: 12,
+                    marginRight: 8,
+                    marginBottom: 8,
+                    borderWidth: 1,
+                    borderColor: '#FFA94D',
+                  }}
+                >
+                  <Text style={{ color: '#FFA94D', fontSize: 13, fontWeight: '600', letterSpacing: 0.2 }}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
         {/* Titre modernisé */}
         <Text style={{ color: '#fff', fontSize: 32, fontWeight: 'bold', textAlign: 'center', marginBottom: 4, letterSpacing: 0.5, textShadowColor: '#0008', textShadowOffset: {width: 0, height: 2}, textShadowRadius: 6, lineHeight: 38, maxWidth: 340 }} numberOfLines={2} ellipsizeMode="tail">{title}</Text>
         
@@ -654,14 +679,6 @@ const BookEditor: React.FC = () => {
           </Text>
         </TouchableOpacity>
 
-        {/* Synopsis */}
-        {book?.synopsis && (
-          <Text style={{ color: '#ccc', fontSize: 15, fontStyle: 'italic', textAlign: 'center', marginBottom: 10, marginHorizontal: 10 }}>
-            {book.synopsis}
-          </Text>
-        )}
-
-        {/* Tags sous les stats */}
         {/* Stats modernisées */}
         <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 24, gap: 18 }}>
           <View style={{ alignItems: 'center', flexDirection: 'row', backgroundColor: '#23232a', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 18, marginHorizontal: 4 }}>
@@ -680,49 +697,54 @@ const BookEditor: React.FC = () => {
             <Text style={{ color: '#888', fontSize: 13, marginLeft: 4 }}>/ 5</Text>
           </View>
         </View>
-        {book?.tags && Array.isArray(book.tags) && book.tags.length > 0 && (
-          <View style={{
-            flexDirection: 'row', flexWrap: 'wrap',
-            alignSelf: 'flex-start',
-            marginLeft: 10,
-            marginBottom: 20,
-            maxWidth: '98%',
-          }}>
-            {book.tags.map((tag: string, idx: number) => (
-              <View
-                key={idx}
-                style={{
-                  backgroundColor: '#23232a',
-                  borderRadius: 8,
-                  paddingVertical: 3,
-                  paddingHorizontal: 10,
-                  marginRight: 6,
-                  marginBottom: 6,
-                  minHeight: 24,
-                }}
-              >
-                <Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: '500', letterSpacing: 0.1 }}>{tag}</Text>
-              </View>
-            ))}
+        
+        {/* Section Synopsis et Tags séparée */}
+        {(book?.synopsis || (book?.tags && Array.isArray(book.tags) && book.tags.length > 0)) && (
+          <View style={{ width: '92%', backgroundColor: '#23232a', borderRadius: 16, padding: 18, marginBottom: 18, alignSelf: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, elevation: 1 }}>
+            
+            {/* Synopsis */}
+            {book?.synopsis && (
+              <>
+                <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 18, marginBottom: 8 }}>Synopsis</Text>
+                <Text style={{ color: '#ccc', fontSize: 15, fontStyle: 'italic', lineHeight: 22, marginBottom: book?.tags && Array.isArray(book.tags) && book.tags.length > 0 ? 16 : 0 }}>
+                  {book.synopsis}
+                </Text>
+              </>
+            )}
+
+            {/* Tags */}
+            {book?.tags && Array.isArray(book.tags) && book.tags.length > 0 && (
+              <>
+                <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 18, marginBottom: 12 }}>Tags</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+                  {book.tags.map((tag: string, idx: number) => (
+                    <View
+                      key={idx}
+                      style={{
+                        backgroundColor: '#18191c',
+                        borderRadius: 12,
+                        paddingVertical: 6,
+                        paddingHorizontal: 12,
+                        marginRight: 8,
+                        marginBottom: 8,
+                        borderWidth: 1,
+                        borderColor: '#FFA94D',
+                      }}
+                    >
+                      <Text style={{ color: '#FFA94D', fontSize: 13, fontWeight: '600', letterSpacing: 0.2 }}>{String(tag)}</Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
           </View>
         )}
 
         {/* Note moyenne modernisée supprimée, déplacée dans la ligne des stats */}
 
-        {/* Champs synopsis et tags pour l'auteur (édition/publication) - UNIQUEMENT si pas encore publié */}
+        {/* Champs tags pour l'auteur (édition/publication) - UNIQUEMENT si pas encore publié */}
         {isAuthor && book?.status !== 'published' && (
           <View style={{ width: '92%', backgroundColor: '#23232a', borderRadius: 16, padding: 18, marginBottom: 18, alignSelf: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, elevation: 1 }}>
-            <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 18, marginBottom: 8 }}>Synopsis</Text>
-            <TextInput
-              value={synopsis}
-              onChangeText={setSynopsis}
-              placeholder="Écrivez le synopsis de votre livre..."
-              placeholderTextColor="#888"
-              style={{ color: '#fff', fontSize: 15, fontStyle: 'italic', lineHeight: 22, backgroundColor: '#18191c', borderRadius: 8, padding: 10, marginBottom: 12 }}
-              multiline
-              numberOfLines={3}
-              maxLength={800}
-            />
             <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 16, marginBottom: 6 }}>Tags</Text>
             
             {/* Tags prédéfinis/catégories populaires */}

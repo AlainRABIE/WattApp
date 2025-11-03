@@ -90,7 +90,7 @@ export default function PublishDetailsModal({ visible, onClose, onSubmit }: Prop
             
             <TextInput
               style={[styles.inputDark, { height: 70 }]}
-              placeholder="Synopsis (optionnel)"
+              placeholder="Synopsis *"
               placeholderTextColor="#888"
               value={synopsis}
               onChangeText={setSynopsis}
@@ -227,6 +227,12 @@ export default function PublishDetailsModal({ visible, onClose, onSubmit }: Prop
                   alert('Vous devez accepter les conditions générales pour publier');
                   return;
                 }
+                
+                if (!synopsis.trim()) {
+                  alert('Le synopsis est obligatoire pour publier votre livre');
+                  return;
+                }
+                
                 const priceNum = parseFloat(price.replace(',', '.'));
                 if (!isFree && (isNaN(priceNum) || priceNum < 0.5)) {
                   alert('Le prix doit être d\'au moins 0,50€');

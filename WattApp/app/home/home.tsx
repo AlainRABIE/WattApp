@@ -107,11 +107,60 @@ const Home: React.FC = () => {
 	return (
 		<View style={{ flex: 1, backgroundColor: '#181818' }}>
 			<StatusBar barStyle="light-content" />
-			{/* Logo amis à gauche et portefeuille + avatar profil à droite */}
-			<View style={{ position: 'absolute', top: 48, left: 18, right: 18, zIndex: 100, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-				<TouchableOpacity onPress={() => router.push('/friends')} activeOpacity={0.8} style={{ backgroundColor: '#232323', borderRadius: 22, padding: 6 }}>
+			
+			{/* Barre de navigation fixe en haut - RESTE TOUJOURS VISIBLE */}
+			<View style={{
+				position: 'absolute',
+				top: 0,
+				left: 0,
+				right: 0,
+				height: Platform.OS === 'ios' ? 100 : 80,
+				backgroundColor: '#181818',
+				zIndex: 999,
+				borderBottomWidth: 1,
+				borderBottomColor: '#2a2a2a',
+				paddingTop: Platform.OS === 'ios' ? 44 : (StatusBar.currentHeight ?? 0) + 8,
+				paddingHorizontal: 18,
+				flexDirection: 'row',
+				justifyContent: 'space-between',
+				alignItems: 'center',
+				shadowColor: '#000',
+				shadowOpacity: 0.2,
+				shadowOffset: { width: 0, height: 2 },
+				shadowRadius: 8,
+				elevation: 10
+			}}>
+				{/* Logo amis à gauche */}
+				<TouchableOpacity 
+					onPress={() => router.push('/friends')} 
+					activeOpacity={0.8} 
+					style={{ 
+						backgroundColor: '#232323', 
+						borderRadius: 22, 
+						padding: 8,
+						shadowColor: '#000',
+						shadowOpacity: 0.3,
+						shadowRadius: 4,
+						elevation: 5
+					}}
+				>
 					<Ionicons name="people" size={28} color="#FFA94D" />
 				</TouchableOpacity>
+
+				{/* Logo central WattApp */}
+				<View style={{ alignItems: 'center' }}>
+					<Text style={{
+						color: '#FFA94D',
+						fontSize: 24,
+						fontWeight: 'bold',
+						letterSpacing: 1,
+						textShadowColor: '#000',
+						textShadowOffset: { width: 0, height: 1 },
+						textShadowRadius: 3
+					}}>
+						WattApp
+					</Text>
+				</View>
 
 				{/* Section droite : Portefeuille + Avatar */}
 				<View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -122,16 +171,20 @@ const Home: React.FC = () => {
 						style={{
 							backgroundColor: '#232323',
 							borderRadius: 20,
-							paddingHorizontal: 14,
-							paddingVertical: 8,
+							paddingHorizontal: 12,
+							paddingVertical: 6,
 							flexDirection: 'row',
 							alignItems: 'center',
 							borderWidth: 1,
-							borderColor: '#FFA94D'
+							borderColor: '#FFA94D',
+							shadowColor: '#000',
+							shadowOpacity: 0.3,
+							shadowRadius: 4,
+							elevation: 5
 						}}
 					>
-						<Ionicons name="wallet-outline" size={20} color="#FFA94D" />
-						<Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 14, marginLeft: 6 }}>
+						<Ionicons name="wallet-outline" size={18} color="#FFA94D" />
+						<Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 13, marginLeft: 4 }}>
 							{String(walletBalance.toFixed(2))}€
 						</Text>
 					</TouchableOpacity>
@@ -140,13 +193,29 @@ const Home: React.FC = () => {
 					<TouchableOpacity onPress={() => router.push('/profile')} activeOpacity={0.8}>
 						<Image
 							source={{ uri: photoURL || avatarUrl }}
-							style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#FFA94D', backgroundColor: '#232323' }}
+							style={{ 
+								width: 40, 
+								height: 40, 
+								borderRadius: 20, 
+								borderWidth: 2, 
+								borderColor: '#FFA94D', 
+								backgroundColor: '#232323'
+							}}
 							resizeMode="cover"
 						/>
 					</TouchableOpacity>
 				</View>
 			</View>
-			<ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 60, paddingBottom: 120 }}>
+
+			{/* Contenu scrollable avec marge pour éviter la barre fixe */}
+			<ScrollView 
+				style={{ flex: 1 }} 
+				contentContainerStyle={{ 
+					paddingTop: Platform.OS === 'ios' ? 120 : 100, 
+					paddingBottom: 120 
+				}}
+				showsVerticalScrollIndicator={false}
+			>
 				{/* Carrousel principal */}
 				<Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 20, marginTop: 28, marginLeft: 18, marginBottom: 8 }}>À la une</Text>
 				<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 18, paddingRight: 18 }}>
