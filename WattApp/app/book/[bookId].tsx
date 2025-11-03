@@ -25,6 +25,8 @@ import PaymentService from '../../services/PaymentService';
 
 import StarRating from '../components/StarRating';
 import * as ImagePicker from 'expo-image-picker';
+import { POPULAR_CATEGORIES } from '../../constants/bookCategories';
+import { TagService, TagStats } from '../../services/TagService';
 
 const BookEditor: React.FC = () => {
   const [showChapters, setShowChapters] = useState(false);
@@ -786,34 +788,6 @@ const BookEditor: React.FC = () => {
             </View>
             
             {/* Input pour tags personnalisés */}
-            <Text style={{ color: '#888', fontSize: 13, marginBottom: 6 }}>Ou ajoutez vos propres tags :</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-              <TextInput
-                value={tagInput}
-                onChangeText={setTagInput}
-                placeholder="Ajouter un tag..."
-                placeholderTextColor="#888"
-                style={{ color: '#fff', fontSize: 14, backgroundColor: '#18191c', borderRadius: 8, padding: 8, minWidth: 100, flex: 1, marginRight: 8 }}
-                onSubmitEditing={() => {
-                  if (tagInput.trim() && !tags.includes(tagInput.trim())) {
-                    setTags([...tags, tagInput.trim()]);
-                    setTagInput('');
-                  }
-                }}
-                returnKeyType="done"
-              />
-              <TouchableOpacity
-                onPress={() => {
-                  if (tagInput.trim() && !tags.includes(tagInput.trim())) {
-                    setTags([...tags, tagInput.trim()]);
-                    setTagInput('');
-                  }
-                }}
-                style={{ backgroundColor: '#FFA94D', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 14 }}
-              >
-                <Text style={{ color: '#18191c', fontWeight: 'bold', fontSize: 15 }}>Ajouter</Text>
-              </TouchableOpacity>
-            </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 4 }}>
               {tags.map((tag, idx) => (
                 <View key={idx} style={{ backgroundColor: '#18191c', borderRadius: 8, paddingVertical: 3, paddingHorizontal: 10, marginRight: 6, marginBottom: 6, minHeight: 22, flexDirection: 'row', alignItems: 'center' }}>
@@ -1134,7 +1108,7 @@ const BookEditor: React.FC = () => {
               );
             })
           )}
-  </View>
+        </View>
         {/* Section Votre avis modernisée (en bas) */}
         {!isAuthor && (
           <View style={{ marginBottom: 32, width: '92%', alignItems: 'center', backgroundColor: '#20222a', borderRadius: 10, padding: 14, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, elevation: 1 }}>

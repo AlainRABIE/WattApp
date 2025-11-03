@@ -7,6 +7,7 @@ import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/fires
 import NoteLayout from '../components/NoteLayout';
 import PDFDrawingEditor from '../components/PDFDrawingEditorClean';
 import PublishDetailsModal from './PublishDetailsModal';
+import { TagService } from '../../services/TagService';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
@@ -261,7 +262,7 @@ const TemplateEditor: React.FC = () => {
               <PublishDetailsModal
                 visible={showPublishModal}
                 onClose={() => setShowPublishModal(false)}
-                onSubmit={async (cover, title, synopsis, price, termsAcceptance) => {
+                onSubmit={async (cover, title, synopsis, price, tags, termsAcceptance) => {
                   setShowPublishModal(false);
                   try {
                     const auth = getAuth(app);
@@ -275,6 +276,7 @@ const TemplateEditor: React.FC = () => {
                       body: '',
                       synopsis: synopsis || '',
                       coverImage: cover || '',
+                      tags: tags || [],
                       templateId: template?.id || null,
                       templateName: template?.title || template?.nom || '',
                       templateBackgroundImage: template?.backgroundImage || '',
@@ -310,6 +312,11 @@ const TemplateEditor: React.FC = () => {
                     
                     // Stocker dans collection d'audit séparée
                     await addDoc(collection(db, 'termsAcceptanceAudit'), termsAuditData);
+                    
+                    // Incrémenter l'usage des tags
+                    if (tags && tags.length > 0) {
+                      await TagService.incrementMultipleTagsUsage(tags);
+                    }
                     
                     Alert.alert('Publié', 'Votre document a été publié !');
                   } catch (e) {
