@@ -186,6 +186,14 @@ const WritingDashboard: React.FC = () => {
       action: () => router.push('/write/manga-editor/simple?projectId=new')
     },
     {
+      id: 'manga-cover',
+      title: 'Créer une Couverture',
+      description: 'Dessiner ou importer une couverture de manga',
+      icon: 'image-outline',
+      color: '#9C27B0',
+      action: () => router.push('/write/manga-cover-creator')
+    },
+    {
       id: 'manga-templates',
       title: 'Templates Manga',
       description: 'Layouts 4-koma, webtoon, traditionnel',
@@ -628,6 +636,19 @@ const WritingDashboard: React.FC = () => {
 
                   <TouchableOpacity 
                     style={styles.mangaTool}
+                    onPress={() => router.push('/write/manga-cover-creator')}
+                  >
+                    <LinearGradient
+                      colors={['#9C27B0', '#BA68C8']}
+                      style={styles.mangaToolGradient}
+                    >
+                      <Ionicons name="image" size={24} color="#fff" />
+                      <Text style={styles.mangaToolText}>Couvertures</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={styles.mangaTool}
                     onPress={() => router.push('/write/manga-layouts')}
                   >
                     <LinearGradient
@@ -649,19 +670,6 @@ const WritingDashboard: React.FC = () => {
                     >
                       <Ionicons name="chatbubble" size={24} color="#fff" />
                       <Text style={styles.mangaToolText}>Bulles</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    style={styles.mangaTool}
-                    onPress={() => router.push('/write/manga-characters')}
-                  >
-                    <LinearGradient
-                      colors={['#9C27B0', '#BA68C8']}
-                      style={styles.mangaToolGradient}
-                    >
-                      <Ionicons name="person" size={24} color="#fff" />
-                      <Text style={styles.mangaToolText}>Persos</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 </View>
