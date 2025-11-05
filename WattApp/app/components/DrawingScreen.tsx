@@ -9,6 +9,21 @@ export default function DrawingScreen() {
   const canvasRef = useRef<any>(null);
   const [color, setColor] = useState(COLORS[0]);
   const [size, setSize] = useState(SIZES[1]);
+  const [lastTouchType, setLastTouchType] = useState<string>('touch');
+  const [lastPressure, setLastPressure] = useState<number>(0);
+
+  const handleDrawingChange = (paths: any[]) => {
+    // Obtenir le dernier trait pour afficher les infos de debug
+    if (paths.length > 0) {
+      const lastPath = paths[paths.length - 1];
+      if (lastPath.touchType) {
+        setLastTouchType(lastPath.touchType);
+      }
+      if (lastPath.pressure) {
+        setLastPressure(lastPath.pressure);
+      }
+    }
+  };
 
   // Pour undo/clear, on passe des refs ou callbacks au composant DrawingCanvas
   return (
@@ -17,7 +32,19 @@ export default function DrawingScreen() {
         ref={canvasRef}
         penColor={color}
         penSize={size}
+        onChange={handleDrawingChange}
       />
+      
+      {/* Indicateur de debug pour le stylet */}
+      <View style={styles.debugInfo}>
+        <Text style={styles.debugText}>
+          Type: {lastTouchType === 'pen' ? '🖊️ Stylet' : '👆 Doigt'}
+        </Text>
+        <Text style={styles.debugText}>
+          Pression: {(lastPressure * 100).toFixed(0)}%
+        </Text>
+      </View>
+      
       <View style={styles.toolbar}>
         <View style={styles.colors}>
           {COLORS.map((c) => (
@@ -98,5 +125,20 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 20,
+  },
+  debugInfo: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    padding: 12,
+    borderRadius: 8,
+    minWidth: 120,
+  },
+  debugText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
   },
 });

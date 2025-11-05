@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import * as DocumentPicker from 'expo-document-picker';
 
 const { width, height } = Dimensions.get('window');
 
@@ -92,7 +93,23 @@ const TemplatesGallery: React.FC = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showImportPreview, setShowImportPreview] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  
+  // États d'importation
+  const [importedFile, setImportedFile] = useState<{
+    name: string;
+    content: string;
+    type: string;
+    size: number;
+  } | null>(null);
+  const [importSettings, setImportSettings] = useState({
+    title: '',
+    category: 'Personnalisé',
+    genre: 'Personnalisé',
+    difficulty: 'beginner' as 'beginner' | 'intermediate' | 'advanced',
+    autoDetectStructure: true,
+  });
   
   // États de filtrage
   const [searchQuery, setSearchQuery] = useState('');
@@ -600,29 +617,316 @@ THÈMES RÉCURRENTS :
   // Importation d'un template depuis un fichier
   const handleImportTemplate = async () => {
     try {
-      // Dans une vraie app, on utiliserait DocumentPicker d'Expo
-      Alert.prompt(
-        'Importer un template',
-        'Collez le contenu de votre template ici :',
-        [
-          { text: 'Annuler', style: 'cancel' },
-          { 
-            text: 'Importer', 
-            onPress: (content) => {
-              if (content && content.trim()) {
-                createCustomTemplate(content.trim());
-              }
-            }
-          }
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          'text/plain',              // .txt
+          'text/markdown',           // .md
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+          'application/msword',      // .doc
+          '*/*'                      // Tous les fichiers comme fallback
         ],
-        'plain-text'
-      );
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const file = result.assets[0];
+        console.log('Fichier sélectionné:', file);
+
+        // Lire le contenu du fichier
+        const content = await readFileContent(file);
+        
+        if (content) {
+          // Préparer les données d'importation
+          setImportedFile({
+            name: file.name,
+            content: content,
+            type: file.mimeType || 'text/plain',
+            size: file.size || 0,
+          });
+          
+          // Auto-détecter le titre depuis le nom du fichier
+          const titleFromFile = file.name.replace(/\.[^/.]+$/, ""); // Enlever l'extension
+          setImportSettings(prev => ({
+            ...prev,
+            title: titleFromFile,
+            category: detectTemplateCategory(content),
+            genre: detectTemplateGenre(content),
+            difficulty: detectTemplateDifficulty(content),
+          }));
+          
+          // Fermer le modal d'import et ouvrir la prévisualisation
+          setShowImportModal(false);
+          setShowImportPreview(true);
+        }
+      }
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible d\'importer le template');
+      console.error('Erreur lors de l\'importation:', error);
+      Alert.alert('Erreur', 'Impossible d\'importer le fichier. Vérifiez que le fichier est accessible et au bon format.');
     }
   };
 
-  // Création d'un template personnalisé
+  // Lire le contenu d'un fichier selon son type
+  const readFileContent = async (file: any): Promise<string | null> => {
+    try {
+      // Pour les fichiers texte simples
+      if (file.mimeType === 'text/plain' || file.mimeType === 'text/markdown' || file.name.endsWith('.txt') || file.name.endsWith('.md')) {
+        const response = await fetch(file.uri);
+        const text = await response.text();
+        return text;
+      }
+      
+      // Pour les fichiers Word (.docx) - limitation: on ne peut pas facilement les parser sans librairie spécialisée
+      if (file.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        Alert.alert(
+          'Format Word détecté', 
+          'Les fichiers .docx ne sont pas encore entièrement supportés. Convertissez votre fichier en .txt ou .md pour de meilleurs résultats.',
+          [{ text: 'Continuer quand même', onPress: async () => {
+            try {
+              const response = await fetch(file.uri);
+              const text = await response.text();
+              return text;
+            } catch {
+              return null;
+            }
+          }}, { text: 'Annuler' }]
+        );
+        return null;
+      }
+      
+      // Fallback pour autres types
+      const response = await fetch(file.uri);
+      const text = await response.text();
+      return text;
+      
+    } catch (error) {
+      console.error('Erreur lecture fichier:', error);
+      return null;
+    }
+  };
+
+  // Détecter automatiquement la catégorie du template
+  const detectTemplateCategory = (content: string): string => {
+    const lowerContent = content.toLowerCase();
+    
+    if (lowerContent.includes('chapitre') || lowerContent.includes('chapter')) {
+      return 'Roman';
+    }
+    if (lowerContent.includes('acte') || lowerContent.includes('scène') || lowerContent.includes('scene')) {
+      return 'Théâtre';
+    }
+    if (lowerContent.includes('vers') || lowerContent.includes('strophe') || content.split('\n').some(line => line.length < 50 && line.trim().length > 0)) {
+      return 'Poésie';
+    }
+    if (lowerContent.includes('enquête') || lowerContent.includes('inspecteur') || lowerContent.includes('crime')) {
+      return 'Policier';
+    }
+    if (lowerContent.includes('science') || lowerContent.includes('futur') || lowerContent.includes('robot')) {
+      return 'Science-Fiction';
+    }
+    if (lowerContent.includes('amour') || lowerContent.includes('cœur') || lowerContent.includes('coeur')) {
+      return 'Romance';
+    }
+    
+    return 'Personnalisé';
+  };
+
+  // Détecter le genre du template
+  const detectTemplateGenre = (content: string): string => {
+    const category = detectTemplateCategory(content);
+    const lowerContent = content.toLowerCase();
+    
+    if (category === 'Science-Fiction') return 'Science-Fiction';
+    if (category === 'Romance') return 'Romance';
+    if (category === 'Policier') return 'Policier';
+    if (category === 'Poésie') return 'Poésie';
+    
+    if (lowerContent.includes('fantastique') || lowerContent.includes('magie') || lowerContent.includes('dragon')) {
+      return 'Fantasy';
+    }
+    if (lowerContent.includes('horreur') || lowerContent.includes('peur') || lowerContent.includes('terrifiant')) {
+      return 'Horreur';
+    }
+    if (lowerContent.includes('thriller') || lowerContent.includes('suspense')) {
+      return 'Thriller';
+    }
+    
+    return 'Général';
+  };
+
+  // Détecter la difficulté du template
+  const detectTemplateDifficulty = (content: string): 'beginner' | 'intermediate' | 'advanced' => {
+    const wordCount = content.split(/\s+/).length;
+    const complexity = content.split(/[.!?]+/).length; // Nombre de phrases
+    const avgSentenceLength = wordCount / complexity;
+    
+    if (wordCount < 1000 && avgSentenceLength < 15) return 'beginner';
+    if (wordCount > 5000 || avgSentenceLength > 25) return 'advanced';
+    return 'intermediate';
+  };
+
+  // Finaliser l'importation avec les paramètres personnalisés
+  const finalizeImport = () => {
+    if (!importedFile) return;
+    
+    const content = importedFile.content;
+    const wordCount = content.split(/\s+/).length;
+    
+    // Créer la structure automatiquement si demandé
+    let structure = {
+      chapters: [
+        {
+          id: '1',
+          title: 'Contenu Importé',
+          description: 'Contenu du fichier importé',
+          wordTarget: wordCount,
+          keyEvents: ['Contenu importé'],
+          notes: `Importé depuis ${importedFile.name}`
+        }
+      ],
+      plotPoints: ['Début', 'Développement', 'Fin'],
+      characterArcs: ['Évolution principale'],
+      themes: ['Thème principal']
+    };
+    
+    // Si auto-détection de structure activée, essayer de détecter les chapitres
+    if (importSettings.autoDetectStructure) {
+      structure = detectTemplateStructure(content);
+    }
+    
+    const newTemplate: Template = {
+      id: Date.now().toString(),
+      title: importSettings.title || 'Template Importé',
+      description: `Template importé depuis ${importedFile.name} (${Math.round(importedFile.size / 1024)} KB)`,
+      category: importSettings.category,
+      genre: [importSettings.genre],
+      difficulty: importSettings.difficulty,
+      estimatedTime: Math.ceil(wordCount / 200), // Estimation basée sur 200 mots/minute de lecture
+      wordCount: wordCount,
+      tags: ['importé', 'personnalisé', importSettings.category.toLowerCase()],
+      content: content,
+      structure: structure,
+      preview: content.substring(0, 200) + (content.length > 200 ? '...' : ''),
+      author: 'Utilisateur',
+      rating: 5.0,
+      downloads: 1,
+      lastUpdated: new Date(),
+      isOfficial: false,
+      isPremium: false,
+      color: getRandomTemplateColor(),
+    };
+
+    // Ajouter le template à la liste
+    setTemplates(prev => [...prev, newTemplate]);
+    
+    // Réinitialiser les états
+    setImportedFile(null);
+    setShowImportPreview(false);
+    setImportSettings({
+      title: '',
+      category: 'Personnalisé',
+      genre: 'Personnalisé',
+      difficulty: 'beginner',
+      autoDetectStructure: true,
+    });
+    
+    Alert.alert('Succès !', `Template "${newTemplate.title}" importé avec succès !`);
+  };
+
+  // Détecter la structure d'un template
+  const detectTemplateStructure = (content: string) => {
+    const lines = content.split('\n');
+    const chapters: any[] = [];
+    let currentChapter = null;
+    let chapterCount = 0;
+    
+    // Rechercher les indicateurs de chapitres
+    const chapterPatterns = [
+      /^(chapitre|chapter)\s+(\d+|[IVX]+)/i,
+      /^#{1,3}\s+(.+)$/,  // Markdown headers
+      /^(\d+)\.\s+(.+)$/,  // Numérotation
+      /^(ACTE|PARTIE|SECTION)\s+/i
+    ];
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      for (const pattern of chapterPatterns) {
+        const match = line.match(pattern);
+        if (match) {
+          // Sauvegarder le chapitre précédent
+          if (currentChapter) {
+            chapters.push(currentChapter);
+          }
+          
+          chapterCount++;
+          currentChapter = {
+            id: chapterCount.toString(),
+            title: match[1] || `Chapitre ${chapterCount}`,
+            description: `Chapitre détecté automatiquement`,
+            wordTarget: 0,
+            keyEvents: ['Contenu détecté'],
+            notes: `Détecté depuis la ligne ${i + 1}`
+          };
+          break;
+        }
+      }
+      
+      // Compter les mots pour le chapitre actuel
+      if (currentChapter && line.length > 0) {
+        currentChapter.wordTarget += line.split(/\s+/).length;
+      }
+    }
+    
+    // Ajouter le dernier chapitre
+    if (currentChapter) {
+      chapters.push(currentChapter);
+    }
+    
+    // Si aucun chapitre détecté, créer un chapitre unique
+    if (chapters.length === 0) {
+      chapters.push({
+        id: '1',
+        title: 'Contenu Principal',
+        description: 'Tout le contenu importé',
+        wordTarget: content.split(/\s+/).length,
+        keyEvents: ['Contenu complet'],
+        notes: 'Aucune structure de chapitre détectée'
+      });
+    }
+    
+    return {
+      chapters,
+      plotPoints: chapters.length > 1 ? chapters.map(c => c.title) : ['Début', 'Développement', 'Fin'],
+      characterArcs: ['Évolution principale'],
+      themes: [detectMainTheme(content)]
+    };
+  };
+
+  // Détecter le thème principal
+  const detectMainTheme = (content: string): string => {
+    const lowerContent = content.toLowerCase();
+    
+    if (lowerContent.includes('amour') || lowerContent.includes('cœur')) return 'Amour';
+    if (lowerContent.includes('guerre') || lowerContent.includes('combat')) return 'Conflit';
+    if (lowerContent.includes('famille')) return 'Famille';
+    if (lowerContent.includes('amitié')) return 'Amitié';
+    if (lowerContent.includes('voyage')) return 'Aventure';
+    if (lowerContent.includes('justice')) return 'Justice';
+    if (lowerContent.includes('liberté')) return 'Liberté';
+    
+    return 'Thème général';
+  };
+
+  // Générer une couleur aléatoire pour le template
+  const getRandomTemplateColor = (): string => {
+    const colors = [
+      '#667eea', '#f093fb', '#4facfe', '#fa709a', '#95e1d3', 
+      '#fbc7d4', '#a8edea', '#fed6e3', '#d299c2', '#ffeaa7'
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
+
+  // Création d'un template personnalisé (version simple pour le prompt texte)
   const createCustomTemplate = (content: string) => {
     const newTemplate: Template = {
       id: Date.now().toString(),
@@ -1143,6 +1447,142 @@ Commencez à écrire votre template ici...
     </Modal>
   );
 
+  // Rendu du modal de prévisualisation d'importation
+  const renderImportPreview = () => (
+    <Modal visible={showImportPreview} animationType="slide" statusBarTranslucent>
+      <View style={styles.importPreviewContainer}>
+        <StatusBar barStyle="light-content" backgroundColor="#181818" />
+        
+        {/* Header */}
+        <View style={styles.importPreviewHeader}>
+          <TouchableOpacity onPress={() => setShowImportPreview(false)}>
+            <Ionicons name="close" size={24} color="#FFA94D" />
+          </TouchableOpacity>
+          <Text style={styles.importPreviewTitle}>Prévisualisation Importation</Text>
+          <TouchableOpacity onPress={finalizeImport} style={styles.finalizeImportButton}>
+            <Text style={styles.finalizeImportButtonText}>Importer</Text>
+          </TouchableOpacity>
+        </View>
+
+        {importedFile && (
+          <ScrollView style={styles.importPreviewContent}>
+            {/* Informations du fichier */}
+            <View style={styles.fileInfoSection}>
+              <Text style={styles.sectionTitle}>Fichier Sélectionné</Text>
+              <View style={styles.fileInfoCard}>
+                <Ionicons name="document-text-outline" size={24} color="#FFA94D" />
+                <View style={styles.fileInfoDetails}>
+                  <Text style={styles.fileName}>{importedFile.name}</Text>
+                  <Text style={styles.fileDetails}>
+                    {Math.round(importedFile.size / 1024)} KB • {importedFile.content.split(/\s+/).length} mots
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Paramètres d'importation */}
+            <View style={styles.importSettingsSection}>
+              <Text style={styles.sectionTitle}>Paramètres du Template</Text>
+              
+              <View style={styles.settingRow}>
+                <Text style={styles.settingLabel}>Titre</Text>
+                <TextInput
+                  style={styles.settingInput}
+                  value={importSettings.title}
+                  onChangeText={(text) => setImportSettings(prev => ({ ...prev, title: text }))}
+                  placeholder="Nom du template"
+                  placeholderTextColor="#666"
+                />
+              </View>
+
+              <View style={styles.settingRow}>
+                <Text style={styles.settingLabel}>Catégorie</Text>
+                <View style={styles.categorySelector}>
+                  {['Personnalisé', 'Roman', 'Nouvelle', 'Poésie', 'Théâtre', 'Policier', 'Science-Fiction', 'Romance'].map((cat) => (
+                    <TouchableOpacity
+                      key={cat}
+                      style={[
+                        styles.categoryOption,
+                        importSettings.category === cat && styles.categoryOptionSelected
+                      ]}
+                      onPress={() => setImportSettings(prev => ({ ...prev, category: cat }))}
+                    >
+                      <Text style={[
+                        styles.categoryOptionText,
+                        importSettings.category === cat && styles.categoryOptionTextSelected
+                      ]}>
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.settingRow}>
+                <Text style={styles.settingLabel}>Difficulté</Text>
+                <View style={styles.difficultySelector}>
+                  {[
+                    { key: 'beginner', label: 'Débutant' },
+                    { key: 'intermediate', label: 'Intermédiaire' },
+                    { key: 'advanced', label: 'Avancé' }
+                  ].map((diff) => (
+                    <TouchableOpacity
+                      key={diff.key}
+                      style={[
+                        styles.difficultyOption,
+                        importSettings.difficulty === diff.key && styles.difficultyOptionSelected
+                      ]}
+                      onPress={() => setImportSettings(prev => ({ ...prev, difficulty: diff.key as any }))}
+                    >
+                      <Text style={[
+                        styles.difficultyOptionText,
+                        importSettings.difficulty === diff.key && styles.difficultyOptionTextSelected
+                      ]}>
+                        {diff.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.settingRow}>
+                <View style={styles.toggleRow}>
+                  <Text style={styles.settingLabel}>Détecter structure automatiquement</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.toggle,
+                      importSettings.autoDetectStructure && styles.toggleActive
+                    ]}
+                    onPress={() => setImportSettings(prev => ({ ...prev, autoDetectStructure: !prev.autoDetectStructure }))}
+                  >
+                    <View style={[
+                      styles.toggleThumb,
+                      importSettings.autoDetectStructure && styles.toggleThumbActive
+                    ]} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.settingDescription}>
+                  Active la détection automatique des chapitres et de la structure
+                </Text>
+              </View>
+            </View>
+
+            {/* Aperçu du contenu */}
+            <View style={styles.contentPreviewSection}>
+              <Text style={styles.sectionTitle}>Aperçu du Contenu</Text>
+              <View style={styles.contentPreview}>
+                <Text style={styles.contentPreviewText}>
+                  {importedFile.content.substring(0, 500)}
+                  {importedFile.content.length > 500 && '...'}
+                </Text>
+              </View>
+            </View>
+          </ScrollView>
+        )}
+      </View>
+    </Modal>
+  );
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#181818" />
@@ -1240,6 +1680,7 @@ Commencez à écrire votre template ici...
       {renderFilters()}
       {renderPreview()}
       {renderImportModal()}
+      {renderImportPreview()}
     </View>
   );
 };
@@ -1806,6 +2247,191 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 14,
     textAlign: 'center',
+    lineHeight: 20,
+  },
+  
+  // Import Preview Styles
+  importPreviewContainer: {
+    flex: 1,
+    backgroundColor: '#181818',
+  },
+  importPreviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  importPreviewTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  finalizeImportButton: {
+    backgroundColor: '#FFA94D',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+  },
+  finalizeImportButtonText: {
+    color: '#181818',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  importPreviewContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  fileInfoSection: {
+    marginBottom: 24,
+  },
+  fileInfoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#23232a',
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+  },
+  fileInfoDetails: {
+    flex: 1,
+  },
+  fileName: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  fileDetails: {
+    color: '#888',
+    fontSize: 14,
+  },
+  importSettingsSection: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  settingRow: {
+    marginBottom: 20,
+  },
+  settingLabel: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  settingInput: {
+    backgroundColor: '#23232a',
+    color: '#fff',
+    padding: 12,
+    borderRadius: 8,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  categorySelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  categoryOption: {
+    backgroundColor: '#23232a',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  categoryOptionSelected: {
+    backgroundColor: '#FFA94D',
+    borderColor: '#FFA94D',
+  },
+  categoryOptionText: {
+    color: '#888',
+    fontSize: 14,
+  },
+  categoryOptionTextSelected: {
+    color: '#181818',
+    fontWeight: '600',
+  },
+  difficultySelector: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  difficultyOption: {
+    flex: 1,
+    backgroundColor: '#23232a',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  difficultyOptionSelected: {
+    backgroundColor: '#FFA94D',
+    borderColor: '#FFA94D',
+  },
+  difficultyOptionText: {
+    color: '#888',
+    fontSize: 14,
+  },
+  difficultyOptionTextSelected: {
+    color: '#181818',
+    fontWeight: '600',
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  toggle: {
+    width: 50,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#333',
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleActive: {
+    backgroundColor: '#FFA94D',
+  },
+  toggleThumb: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#666',
+  },
+  toggleThumbActive: {
+    backgroundColor: '#181818',
+    alignSelf: 'flex-end',
+  },
+  settingDescription: {
+    color: '#666',
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  contentPreviewSection: {
+    marginBottom: 24,
+  },
+  contentPreview: {
+    backgroundColor: '#23232a',
+    padding: 16,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FFA94D',
+    maxHeight: 200,
+  },
+  contentPreviewText: {
+    color: '#ccc',
+    fontSize: 14,
     lineHeight: 20,
   },
 });

@@ -69,6 +69,7 @@ const WritingDashboard: React.FC = () => {
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [selectedMode, setSelectedMode] = useState<WritingMode | null>(null);
+  const [selectedWritingType, setSelectedWritingType] = useState<'book' | 'manga' | null>(null);
   
   // Animations
   const scrollY = new Animated.Value(0);
@@ -77,6 +78,26 @@ const WritingDashboard: React.FC = () => {
     outputRange: [1, 0.9],
     extrapolate: 'clamp',
   });
+
+  // Types de création
+  const creationTypes = [
+    {
+      id: 'book' as const,
+      title: 'Écrire un Livre',
+      description: 'Romans, nouvelles, poésie et essais',
+      icon: 'book-outline',
+      gradient: ['#667eea', '#764ba2'],
+      features: ['Éditeur de texte avancé', 'Gestion des chapitres', 'Formats multiples', 'Publication numérique']
+    },
+    {
+      id: 'manga' as const,
+      title: 'Créer un Manga',
+      description: 'Mangas, webtoons, bandes dessinées digitales',
+      icon: 'brush-outline',
+      gradient: ['#f093fb', '#f5576c'],
+      features: ['Outils de dessin avancés', 'Templates layouts manga', 'Storyboard intégré', 'Bulles de dialogue', 'Gestion personnages', 'Publication marketplace']
+    }
+  ];
 
   // Modes d'écriture disponibles
   const writingModes: WritingMode[] = [
@@ -114,12 +135,12 @@ const WritingDashboard: React.FC = () => {
     }
   ];
 
-  // Actions rapides
-  const quickActions: QuickAction[] = [
+  // Actions rapides pour les livres
+  const bookActions: QuickAction[] = [
     {
-      id: 'new-project',
-      title: 'Nouveau Projet',
-      description: 'Commencer un nouveau livre',
+      id: 'new-book',
+      title: 'Nouveau Livre',
+      description: 'Commencer un nouveau projet d\'écriture',
       icon: 'add-circle',
       color: '#4CAF50',
       action: () => router.push('/write/new-project')
@@ -127,7 +148,7 @@ const WritingDashboard: React.FC = () => {
     {
       id: 'continue-writing',
       title: 'Continuer à Écrire',
-      description: 'Reprendre votre projet actuel',
+      description: 'Reprendre votre dernier projet',
       icon: 'play-circle',
       color: '#2196F3',
       action: () => {
@@ -138,8 +159,8 @@ const WritingDashboard: React.FC = () => {
     },
     {
       id: 'templates',
-      title: 'Templates',
-      description: 'Utiliser un modèle prédéfini',
+      title: 'Templates Livre',
+      description: 'Modèles prédéfinis pour commencer',
       icon: 'document-text',
       color: '#FF9800',
       action: () => router.push('/write/templates')
@@ -153,6 +174,77 @@ const WritingDashboard: React.FC = () => {
       action: () => router.push('/write/import')
     }
   ];
+
+  // Actions rapides pour les mangas
+  const mangaActions: QuickAction[] = [
+    {
+      id: 'new-manga',
+      title: 'Nouveau Manga',
+      description: 'Créer un nouveau manga avec outils de dessin',
+      icon: 'brush-outline',
+      color: '#FF6B6B',
+      action: () => router.push('/write/manga-editor/simple?projectId=new')
+    },
+    {
+      id: 'manga-templates',
+      title: 'Templates Manga',
+      description: 'Layouts 4-koma, webtoon, traditionnel',
+      icon: 'apps-outline',
+      color: '#FF9800',
+      action: () => router.push('/write/manga-templates')
+    },
+    {
+      id: 'storyboard',
+      title: 'Storyboard',
+      description: 'Planifier votre manga case par case',
+      icon: 'film-outline',
+      color: '#9C27B0',
+      action: () => router.push('/write/manga-storyboard/new')
+    },
+    {
+      id: 'character-design',
+      title: 'Design Personnages',
+      description: 'Créer et gérer vos personnages',
+      icon: 'person-outline',
+      color: '#2196F3',
+      action: () => router.push('/write/manga-characters')
+    },
+    {
+      id: 'drawing-tools',
+      title: 'Outils de Dessin',
+      description: 'Pinceaux, plumes, effets manga',
+      icon: 'color-palette-outline',
+      color: '#FF5722',
+      action: () => router.push('/write/manga-tools')
+    },
+    {
+      id: 'panel-layouts',
+      title: 'Mise en Page',
+      description: 'Créer des layouts de cases uniques',
+      icon: 'grid-outline',
+      color: '#4CAF50',
+      action: () => router.push('/write/manga-layouts')
+    },
+    {
+      id: 'speech-bubbles',
+      title: 'Bulles de Dialogue',
+      description: 'Outils pour dialogue et narration',
+      icon: 'chatbubble-outline',
+      color: '#00BCD4',
+      action: () => router.push('/write/manga-bubbles')
+    },
+    {
+      id: 'publish-manga',
+      title: 'Publier Manga',
+      description: 'Publier sur marketplace manga',
+      icon: 'rocket-outline',
+      color: '#673AB7',
+      action: () => router.push('/write/publish-manga')
+    }
+  ];
+
+  // Actions rapides actuelles (pour compatibilité)
+  const quickActions = selectedWritingType === 'manga' ? mangaActions : bookActions;
 
   // Filtres de projets
   const filters = [
@@ -349,6 +441,70 @@ const WritingDashboard: React.FC = () => {
     </TouchableOpacity>
   );
 
+  // Rendu du sélecteur de type de création
+  const renderCreationTypeSelector = () => (
+    <View style={styles.creationTypeSelector}>
+      <Text style={styles.sectionTitle}>Que souhaitez-vous créer ?</Text>
+      <Text style={styles.sectionSubtitle}>Choisissez votre mode de création</Text>
+      
+      <View style={styles.creationTypesContainer}>
+        {creationTypes.map((type) => (
+          <TouchableOpacity
+            key={type.id}
+            style={[
+              styles.creationTypeCard,
+              selectedWritingType === type.id && styles.creationTypeCardSelected
+            ]}
+            onPress={() => setSelectedWritingType(type.id)}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={type.gradient as [string, string]}
+              style={styles.creationTypeGradient}
+            >
+              <View style={styles.creationTypeIcon}>
+                <Ionicons name={type.icon as any} size={32} color="#fff" />
+              </View>
+              
+              <Text style={styles.creationTypeTitle}>{type.title}</Text>
+              <Text style={styles.creationTypeDescription}>{type.description}</Text>
+              
+              <View style={styles.creationTypeFeatures}>
+                {type.features.slice(0, 2).map((feature, index) => (
+                  <View key={index} style={styles.creationTypeFeature}>
+                    <Ionicons name="checkmark-circle" size={14} color="#fff" />
+                    <Text style={styles.creationTypeFeatureText}>{feature}</Text>
+                  </View>
+                ))}
+              </View>
+              
+              {selectedWritingType === type.id && (
+                <View style={styles.selectedIndicator}>
+                  <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                </View>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        ))}
+      </View>
+      
+      {selectedWritingType && (
+        <TouchableOpacity
+          style={styles.continueButton}
+          onPress={() => setShowQuickActions(true)}
+        >
+          <LinearGradient
+            colors={['#FFA94D', '#FF8A65']}
+            style={styles.continueButtonGradient}
+          >
+            <Text style={styles.continueButtonText}>Continuer</Text>
+            <Ionicons name="arrow-forward" size={20} color="#fff" />
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#181818" />
@@ -397,87 +553,215 @@ const WritingDashboard: React.FC = () => {
           />
         }
       >
-        {/* Section Héro */}
-        <View style={styles.heroSection}>
-          <Text style={styles.heroTitle}>Donnez vie à vos histoires</Text>
-          <Text style={styles.heroSubtitle}>
-            Créez, collaborez et publiez avec les outils d'écriture les plus avancés
-          </Text>
-          
-          <TouchableOpacity
-            style={styles.heroButton}
-            onPress={() => setShowModeSelector(true)}
-          >
-            <LinearGradient colors={['#FFA94D', '#FF6B6B']} style={styles.heroButtonGradient}>
-              <Ionicons name="create" size={20} color="#fff" />
-              <Text style={styles.heroButtonText}>Commencer à écrire</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-
-        {/* Projets récents */}
-        {recentProjects.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Continuer l'écriture</Text>
-              <TouchableOpacity onPress={() => router.push('/write/projects')}>
-                <Text style={styles.sectionAction}>Voir tout</Text>
+        {/* Sélecteur de type de création */}
+        {!selectedWritingType ? (
+          renderCreationTypeSelector()
+        ) : (
+          <>
+            {/* Section retour */}
+            <View style={styles.heroSection}>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => setSelectedWritingType(null)}
+              >
+                <Ionicons name="arrow-back" size={20} color="#FFA94D" />
+                <Text style={styles.backButtonText}>Changer de type</Text>
               </TouchableOpacity>
+              
+              <Text style={styles.heroTitle}>
+                {selectedWritingType === 'manga' ? 'Créer un Manga' : 'Écrire un Livre'}
+              </Text>
+              <Text style={styles.heroSubtitle}>
+                {selectedWritingType === 'manga' 
+                  ? 'Dessinez et publiez vos histoires visuelles'
+                  : 'Créez, collaborez et publiez avec les outils d\'écriture les plus avancés'
+                }
+              </Text>
             </View>
-            
-            <FlatList
-              data={recentProjects}
-              renderItem={renderProjectCard}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.projectsList}
-            />
-          </View>
+
+            {/* Section spéciale Manga */}
+            {selectedWritingType === 'manga' && (
+              <View style={styles.mangaSpecialSection}>
+                <LinearGradient
+                  colors={['#f093fb', '#f5576c']}
+                  style={styles.mangaInfoCard}
+                >
+                  <View style={styles.mangaInfoHeader}>
+                    <Ionicons name="brush-outline" size={28} color="#fff" />
+                    <Text style={styles.mangaInfoTitle}>Studio Manga</Text>
+                  </View>
+                  
+                  <View style={styles.mangaStatsRow}>
+                    <View style={styles.mangaStat}>
+                      <Text style={styles.mangaStatNumber}>12</Text>
+                      <Text style={styles.mangaStatLabel}>Pages</Text>
+                    </View>
+                    <View style={styles.mangaStat}>
+                      <Text style={styles.mangaStatNumber}>3</Text>
+                      <Text style={styles.mangaStatLabel}>Chapitres</Text>
+                    </View>
+                    <View style={styles.mangaStat}>
+                      <Text style={styles.mangaStatNumber}>45</Text>
+                      <Text style={styles.mangaStatLabel}>Followers</Text>
+                    </View>
+                  </View>
+                  
+                  <Text style={styles.mangaTip}>
+                    💡 Conseil du jour : Utilisez le format 4-koma pour les histoires comiques courtes
+                  </Text>
+                </LinearGradient>
+
+                {/* Outils Manga Rapides */}
+                <View style={styles.mangaToolsGrid}>
+                  <TouchableOpacity 
+                    style={styles.mangaTool}
+                    onPress={() => router.push('/write/manga-tools')}
+                  >
+                    <LinearGradient
+                      colors={['#FF5722', '#FF8A65']}
+                      style={styles.mangaToolGradient}
+                    >
+                      <Ionicons name="brush" size={24} color="#fff" />
+                      <Text style={styles.mangaToolText}>Pinceaux</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={styles.mangaTool}
+                    onPress={() => router.push('/write/manga-layouts')}
+                  >
+                    <LinearGradient
+                      colors={['#4CAF50', '#81C784']}
+                      style={styles.mangaToolGradient}
+                    >
+                      <Ionicons name="grid" size={24} color="#fff" />
+                      <Text style={styles.mangaToolText}>Layouts</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={styles.mangaTool}
+                    onPress={() => router.push('/write/manga-bubbles')}
+                  >
+                    <LinearGradient
+                      colors={['#00BCD4', '#4DD0E1']}
+                      style={styles.mangaToolGradient}
+                    >
+                      <Ionicons name="chatbubble" size={24} color="#fff" />
+                      <Text style={styles.mangaToolText}>Bulles</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={styles.mangaTool}
+                    onPress={() => router.push('/write/manga-characters')}
+                  >
+                    <LinearGradient
+                      colors={['#9C27B0', '#BA68C8']}
+                      style={styles.mangaToolGradient}
+                    >
+                      <Ionicons name="person" size={24} color="#fff" />
+                      <Text style={styles.mangaToolText}>Persos</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Actions Rapides Manga */}
+                <View style={styles.mangaQuickActions}>
+                  <Text style={styles.mangaQuickActionsTitle}>Actions Rapides</Text>
+                  <View style={styles.mangaQuickActionsGrid}>
+                    {mangaActions.slice(0, 4).map((action) => (
+                      <TouchableOpacity
+                        key={action.id}
+                        style={styles.mangaQuickActionItem}
+                        onPress={action.action}
+                      >
+                        <View style={[styles.mangaQuickActionIcon, { backgroundColor: action.color }]}>
+                          <Ionicons name={action.icon as any} size={20} color="#fff" />
+                        </View>
+                        <Text style={styles.mangaQuickActionTitle}>{action.title}</Text>
+                        <Text style={styles.mangaQuickActionDesc}>{action.description}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </View>
+            )}
+          </>
         )}
 
-        {/* Recherche et filtres */}
-        <View style={styles.section}>
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color="#666" />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Rechercher un projet..."
-              placeholderTextColor="#666"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersContainer}>
-            {filters.map((filter) => (
-              <TouchableOpacity
-                key={filter.key}
-                style={[
-                  styles.filterButton,
-                  selectedFilter === filter.key && styles.filterButtonActive
-                ]}
-                onPress={() => setSelectedFilter(filter.key as any)}
-              >
-                <Ionicons 
-                  name={filter.icon as any} 
-                  size={16} 
-                  color={selectedFilter === filter.key ? '#181818' : '#FFA94D'} 
+        {/* Contenu conditionnel selon le type sélectionné */}
+        {selectedWritingType && (
+          <>
+            {/* Projets récents */}
+            {recentProjects.length > 0 && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Continuer l'écriture</Text>
+                  <TouchableOpacity onPress={() => router.push('/write/projects')}>
+                    <Text style={styles.sectionAction}>Voir tout</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                <FlatList
+                  data={recentProjects}
+                  renderItem={renderProjectCard}
+                  keyExtractor={(item) => item.id}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.projectsList}
                 />
-                <Text style={[
-                  styles.filterText,
-                  selectedFilter === filter.key && styles.filterTextActive
-                ]}>
-                  {filter.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+              </View>
+            )}
+          </>
+        )}
 
-        {/* Liste des projets */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mes Projets</Text>
+        {selectedWritingType && (
+          <>
+            {/* Recherche et filtres */}
+            <View style={styles.section}>
+              <View style={styles.searchContainer}>
+                <Ionicons name="search" size={20} color="#666" />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Rechercher un projet..."
+                  placeholderTextColor="#666"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+              </View>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersContainer}>
+                {filters.map((filter) => (
+                  <TouchableOpacity
+                    key={filter.key}
+                    style={[
+                      styles.filterButton,
+                      selectedFilter === filter.key && styles.filterButtonActive
+                    ]}
+                    onPress={() => setSelectedFilter(filter.key as any)}
+                  >
+                    <Ionicons 
+                      name={filter.icon as any} 
+                      size={16} 
+                      color={selectedFilter === filter.key ? '#181818' : '#FFA94D'} 
+                    />
+                    <Text style={[
+                      styles.filterText,
+                      selectedFilter === filter.key && styles.filterTextActive
+                    ]}>
+                      {filter.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* Liste des projets */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>
+                {selectedWritingType === 'manga' ? 'Mes Mangas' : 'Mes Projets'}
+              </Text>
           
           {filteredProjects.map((project, index) => (
             <TouchableOpacity
@@ -517,7 +801,9 @@ const WritingDashboard: React.FC = () => {
               </View>
             </TouchableOpacity>
           ))}
-        </View>
+            </View>
+          </>
+        )}
 
         <View style={styles.bottomSpacing} />
       </Animated.ScrollView>
@@ -532,11 +818,28 @@ const WritingDashboard: React.FC = () => {
         <BlurView intensity={50} style={styles.modalOverlay}>
           <View style={styles.quickActionsModal}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Actions Rapides</Text>
+              <Text style={styles.modalTitle}>
+                {selectedWritingType === 'manga' ? 'Outils Manga' : 'Actions Rapides'}
+              </Text>
               <TouchableOpacity onPress={() => setShowQuickActions(false)}>
                 <Ionicons name="close" size={24} color="#FFA94D" />
               </TouchableOpacity>
             </View>
+            
+            {/* Header spécial pour Manga */}
+            {selectedWritingType === 'manga' && (
+              <View style={styles.mangaModalHeader}>
+                <LinearGradient
+                  colors={['#f093fb', '#f5576c']}
+                  style={styles.mangaModalBanner}
+                >
+                  <Ionicons name="brush-outline" size={24} color="#fff" />
+                  <Text style={styles.mangaModalText}>
+                    Créez des mangas professionnels avec nos outils avancés
+                  </Text>
+                </LinearGradient>
+              </View>
+            )}
             
             <FlatList
               data={quickActions}
@@ -1015,6 +1318,249 @@ const styles = StyleSheet.create({
   // Espacement
   bottomSpacing: {
     height: 100,
+  },
+
+  // Sélecteur de type de création
+  creationTypeSelector: {
+    padding: 20,
+    marginTop: 20,
+  },
+  sectionSubtitle: {
+    color: '#888',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  creationTypesContainer: {
+    gap: 16,
+    marginBottom: 24,
+  },
+  creationTypeCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  creationTypeCardSelected: {
+    transform: [{ scale: 1.02 }],
+  },
+  creationTypeGradient: {
+    padding: 20,
+    position: 'relative',
+  },
+  creationTypeIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  creationTypeTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  creationTypeDescription: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 14,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  creationTypeFeatures: {
+    gap: 8,
+  },
+  creationTypeFeature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  creationTypeFeatureText: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 12,
+  },
+  selectedIndicator: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  continueButton: {
+    borderRadius: 25,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  continueButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
+  },
+  continueButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+
+  // Bouton de retour
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255, 169, 77, 0.1)',
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+  },
+  backButtonText: {
+    color: '#FFA94D',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // Styles spéciaux pour Manga
+  mangaSpecialSection: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  mangaInfoCard: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+  },
+  mangaInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  mangaInfoTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginLeft: 12,
+  },
+  mangaStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 16,
+  },
+  mangaStat: {
+    alignItems: 'center',
+  },
+  mangaStatNumber: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  mangaStatLabel: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  mangaTip: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 14,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 12,
+    borderRadius: 8,
+  },
+  mangaToolsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  mangaTool: {
+    width: (width - 64) / 4,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  mangaToolGradient: {
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 80,
+  },
+  mangaToolText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+
+  // Styles pour modal manga
+  mangaModalHeader: {
+    marginBottom: 16,
+  },
+  mangaModalBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+  },
+  mangaModalText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+  },
+
+  // Actions rapides manga
+  mangaQuickActions: {
+    marginTop: 16,
+  },
+  mangaQuickActionsTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  mangaQuickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  mangaQuickActionItem: {
+    width: (width - 64) / 2,
+    backgroundColor: '#23232a',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  mangaQuickActionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  mangaQuickActionTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  mangaQuickActionDesc: {
+    color: '#888',
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 16,
   },
 });
 
