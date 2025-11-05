@@ -60,6 +60,7 @@ export interface MangaProject {
   title: string;
   authorId: string;
   authorUid: string; // Pour compatibilité avec 'books'
+  ownerUid?: string; // Pour affichage dans bibliothèque
   author: string; // Nom d'affichage
   createdAt: any;
   updatedAt: any;
@@ -143,6 +144,7 @@ class MangaProjectService {
         title: projectData.title,
         authorId: projectData.authorId,
         authorUid: projectData.authorUid,
+        ownerUid: projectData.authorUid, // Pour affichage dans bibliothèque
         author: projectData.author,
         status: 'draft',
         type: 'manga',

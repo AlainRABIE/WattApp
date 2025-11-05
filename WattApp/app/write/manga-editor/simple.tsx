@@ -19,6 +19,8 @@ import Svg, { Path, Rect, Text as SvgText } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import MangaDrawingModal from '../../components/MangaDrawingModal';
 import { mangaProjectService, MangaProject, MangaPage, MangaPanel, DrawingPath } from '../../services/MangaProjectService';
+import { getAuth } from 'firebase/auth';
+import app from '../../../constants/firebaseConfig';
 
 const { width, height } = Dimensions.get('window');
 
@@ -49,6 +51,12 @@ const MangaEditorSimple: React.FC = () => {
   const [drawingPanelData, setDrawingPanelData] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  // Fonction pour obtenir l'utilisateur actuel
+  const getCurrentUser = () => {
+    const auth = getAuth(app);
+    return auth.currentUser;
+  };
   const [showTitleEditor, setShowTitleEditor] = useState(false);
   const [editingTitle, setEditingTitle] = useState('');
 
@@ -110,6 +118,12 @@ const MangaEditorSimple: React.FC = () => {
   };
 
   const createProjectWithPanels = (panels: any[]) => {
+    const user = getCurrentUser();
+    if (!user) {
+      Alert.alert('Erreur', 'Vous devez être connecté pour créer un manga');
+      return;
+    }
+    
     const page: MangaPage = {
       id: '1',
       pageNumber: 1,
@@ -121,9 +135,9 @@ const MangaEditorSimple: React.FC = () => {
     const newProject: MangaProject = {
       id: 'new',
       title: `Mon Manga ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}`,
-      authorId: 'current-user',
-      authorUid: 'current-user-uid',
-      author: 'Auteur',
+      authorId: user.uid,
+      authorUid: user.uid,
+      author: user.displayName || user.email || 'Auteur',
       status: 'draft',
       type: 'manga',
       createdAt: new Date(),
@@ -358,28 +372,34 @@ const MangaEditorSimple: React.FC = () => {
         
         Alert.alert(
           '✅ Succès', 
-          'Manga sauvegardé !',
+          'Manga sauvegardé ! Il est maintenant visible dans votre bibliothèque.',
           [
-            {
-              text: 'Continuer l\'édition',
-              style: 'cancel'
-            },
             {
               text: 'Voir dans la bibliothèque',
               onPress: () => {
                 // Rediriger vers la bibliothèque après sauvegarde
                 router.replace('/library/Library' as any);
               }
+            },
+            {
+              text: 'Continuer l\'édition',
+              style: 'cancel'
             }
           ]
         );
       } else {
         // Nouveau projet - créer
+        const user = getCurrentUser();
+        if (!user) {
+          Alert.alert('Erreur', 'Vous devez être connecté pour sauvegarder un manga');
+          return;
+        }
+        
         const newProjectId = await mangaProjectService.createProject({
           title: project.title,
-          authorId: 'current-user',
-          authorUid: 'current-user-uid',
-          author: 'Auteur',
+          authorId: user.uid,
+          authorUid: user.uid,
+          author: user.displayName || user.email || 'Auteur',
           pages: project.pages,
           templateId: templateId as string,
           description: 'Nouveau manga',
@@ -388,18 +408,18 @@ const MangaEditorSimple: React.FC = () => {
         
         Alert.alert(
           '✅ Succès', 
-          'Nouveau manga créé !',
+          'Nouveau manga créé ! Il est maintenant visible dans votre bibliothèque.',
           [
-            {
-              text: 'Continuer l\'édition',
-              style: 'cancel'
-            },
             {
               text: 'Voir dans la bibliothèque',
               onPress: () => {
                 // Rediriger vers la bibliothèque après création
                 router.replace('/library/Library' as any);
               }
+            },
+            {
+              text: 'Continuer l\'édition',
+              style: 'cancel'
             }
           ]
         );

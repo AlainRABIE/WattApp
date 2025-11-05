@@ -17,9 +17,8 @@ import {
 import { useRouter } from 'expo-router';
 import { Alert } from 'react-native';
 import { getAuth } from 'firebase/auth';
-import app, { db, storage } from '../../constants/firebaseConfig';
+import app, { db } from '../../constants/firebaseConfig';
 import { collection, query, where, getDocs, orderBy, deleteDoc, doc, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { getWishlistBooks } from './wishlistUtils';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
@@ -1309,7 +1308,14 @@ Variables d'état:
                   >
                     {drafts.map((draft: any) => (
                       <View key={draft.id} style={styles.draftCard}>
-                        <TouchableOpacity onPress={() => (router as any).push(`/book/${draft.id}`)}>
+                        <TouchableOpacity onPress={() => {
+                          // Rediriger selon le type de projet
+                          if (draft.type === 'manga') {
+                            (router as any).push(`/write/manga-editor/simple?projectId=${draft.id}`);
+                          } else {
+                            (router as any).push(`/book/${draft.id}`);
+                          }
+                        }}>
                           <View style={styles.draftCover}>
                             {draft.coverImage ? (
                               <Image 
@@ -1317,7 +1323,15 @@ Variables d'état:
                                 style={styles.draftCoverImage}
                               />
                             ) : (
-                              <Text style={styles.draftIcon}>📄</Text>
+                              <Text style={styles.draftIcon}>
+                                {draft.type === 'manga' ? '🎨' : '📄'}
+                              </Text>
+                            )}
+                            {/* Badge pour les mangas */}
+                            {draft.type === 'manga' && (
+                              <View style={styles.mangaBadge}>
+                                <Text style={styles.mangaBadgeText}>MANGA</Text>
+                              </View>
                             )}
                           </View>
                         </TouchableOpacity>
@@ -1344,10 +1358,18 @@ Variables d'état:
                           )}
                           <TouchableOpacity
                             style={{ backgroundColor: '#FFA94D', borderRadius: 18, paddingVertical: 7, paddingHorizontal: 18, alignSelf: 'flex-end', marginTop: 8, flexDirection: 'row', alignItems: 'center' }}
-                            onPress={() => (router as any).push(`/book/${draft.id}/read`)}
+                            onPress={() => {
+                              if (draft.type === 'manga') {
+                                (router as any).push(`/write/manga-editor/simple?projectId=${draft.id}`);
+                              } else {
+                                (router as any).push(`/book/${draft.id}/read`);
+                              }
+                            }}
                             activeOpacity={0.85}
                           >
-                            <Text style={{ color: '#18191c', fontWeight: 'bold', fontSize: 15 }}>Aperçu</Text>
+                            <Text style={{ color: '#18191c', fontWeight: 'bold', fontSize: 15 }}>
+                              {draft.type === 'manga' ? 'Éditer' : 'Aperçu'}
+                            </Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -1884,6 +1906,21 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#181818',
     borderRadius: 2,
+  },
+  // Styles pour badge manga
+  mangaBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#FF6B6B',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  mangaBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });
 
