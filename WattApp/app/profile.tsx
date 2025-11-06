@@ -6,7 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { getAuth, updateProfile } from 'firebase/auth';
-import app, { db, storage } from '../constants/firebaseConfig';
+import app, { db } from '../constants/firebaseConfig';
 import { collection, query, where, getDocs, getCountFromServer, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, uploadString, getDownloadURL } from 'firebase/storage';
 import { useRouter } from 'expo-router';
@@ -562,7 +562,7 @@ const Profile: React.FC = () => {
           try {
             const auth = getAuth(app);
             await auth.signOut();
-            router.replace('/register');
+            router.replace('../index');
           } catch (e) {
             Alert.alert('Erreur', 'Impossible de se déconnecter.');
           }
