@@ -8,6 +8,17 @@ import { doc, getDoc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/fi
 import { StripeProvider, usePaymentSheet } from '@stripe/stripe-react-native';
 import { STRIPE_CONFIG } from '../../constants/stripeConfig';
 import PaymentService from '../../services/PaymentService';
+// Fonction utilitaire pour appeler l'API backend (à adapter selon votre déploiement)
+async function createStripePaymentIntent(bookId, amount) {
+  // Remplacez l'URL par celle de votre backend (Firebase Function, Node, etc.)
+  const response = await fetch('https://your-backend-url.com/create-payment-intent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bookId, amount })
+  });
+  if (!response.ok) throw new Error('Erreur lors de la création du paiement Stripe');
+  return await response.json(); // { clientSecret, paymentIntentId }
+}
 
 const PaymentScreen: React.FC = () => {
   const { bookId } = useLocalSearchParams();
@@ -122,25 +133,18 @@ const PaymentScreen: React.FC = () => {
 
   const initializePaymentSheet = async () => {
     if (!book) return;
-
     const auth = getAuth(app);
     const user = auth.currentUser;
-    
     if (!user) {
       Alert.alert('Connexion requise', 'Vous devez être connecté pour effectuer un achat');
       return;
     }
-
     try {
-      // Version de production avec Firebase Functions
-      // const { clientSecret } = await StripeService.createPaymentIntent(book.id, book.price);
-      
-      // Version de démonstration (à remplacer)
-      const demoClientSecret = `pi_demo_${book.id}_${Date.now()}_secret_demo`;
-
+      // Appel réel à l'API backend pour créer un PaymentIntent Stripe
+      const { clientSecret } = await createStripePaymentIntent(book.id, book.price);
       const { error } = await initPaymentSheet({
         merchantDisplayName: STRIPE_CONFIG.MERCHANT_DISPLAY_NAME,
-        paymentIntentClientSecret: demoClientSecret,
+        paymentIntentClientSecret: clientSecret,
         defaultBillingDetails: {
           name: user.displayName || user.email || 'Utilisateur',
           email: user.email || undefined,
@@ -149,7 +153,6 @@ const PaymentScreen: React.FC = () => {
         allowsDelayedPaymentMethods: false,
         returnURL: 'wattapp://payment-return',
       });
-
       if (error) {
         console.error('Erreur d\'initialisation Stripe:', error);
         Alert.alert('Erreur', 'Impossible d\'initialiser le système de paiement');
@@ -165,42 +168,39 @@ const PaymentScreen: React.FC = () => {
       Alert.alert('Méthode de paiement', 'Veuillez sélectionner une méthode de paiement');
       return;
     }
-
     if (!book) {
       Alert.alert('Erreur', 'Informations du livre non disponibles');
       return;
     }
-
     const auth = getAuth(app);
     const user = auth.currentUser;
-    
     if (!user) {
       Alert.alert('Connexion requise', 'Vous devez être connecté pour effectuer un achat');
       return;
     }
-
     setProcessing(true);
-
     try {
-      // Version simplifiée pour la démo (sans Payment Sheet)
-      const result = await PaymentService.processPayment(book.id, book.price);
-
-      if (result.success) {
-        Alert.alert(
-          'Achat réussi ! 🎉',
-          `Vous avez acheté "${book.title}" avec succès. Le livre est maintenant disponible dans votre bibliothèque.`,
-          [
-            {
-              text: 'Voir le livre',
-              onPress: () => router.push(`/book/${bookId}`)
-            }
-          ]
-        );
-      } else {
-        throw new Error(result.message);
+      // Initialiser la PaymentSheet Stripe réelle
+      await initializePaymentSheet();
+      const { error } = await presentPaymentSheet();
+      if (error) {
+        Alert.alert('Erreur de paiement', error.message || 'Le paiement a échoué.');
+        setProcessing(false);
+        return;
       }
-
-    } catch (error: any) {
+      // Succès Stripe : marquer le livre comme acheté
+      await PaymentService.handlePaymentSuccess(book.id, 'stripe', book.price);
+      Alert.alert(
+        'Achat réussi ! 🎉',
+        `Vous avez acheté "${book.title}" avec succès. Le livre est maintenant disponible dans votre bibliothèque.`,
+        [
+          {
+            text: 'Voir le livre',
+            onPress: () => router.push(`/book/${bookId}`)
+          }
+        ]
+      );
+    } catch (error) {
       console.error('Erreur lors du paiement:', error);
       Alert.alert('Erreur de paiement', error.message || 'Une erreur est survenue lors du traitement de votre paiement. Veuillez réessayer.');
     } finally {
