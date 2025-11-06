@@ -11,7 +11,8 @@ import PaymentService from '../../services/PaymentService';
 // Fonction utilitaire pour appeler l'API backend (à adapter selon votre déploiement)
 async function createStripePaymentIntent(bookId, amount) {
   // Remplacez l'URL par celle de votre backend (Firebase Function, Node, etc.)
-  const response = await fetch('https://your-backend-url.com/create-payment-intent', {
+  // Remplacez l'URL par celle de votre backend Vercel
+  const response = await fetch('https://watt-app.vercel.app/api/create-payment-intent', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ bookId, amount })
