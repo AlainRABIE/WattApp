@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, StatusBar, Image, Platform, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, StatusBar, Image, Platform, TextInput, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getAuth } from 'firebase/auth';
@@ -8,10 +8,8 @@ import { doc, getDoc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/fi
 import { StripeProvider, usePaymentSheet } from '@stripe/stripe-react-native';
 import { STRIPE_CONFIG } from '../../constants/stripeConfig';
 import PaymentService from '../../services/PaymentService';
-// Fonction utilitaire pour appeler l'API backend (à adapter selon votre déploiement)
+// Fonction utilitaire pour appeler l'API backend Stripe PaymentIntent
 async function createStripePaymentIntent(bookId, amount) {
-  // Remplacez l'URL par celle de votre backend (Firebase Function, Node, etc.)
-  // Remplacez l'URL par celle de votre backend Vercel
   const response = await fetch('https://watt-app.vercel.app/api/create-payment-intent', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -19,6 +17,24 @@ async function createStripePaymentIntent(bookId, amount) {
   });
   if (!response.ok) throw new Error('Erreur lors de la création du paiement Stripe');
   return await response.json(); // { clientSecret, paymentIntentId }
+}
+
+// Fonction utilitaire pour créer une session Stripe Checkout (PayPal)
+async function createStripeCheckoutSession(bookId, amount, bookTitle) {
+  const response = await fetch('https://watt-app.vercel.app/api/create-checkout-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      bookId,
+      amount,
+      bookTitle,
+      currency: 'eur',
+      successUrl: 'https://watt-app.vercel.app/payment-success',
+      cancelUrl: 'https://watt-app.vercel.app/payment-cancel',
+    })
+  });
+  if (!response.ok) throw new Error('Erreur lors de la création de la session PayPal');
+  return await response.json(); // { url }
 }
 
 const PaymentScreen: React.FC = () => {
@@ -151,16 +167,35 @@ const PaymentScreen: React.FC = () => {
           email: user.email || undefined,
         },
         appearance: STRIPE_CONFIG.APPEARANCE,
-        allowsDelayedPaymentMethods: false,
+        allowsDelayedPaymentMethods: true, // Active Apple Pay et autres wallets
         returnURL: 'wattapp://payment-return',
       });
       if (error) {
         console.error('Erreur d\'initialisation Stripe:', error);
+        console.log('Stripe initPaymentSheet error details:', JSON.stringify(error, null, 2));
         Alert.alert('Erreur', 'Impossible d\'initialiser le système de paiement');
       }
     } catch (error) {
       console.error('Erreur lors de l\'initialisation:', error);
       Alert.alert('Erreur', 'Impossible d\'initialiser le système de paiement');
+    }
+  };
+
+  // Handler pour le paiement PayPal (Stripe Checkout)
+  const handlePayPal = async () => {
+    if (!book) return;
+    setProcessing(true);
+    try {
+      const { url } = await createStripeCheckoutSession(book.id, book.price, book.title);
+      if (url) {
+        Linking.openURL(url);
+      } else {
+        Alert.alert('Erreur', 'Impossible de démarrer le paiement PayPal.');
+      }
+    } catch (e) {
+      Alert.alert('Erreur', 'Impossible de démarrer le paiement PayPal.');
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -321,7 +356,8 @@ const PaymentScreen: React.FC = () => {
           <View style={styles.paymentSection}>
             <Text style={styles.sectionTitle}>Méthode de paiement</Text>
             
-            {/* Carte bancaire */}
+
+            {/* Carte bancaire (Stripe PaymentSheet) */}
             <TouchableOpacity 
               style={[styles.paymentMethod, selectedPaymentMethod === 'card' && styles.selectedPaymentMethod]}
               onPress={() => setSelectedPaymentMethod('card')}
@@ -330,27 +366,27 @@ const PaymentScreen: React.FC = () => {
               <View style={styles.paymentMethodLeft}>
                 <Ionicons name="card" size={24} color="#FFA94D" />
                 <View style={styles.paymentMethodInfo}>
-                  <Text style={styles.paymentMethodTitle}>Carte bancaire</Text>
-                  <Text style={styles.paymentMethodDesc}>Visa, Mastercard, American Express</Text>
+                  <Text style={styles.paymentMethodTitle}>Carte bancaire / Apple Pay</Text>
+                  <Text style={styles.paymentMethodDesc}>Visa, Mastercard, American Express, Apple Pay</Text>
                 </View>
               </View>
               <View style={[styles.radio, selectedPaymentMethod === 'card' && styles.radioSelected]} />
             </TouchableOpacity>
 
-            {/* PayPal */}
+            {/* PayPal (Stripe Checkout) */}
             <TouchableOpacity 
-              style={[styles.paymentMethod, selectedPaymentMethod === 'paypal' && styles.selectedPaymentMethod]}
-              onPress={() => setSelectedPaymentMethod('paypal')}
+              style={[styles.paymentMethod, styles.selectedPaymentMethod]}
+              onPress={handlePayPal}
               activeOpacity={0.8}
             >
               <View style={styles.paymentMethodLeft}>
                 <Ionicons name="logo-paypal" size={24} color="#FFA94D" />
                 <View style={styles.paymentMethodInfo}>
                   <Text style={styles.paymentMethodTitle}>PayPal</Text>
-                  <Text style={styles.paymentMethodDesc}>Paiement sécurisé via PayPal</Text>
+                  <Text style={styles.paymentMethodDesc}>Paiement sécurisé via Stripe Checkout</Text>
                 </View>
               </View>
-              <View style={[styles.radio, selectedPaymentMethod === 'paypal' && styles.radioSelected]} />
+              {/* Pas de radio pour PayPal, c'est un bouton direct */}
             </TouchableOpacity>
 
             {/* Apple Pay (si iOS) */}
