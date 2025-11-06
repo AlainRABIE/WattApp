@@ -175,6 +175,8 @@ const BookEditor: React.FC = () => {
   const [synopsis, setSynopsis] = useState<string>('');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState<string>('');
+  const [isFree, setIsFree] = useState<boolean>(true);
+  const [price, setPrice] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
 
@@ -250,12 +252,14 @@ const BookEditor: React.FC = () => {
       // Vérifier si l'utilisateur actuel est l'auteur
       setIsAuthor(bookData.authorUid === user.uid);
 
-      setBook(bookData);
-  setTitle(bookData.title || '');
-  setBody(bookData.body || '');
-  setCoverImage(bookData.coverImage || null);
-  setSynopsis(bookData.synopsis || '');
-  setTags(Array.isArray(bookData.tags) ? bookData.tags : []);
+    setBook(bookData);
+    setTitle(bookData.title || '');
+    setBody(bookData.body || '');
+    setCoverImage(bookData.coverImage || null);
+    setSynopsis(bookData.synopsis || '');
+    setTags(Array.isArray(bookData.tags) ? bookData.tags : []);
+    setIsFree(typeof bookData.isFree === 'boolean' ? bookData.isFree : (bookData.price ? bookData.price === 0 : true));
+    setPrice(typeof bookData.price === 'number' ? bookData.price : 0);
 
       // Charger le template si disponible
       if (bookData.templateId) {
@@ -296,6 +300,8 @@ const BookEditor: React.FC = () => {
         body: body.trim(),
         coverImage: coverImage,
         tags: tags,
+        isFree: isFree,
+        price: isFree ? 0 : price,
         author: user?.displayName || user?.email || 'Auteur inconnu',
         updatedAt: serverTimestamp(),
       });
@@ -350,6 +356,8 @@ const BookEditor: React.FC = () => {
                 coverImage: coverImage,
                 synopsis: synopsis.trim(),
                 tags: tags,
+                isFree: isFree,
+                price: isFree ? 0 : price,
                 status: 'published',
                 publishedAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
@@ -772,6 +780,35 @@ const BookEditor: React.FC = () => {
           </View>
         </View>
         
+        {/* Section Prix */}
+        {isAuthor && book?.status !== 'published' && (
+          <View style={{ width: '92%', backgroundColor: '#23232a', borderRadius: 16, padding: 18, marginBottom: 18, alignSelf: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, elevation: 1 }}>
+            <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 16, marginBottom: 10 }}>Prix du livre</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <Text style={{ color: '#fff', fontSize: 15, marginRight: 12 }}>Gratuit</Text>
+              <TouchableOpacity onPress={() => setIsFree(true)} style={{ marginRight: 18 }}>
+                <Ionicons name={isFree ? 'radio-button-on' : 'radio-button-off'} size={22} color={isFree ? '#FFA94D' : '#888'} />
+              </TouchableOpacity>
+              <Text style={{ color: '#fff', fontSize: 15, marginRight: 12 }}>Payant</Text>
+              <TouchableOpacity onPress={() => setIsFree(false)}>
+                <Ionicons name={!isFree ? 'radio-button-on' : 'radio-button-off'} size={22} color={!isFree ? '#FFA94D' : '#888'} />
+              </TouchableOpacity>
+            </View>
+            {!isFree && (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ color: '#FFA94D', fontSize: 15, marginRight: 8 }}>Prix (€):</Text>
+                <TextInput
+                  style={{ backgroundColor: '#23232a', color: '#fff', borderRadius: 8, padding: 8, fontSize: 15, borderWidth: 1, borderColor: '#FFA94D', width: 90 }}
+                  value={price.toString()}
+                  onChangeText={v => setPrice(Number(v.replace(/[^\d.]/g, '')))}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                  placeholderTextColor="#888"
+                />
+              </View>
+            )}
+          </View>
+        )}
         {/* Section Synopsis et Tags séparée */}
         {(book?.synopsis || (book?.tags && Array.isArray(book.tags) && book.tags.length > 0)) && (
           <View style={{ width: '92%', backgroundColor: '#23232a', borderRadius: 16, padding: 18, marginBottom: 18, alignSelf: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, elevation: 1 }}>

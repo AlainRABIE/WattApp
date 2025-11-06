@@ -247,6 +247,33 @@ const Home: React.FC = () => {
 									<Text style={{ color: '#888', fontSize: 12, marginTop: 2 }} numberOfLines={1}>
 										par {livre.author || livre.auteur || 'Auteur inconnu'}
 									</Text>
+									{/* Tags */}
+									{livre.tags && Array.isArray(livre.tags) && livre.tags.length > 0 && (
+										<View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 }}>
+											{livre.tags.slice(0, 2).map((tag: string, tagIndex: number) => (
+												<View
+													key={tagIndex}
+													style={{
+														backgroundColor: '#FFA94D',
+														borderRadius: 8,
+														paddingHorizontal: 6,
+														paddingVertical: 2,
+														marginRight: 4,
+														marginBottom: 2,
+													}}
+												>
+													<Text style={{ color: '#181818', fontSize: 10, fontWeight: 'bold' }}>
+														{tag}
+													</Text>
+												</View>
+											))}
+											{livre.tags.length > 2 && (
+												<Text style={{ color: '#888', fontSize: 10, marginTop: 2 }}>
+													+{livre.tags.length - 2}
+												</Text>
+											)}
+										</View>
+									)}
 									{/* Prix */}
 									<View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
 										<Text style={{ color: '#FFA94D', fontSize: 14, fontWeight: 'bold' }}>
@@ -288,6 +315,29 @@ const Home: React.FC = () => {
 									<Text style={{ color: '#888', fontSize: 11, marginTop: 2 }} numberOfLines={1}>
 										par {livre.author || livre.auteur || 'Auteur inconnu'}
 									</Text>
+									{/* Tags */}
+									{livre.tags && Array.isArray(livre.tags) && livre.tags.length > 0 && (
+										<View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 3 }}>
+											<View
+												style={{
+													backgroundColor: '#FFA94D',
+													borderRadius: 6,
+													paddingHorizontal: 4,
+													paddingVertical: 1,
+													marginRight: 3,
+												}}
+											>
+												<Text style={{ color: '#181818', fontSize: 9, fontWeight: 'bold' }}>
+													{livre.tags[0]}
+												</Text>
+											</View>
+											{livre.tags.length > 1 && (
+												<Text style={{ color: '#888', fontSize: 9, marginTop: 1 }}>
+													+{livre.tags.length - 1}
+												</Text>
+											)}
+										</View>
+									)}
 									<Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>
 										{livre.price && livre.price > 0 ? `${String(livre.price.toFixed(2))}€` : 'Gratuit'}
 									</Text>
@@ -325,6 +375,29 @@ const Home: React.FC = () => {
 									<Text style={{ color: '#888', fontSize: 11, marginTop: 2 }} numberOfLines={1}>
 										par {livre.author || livre.auteur || 'Auteur inconnu'}
 									</Text>
+									{/* Tags */}
+									{livre.tags && Array.isArray(livre.tags) && livre.tags.length > 0 && (
+										<View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 3 }}>
+											<View
+												style={{
+													backgroundColor: '#FFA94D',
+													borderRadius: 6,
+													paddingHorizontal: 4,
+													paddingVertical: 1,
+													marginRight: 3,
+												}}
+											>
+												<Text style={{ color: '#181818', fontSize: 9, fontWeight: 'bold' }}>
+													{livre.tags[0]}
+												</Text>
+											</View>
+											{livre.tags.length > 1 && (
+												<Text style={{ color: '#888', fontSize: 9, marginTop: 1 }}>
+													+{livre.tags.length - 1}
+												</Text>
+											)}
+										</View>
+									)}
 									<Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>
 										{livre.price && livre.price > 0 ? `${String(livre.price.toFixed(2))}€` : 'Gratuit'}
 									</Text>

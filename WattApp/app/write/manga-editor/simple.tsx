@@ -495,6 +495,19 @@ const MangaEditorSimple: React.FC = () => {
           >
             <Ionicons name={isSaving ? "sync" : "save"} size={20} color="#4CAF50" />
           </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.headerButton, styles.publishButton]}
+            onPress={() => {
+              if (project?.id && project.id !== 'new') {
+                router.push(`/write/publish-manga?projectId=${project.id}`);
+              } else {
+                Alert.alert('Sauvegarde nécessaire', 'Veuillez d\'abord sauvegarder votre manga avant de le publier.');
+              }
+            }}
+          >
+            <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -659,6 +672,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  publishButton: {
+    backgroundColor: '#FFA94D',
   },
 
   // Canvas

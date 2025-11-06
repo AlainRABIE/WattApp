@@ -17,6 +17,10 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
+import { mangaProjectService } from '../services/MangaProjectService';
+import { getAuth } from 'firebase/auth';
+import app, { db } from '../../constants/firebaseConfig';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
 interface MangaPublication {
   id: string;
@@ -81,6 +85,40 @@ const MangaPublisher: React.FC = () => {
   const [showPricing, setShowPricing] = useState(false);
   const [newTag, setNewTag] = useState('');
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Charger les données du projet de manga si projectId est fourni
+  useEffect(() => {
+    const loadProjectData = async () => {
+      if (projectId) {
+        try {
+          const project = await mangaProjectService.getProject(projectId as string);
+          if (project) {
+            const auth = getAuth(app);
+            const user = auth.currentUser;
+            
+            setPublication(prev => ({
+              ...prev,
+              id: project.id,
+              title: project.title || '',
+              description: project.description || '',
+              author: project.author || user?.displayName || user?.email || '',
+              coverImage: project.coverImage || '',
+              totalPages: project.totalPages || project.pages?.length || 0,
+              tags: project.tags || [],
+              genre: project.genre ? [project.genre] : [],
+            }));
+          }
+        } catch (error) {
+          console.error('Erreur chargement projet:', error);
+          Alert.alert('Erreur', 'Impossible de charger les données du projet');
+        }
+      }
+      setLoading(false);
+    };
+
+    loadProjectData();
+  }, [projectId]);
 
   const categories = [
     'Shonen', 'Shojo', 'Seinen', 'Josei', 'Kodomomuke',
@@ -148,12 +186,47 @@ const MangaPublisher: React.FC = () => {
     }
   };
 
-  const saveDraft = () => {
-    // Sauvegarder en tant que brouillon
-    const draftData = { ...publication, isDraft: true, isPublished: false };
-    
-    // Ici, on sauvegarderait dans Firebase
-    Alert.alert('Brouillon sauvegardé', 'Votre manga a été sauvegardé en tant que brouillon');
+  const saveDraft = async () => {
+    try {
+      setLoading(true);
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+      
+      if (!user) {
+        Alert.alert('Erreur', 'Vous devez être connecté pour sauvegarder');
+        return;
+      }
+
+      if (projectId) {
+        const docRef = doc(db, 'books', projectId as string);
+        await updateDoc(docRef, {
+          title: publication.title.trim() || 'Manga sans titre',
+          synopsis: publication.synopsis.trim(),
+          description: publication.description.trim(),
+          tags: publication.tags,
+          status: 'draft',
+          isPublished: false,
+          updatedAt: serverTimestamp(),
+          category: publication.category,
+          genre: publication.genre,
+          isFree: publication.isFree,
+          price: publication.isFree ? 0 : publication.price,
+          rating: publication.rating,
+          targetAudience: publication.targetAudience,
+          language: publication.language,
+          copyrightInfo: publication.copyrightInfo,
+          author: publication.author || user.displayName || user.email || 'Auteur',
+          authorUid: user.uid,
+        });
+
+        Alert.alert('Brouillon sauvegardé', 'Votre manga a été sauvegardé en tant que brouillon');
+      }
+    } catch (error) {
+      console.error('Erreur sauvegarde:', error);
+      Alert.alert('Erreur', 'Impossible de sauvegarder le brouillon');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const validatePublication = (): string[] => {
@@ -171,7 +244,7 @@ const MangaPublisher: React.FC = () => {
     return errors;
   };
 
-  const publishManga = () => {
+  const publishManga = async () => {
     const errors = validatePublication();
     
     if (errors.length > 0) {
@@ -190,17 +263,64 @@ const MangaPublisher: React.FC = () => {
         { text: 'Annuler', style: 'cancel' },
         {
           text: 'Publier',
-          onPress: () => {
-            const publishedData = {
-              ...publication,
-              isDraft: false,
-              isPublished: true,
-              publishDate: new Date(),
-            };
-            
-            // Ici, on publierait dans Firebase
-            Alert.alert('Manga publié !', 'Votre manga est maintenant disponible dans la marketplace');
-            router.push('/(tabs)/marketplace' as any);
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const auth = getAuth(app);
+              const user = auth.currentUser;
+              
+              if (!user) {
+                Alert.alert('Erreur', 'Vous devez être connecté pour publier');
+                return;
+              }
+
+              if (projectId) {
+                // Mettre à jour le projet de manga existant
+                const docRef = doc(db, 'books', projectId as string);
+                await updateDoc(docRef, {
+                  title: publication.title.trim(),
+                  synopsis: publication.synopsis.trim(),
+                  description: publication.description.trim(),
+                  tags: publication.tags,
+                  status: 'published',
+                  isPublished: true,
+                  publishedAt: serverTimestamp(),
+                  updatedAt: serverTimestamp(),
+                  category: publication.category,
+                  genre: publication.genre,
+                  isFree: publication.isFree,
+                  price: publication.isFree ? 0 : publication.price,
+                  rating: publication.rating,
+                  targetAudience: publication.targetAudience,
+                  language: publication.language,
+                  copyrightInfo: publication.copyrightInfo,
+                  author: publication.author || user.displayName || user.email || 'Auteur',
+                  authorUid: user.uid,
+                });
+
+                Alert.alert(
+                  'Manga publié !', 
+                  'Votre manga est maintenant disponible dans la marketplace',
+                  [
+                    {
+                      text: 'Voir dans marketplace',
+                      onPress: () => router.push('/(tabs)/marketplace' as any)
+                    },
+                    {
+                      text: 'Retourner aux projets',
+                      onPress: () => router.push('/write/index' as any)
+                    }
+                  ]
+                );
+              } else {
+                Alert.alert('Erreur', 'Aucun projet sélectionné');
+              }
+            } catch (error) {
+              console.error('Erreur publication:', error);
+              Alert.alert('Erreur', 'Impossible de publier le manga');
+            } finally {
+              setLoading(false);
+            }
           }
         }
       ]
@@ -559,15 +679,21 @@ const MangaPublisher: React.FC = () => {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {renderBasicInfo()}
-        {renderCoverUpload()}
-        {renderCategoriesAndGenres()}
-        {renderTags()}
-        {renderPricingSection()}
-        {renderAdditionalInfo()}
-        {renderActions()}
-      </ScrollView>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Chargement des données du projet...</Text>
+        </View>
+      ) : (
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {renderBasicInfo()}
+          {renderCoverUpload()}
+          {renderCategoriesAndGenres()}
+          {renderTags()}
+          {renderPricingSection()}
+          {renderAdditionalInfo()}
+          {renderActions()}
+        </ScrollView>
+      )}
     </View>
   );
 };
@@ -576,6 +702,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#181818',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    color: '#fff',
+    fontSize: 16,
   },
   header: {
     flexDirection: 'row',
