@@ -1,16 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-  StatusBar,
-  Image,
-  Platform,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, StatusBar, Image, Platform, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getAuth } from 'firebase/auth';
@@ -26,12 +15,81 @@ const PaymentScreen: React.FC = () => {
   const [book, setBook] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [walletLoading, setWalletLoading] = useState(true);
+  const [walletToUse, setWalletToUse] = useState<string>('');
+  // Calcule le montant à utiliser depuis le portefeuille (max: solde ou prix du livre)
+  const walletAmount = Math.max(0, Math.min(parseFloat(walletToUse) || 0, walletBalance, book ? book.price : 0));
+  const resteAPayer = book ? Math.max(0, book.price - walletAmount) : 0;
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'card' | 'paypal' | 'apple' | null>(null);
   const { initPaymentSheet, presentPaymentSheet } = usePaymentSheet();
 
+
   useEffect(() => {
     loadBook();
+    loadWallet();
   }, [bookId]);
+
+  const loadWallet = async () => {
+    try {
+      setWalletLoading(true);
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+      if (!user) return;
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        setWalletBalance(data.walletBalance || 0);
+      } else {
+        setWalletBalance(0);
+      }
+    } catch (e) {
+      setWalletBalance(0);
+    } finally {
+      setWalletLoading(false);
+    }
+  };
+  const handleWalletPayment = async () => {
+    if (!book) return;
+    const auth = getAuth(app);
+    const user = auth.currentUser;
+    if (!user) {
+      Alert.alert('Connexion requise', 'Vous devez être connecté pour effectuer un achat');
+      return;
+    }
+    if (walletBalance < book.price) {
+      Alert.alert('Solde insuffisant', 'Votre solde de portefeuille est insuffisant pour cet achat.');
+      return;
+    }
+    setProcessing(true);
+    try {
+      // Débiter le portefeuille utilisateur
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        walletBalance: walletBalance - book.price,
+        updatedAt: serverTimestamp(),
+      });
+      // Marquer le livre comme acheté (simulate PaymentService)
+      await PaymentService.handlePaymentSuccess(book.id, `wallet_${Date.now()}`, book.price);
+      Alert.alert(
+        'Achat réussi avec portefeuille ! 🎉',
+        `Vous avez acheté "${book.title}" avec succès. Le livre est maintenant disponible dans votre bibliothèque.`,
+        [
+          {
+            text: 'Voir le livre',
+            onPress: () => router.push(`/book/${bookId}`)
+          }
+        ]
+      );
+      // Rafraîchir le solde
+      loadWallet();
+    } catch (e) {
+      Alert.alert('Erreur', 'Une erreur est survenue lors du paiement avec le portefeuille.');
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   const loadBook = async () => {
     if (!bookId || typeof bookId !== 'string') {
@@ -176,7 +234,6 @@ const PaymentScreen: React.FC = () => {
     <StripeProvider publishableKey={STRIPE_CONFIG.PUBLISHABLE_KEY}>
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
-        
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -186,7 +243,40 @@ const PaymentScreen: React.FC = () => {
           <View style={{ width: 24 }} />
         </View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+  <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Paiement partiel avec portefeuille */}
+          <View style={styles.paymentSection}>
+            <Text style={styles.sectionTitle}>Utiliser le portefeuille</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <Ionicons name="wallet-outline" size={28} color="#FFA94D" style={{ marginRight: 10 }} />
+              {walletLoading ? (
+                <ActivityIndicator size="small" color="#FFA94D" />
+              ) : (
+                <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 16 }}>
+                  Solde: {walletBalance.toFixed(2)}€
+                </Text>
+              )}
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <Text style={{ color: '#fff', marginRight: 8 }}>Montant à utiliser :</Text>
+              <View style={{ backgroundColor: '#232323', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, minWidth: 60 }}>
+                <TextInput
+                  style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 16, textAlign: 'right' }}
+                  placeholder="0.00"
+                  placeholderTextColor="#888"
+                  value={walletToUse}
+                  onChangeText={setWalletToUse}
+                  keyboardType="decimal-pad"
+                  editable={!processing && !walletLoading}
+                  maxLength={6}
+                />
+              </View>
+              <Text style={{ color: '#FFA94D', marginLeft: 4 }}>€</Text>
+            </View>
+            <Text style={{ color: '#aaa', marginBottom: 8 }}>
+              Reste à payer par carte/PayPal : <Text style={{ color: '#FFA94D', fontWeight: 'bold' }}>{resteAPayer.toFixed(2)}€</Text>
+            </Text>
+          </View>
           {/* Informations du livre */}
           <View style={styles.bookSection}>
             <Text style={styles.sectionTitle}>Récapitulatif de commande</Text>

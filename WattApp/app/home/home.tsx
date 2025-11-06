@@ -92,7 +92,9 @@ const Home: React.FC = () => {
 			try {
 				const booksSnap = await getDocs(collection(db, 'books'));
 				const booksList = booksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-				setBooks(booksList);
+				// Exclure les fichiers importés
+				const filteredBooks = booksList.filter((book: any) => book.status !== 'imported');
+				setBooks(filteredBooks);
 			} catch (err) {
 				console.warn('Erreur lors du chargement des livres', err);
 			} finally {
