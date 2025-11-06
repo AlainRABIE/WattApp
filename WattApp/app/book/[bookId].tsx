@@ -761,6 +761,39 @@ const BookEditor: React.FC = () => {
           </Text>
         </TouchableOpacity>
 
+        {/* Section Prix et distribution */}
+        <View style={{ width: '92%', backgroundColor: '#23232a', borderRadius: 18, padding: 20, marginBottom: 18, alignSelf: 'center', shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 6, elevation: 2 }}>
+          <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 18, marginBottom: 12 }}>Prix et distribution</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
+            <View style={{
+              backgroundColor: book?.isFree || !book?.price || book?.price === 0 ? '#4CAF50' : '#FFA94D',
+              borderRadius: 16,
+              paddingVertical: 10,
+              paddingHorizontal: 28,
+              marginRight: 18,
+              alignItems: 'center',
+              flexDirection: 'row',
+              shadowColor: '#000',
+              shadowOpacity: 0.10,
+              shadowRadius: 6,
+              elevation: 2,
+            }}>
+              <Ionicons name={book?.isFree || !book?.price || book?.price === 0 ? 'pricetag-outline' : 'card-outline'} size={20} color={book?.isFree || !book?.price || book?.price === 0 ? '#fff' : '#181818'} style={{ marginRight: 8 }} />
+              <Text style={{
+                color: book?.isFree || !book?.price || book?.price === 0 ? '#fff' : '#181818',
+                fontWeight: 'bold',
+                fontSize: 17,
+                letterSpacing: 0.2,
+                textTransform: 'uppercase',
+              }}>
+                {book?.isFree || !book?.price || book?.price === 0 ? 'GRATUIT' : `${Number(book.price).toFixed(2)} €`}
+              </Text>
+            </View>
+            <Text style={{ color: '#888', fontSize: 15, fontStyle: 'italic' }}>
+              {book?.isFree || !book?.price || book?.price === 0 ? 'Lecture libre pour tous' : 'Achat requis pour lecture complète'}
+            </Text>
+          </View>
+        </View>
         {/* Stats modernisées */}
         <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 24, gap: 18 }}>
           <View style={{ alignItems: 'center', flexDirection: 'row', backgroundColor: '#23232a', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 18, marginHorizontal: 4 }}>
@@ -812,20 +845,18 @@ const BookEditor: React.FC = () => {
         {/* Section Synopsis et Tags séparée */}
         {(book?.synopsis || (book?.tags && Array.isArray(book.tags) && book.tags.length > 0)) && (
           <View style={{ width: '92%', backgroundColor: '#23232a', borderRadius: 16, padding: 18, marginBottom: 18, alignSelf: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, elevation: 1 }}>
-            
             {/* Synopsis */}
             {book?.synopsis && (
-              <>
+              <View>
                 <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 18, marginBottom: 8 }}>Synopsis</Text>
                 <Text style={{ color: '#ccc', fontSize: 15, fontStyle: 'italic', lineHeight: 22, marginBottom: book?.tags && Array.isArray(book.tags) && book.tags.length > 0 ? 16 : 0 }}>
                   {book.synopsis}
                 </Text>
-              </>
+              </View>
             )}
-
             {/* Tags */}
             {book?.tags && Array.isArray(book.tags) && book.tags.length > 0 && (
-              <>
+              <View>
                 <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 18, marginBottom: 12 }}>Tags</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
                   {book.tags.map((tag: string, idx: number) => (
@@ -846,7 +877,7 @@ const BookEditor: React.FC = () => {
                     </View>
                   ))}
                 </View>
-              </>
+              </View>
             )}
           </View>
         )}
