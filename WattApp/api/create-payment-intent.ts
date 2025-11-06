@@ -17,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(400).json({ error: 'Amount is required' });
       return;
     }
-
+// Create a PaymentIntent with the specified amount, currency, and metadata
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency,
