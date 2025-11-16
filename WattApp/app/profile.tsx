@@ -200,9 +200,14 @@ const Profile: React.FC = () => {
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 48, paddingBottom: 12, backgroundColor: '#181818' }}>
         <View />
         <Text style={{ color: '#FFA94D', fontSize: 20, fontWeight: 'bold' }}>Mon profil</Text>
-        <TouchableOpacity onPress={() => router.push('/settings')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="settings" size={28} color="#FFA94D" />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity onPress={() => router.push('/dashboard')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ marginRight: 8 }}>
+            <Ionicons name="stats-chart-outline" size={28} color="#4FC3F7" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/settings')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="settings" size={28} color="#FFA94D" />
+          </TouchableOpacity>
+        </View>
       </View>
       <ScrollView contentContainerStyle={styles.container}>
         {/* Banner avec bouton de modification */}
