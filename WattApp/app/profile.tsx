@@ -2,13 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-// use legacy API for readAsStringAsync fallback (avoids the runtime deprecation error on SDK54)
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { getAuth, updateProfile } from 'firebase/auth';
 import app, { db } from '../constants/firebaseConfig';
-import { collection, query, where, getDocs, getCountFromServer, doc, updateDoc, addDoc } from 'firebase/firestore';
-import { ref, uploadBytes, uploadString, getDownloadURL } from 'firebase/storage';
+import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { ThemeSelector } from './components/ThemeSelector';
@@ -23,6 +21,7 @@ const Profile: React.FC = () => {
   const [followersCount, setFollowersCount] = useState<number | null>(null);
   const [friendsCount, setFriendsCount] = useState<number | null>(null);
   const [bio, setBio] = useState<string | null>(null);
+  const [isPrivate, setIsPrivate] = useState<boolean>(false);
   const [bannerURL, setBannerURL] = useState<string | null>(null);
   const [works, setWorks] = useState<any[]>([]);
   const [recentReads, setRecentReads] = useState<any[]>([]);
@@ -30,10 +29,8 @@ const Profile: React.FC = () => {
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [showThemeSelector, setShowThemeSelector] = useState(false);
   const { theme } = useTheme();
-  // Exemples en dur pour preview
 
   useEffect(() => {
-    // refactored: loadProfile called on mount and on focus
     const load = async () => await loadProfile();
     load();
   }, []);
@@ -54,16 +51,15 @@ const Profile: React.FC = () => {
       setEmail(user.email || '');
       setPhotoURL(user.photoURL || null);
 
-      // Compter les oeuvres (ex: collection 'books' with field authorUid)
-    const qWorks = query(collection(db, 'books'), where('authorUid', '==', user.uid));
-    const snapWorks = await getDocs(qWorks);
-    // Récupère toutes les œuvres et filtre les doublons par id
-    const worksArr = snapWorks.docs.map(d => ({ id: d.id, ...d.data() }));
-    const uniqueWorks = worksArr.filter((w, idx, arr) => arr.findIndex(x => x.id === w.id) === idx);
-    setWorks(uniqueWorks);
-    setWorksCount(uniqueWorks.length);
+      // Compter les oeuvres
+      const qWorks = query(collection(db, 'books'), where('authorUid', '==', user.uid));
+      const snapWorks = await getDocs(qWorks);
+      const worksArr = snapWorks.docs.map(d => ({ id: d.id, ...d.data() }));
+      const uniqueWorks = worksArr.filter((w, idx, arr) => arr.findIndex(x => x.id === w.id) === idx);
+      setWorks(uniqueWorks);
+      setWorksCount(uniqueWorks.length);
 
-      // Compter les followers/friends
+      // Followers/friends
       const qFollowers = query(collection(db, 'followers'), where('toUid', '==', user.uid));
       const snapFollowers = await getDocs(qFollowers);
       setFollowersCount(snapFollowers.size);
@@ -72,7 +68,7 @@ const Profile: React.FC = () => {
       const snapFriends = await getDocs(qFriends);
       setFriendsCount(snapFriends.size);
 
-      // Lecture du doc user pour bio (si présent)
+      // User doc pour bio, photo, bannière, privé
       const qUser = query(collection(db, 'users'), where('uid', '==', user.uid));
       const snapUser = await getDocs(qUser);
       if (!snapUser.empty) {
@@ -80,25 +76,22 @@ const Profile: React.FC = () => {
         if (d.bio) setBio(d.bio);
         if (d.photoURL) setPhotoURL(d.photoURL);
         if (d.bannerURL) setBannerURL(d.bannerURL);
+        if (typeof d.isPrivate !== 'undefined') setIsPrivate(!!d.isPrivate);
       }
 
-      // Récupère les lectures récentes (collection 'reads' attendu)
+      // Lectures récentes
       try {
         const qReads = query(collection(db, 'reads'), where('uid', '==', user.uid));
         const snapReads = await getDocs(qReads);
         setRecentReads(snapReads.docs.map(d => ({ id: d.id, ...d.data() })));
-      } catch (e) {
-        console.warn('No reads collection or failed to load reads', e);
-      }
+      } catch (e) {}
 
-      // Récupère les playlists de l'utilisateur
+      // Playlists
       try {
         const qPlaylists = query(collection(db, 'playlists'), where('uid', '==', user.uid));
         const snapPlaylists = await getDocs(qPlaylists);
         setPlaylists(snapPlaylists.docs.map(d => ({ id: d.id, ...d.data() })));
-      } catch (e) {
-        console.warn('No playlists collection or failed to load playlists', e);
-      }
+      } catch (e) {}
     } catch (err) {
       console.warn('Profile load error', err);
     }
@@ -109,105 +102,13 @@ const Profile: React.FC = () => {
       {item.coverImage ? (
         <Image source={{ uri: item.coverImage }} style={styles.workCover} />
       ) : (
-        <View style={[styles.workCover, { backgroundColor: '#222', justifyContent: 'center', alignItems: 'center' }]}> 
+        <View style={[styles.workCover, { backgroundColor: '#222', justifyContent: 'center', alignItems: 'center' }]}>
           <Text style={{ color: '#888', fontSize: 12 }}>Pas d'image</Text>
         </View>
       )}
       <Text style={styles.workTitle} numberOfLines={2}>{item.title ? item.title : 'Sans titre'}</Text>
     </TouchableOpacity>
   );
-
-  const addPlaylist = () => {
-    Alert.alert(
-      'Ajouter une playlist',
-      'Choisissez le type de playlist à ajouter :',
-      [
-        { text: 'Spotify', onPress: () => addPlaylistByType('spotify') },
-        { text: 'Apple Music', onPress: () => addPlaylistByType('apple') },
-        { text: 'YouTube Music', onPress: () => addPlaylistByType('youtube') },
-        { text: 'Deezer', onPress: () => addPlaylistByType('deezer') },
-        { text: 'Annuler', style: 'cancel' }
-      ]
-    );
-  };
-
-  const addPlaylistByType = async (platform: string) => {
-    Alert.prompt(
-      `Ajouter une playlist ${platform.charAt(0).toUpperCase() + platform.slice(1)}`,
-      'Collez le lien de votre playlist :',
-      async (url) => {
-        if (!url || !url.trim()) return;
-        
-        try {
-          const auth = getAuth(app);
-          const user = auth.currentUser;
-          if (!user) return;
-
-          // Extraire le nom de la playlist depuis l'URL ou demander à l'utilisateur
-          const playlistName = await new Promise<string>((resolve) => {
-            Alert.prompt(
-              'Nom de la playlist',
-              'Donnez un nom à votre playlist :',
-              (name) => resolve(name || `Ma playlist ${platform}`)
-            );
-          });
-
-          const newPlaylist = {
-            uid: user.uid,
-            name: playlistName,
-            platform,
-            url: url.trim(),
-            createdAt: new Date(),
-            icon: getPlaylistIcon(platform),
-            isPrivate: false // Par défaut public
-          };
-
-          await addDoc(collection(db, 'playlists'), newPlaylist);
-          
-          // Recharger les playlists
-          const qPlaylists = query(collection(db, 'playlists'), where('uid', '==', user.uid));
-          const snapPlaylists = await getDocs(qPlaylists);
-          setPlaylists(snapPlaylists.docs.map(d => ({ id: d.id, ...d.data() })));
-          
-          Alert.alert('Succès', 'Playlist ajoutée avec succès !');
-        } catch (error) {
-          console.error('Erreur lors de l\'ajout de la playlist:', error);
-          Alert.alert('Erreur', 'Impossible d\'ajouter la playlist.');
-        }
-      }
-    );
-  };
-
-  const getPlaylistIcon = (platform: string) => {
-    switch (platform) {
-      case 'spotify': return 'https://upload.wikimedia.org/wikipedia/commons/8/84/Spotify_icon.svg';
-      case 'apple': return 'https://upload.wikimedia.org/wikipedia/commons/5/5f/Apple_Music_icon.svg';
-      case 'youtube': return 'https://upload.wikimedia.org/wikipedia/commons/6/6a/Youtube_Music_icon.svg';
-      case 'deezer': return 'https://upload.wikimedia.org/wikipedia/commons/3/3d/Deezer_logo.svg';
-      default: return 'https://upload.wikimedia.org/wikipedia/commons/8/84/Spotify_icon.svg';
-    }
-  };
-
-  const renderPlatformIcon = (platform: string, iconName: string) => {
-    if (platform === 'apple' || platform === 'spotify' || platform === 'youtube' || platform === 'deezer') {
-      return (
-        <Image 
-          source={{ uri: iconName }} 
-          style={styles.playlistIconImage}
-          resizeMode="contain"
-        />
-      );
-    } else {
-      return (
-        <Ionicons 
-          name={iconName as any} 
-          size={32}
-          color="#FFA94D"
-          style={styles.playlistIconImage}
-        />
-      );
-    }
-  };
 
   const getPlatformColor = (platform: string) => {
     switch (platform) {
@@ -216,6 +117,27 @@ const Profile: React.FC = () => {
       case 'youtube': return '#FF0000';
       case 'deezer': return '#A238FF';
       default: return '#FFA94D';
+    }
+  };
+
+  const renderPlatformIcon = (platform: string, iconName: string) => {
+    if (platform === 'apple' || platform === 'spotify' || platform === 'youtube' || platform === 'deezer') {
+      return (
+        <Image
+          source={{ uri: iconName }}
+          style={styles.playlistIconImage}
+          resizeMode="contain"
+        />
+      );
+    } else {
+      return (
+        <Ionicons
+          name={iconName as any}
+          size={32}
+          color="#FFA94D"
+          style={styles.playlistIconImage}
+        />
+      );
     }
   };
 
@@ -238,8 +160,8 @@ const Profile: React.FC = () => {
       'Êtes-vous sûr de vouloir supprimer cette playlist ?',
       [
         { text: 'Annuler', style: 'cancel' },
-        { 
-          text: 'Supprimer', 
+        {
+          text: 'Supprimer',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -257,17 +179,14 @@ const Profile: React.FC = () => {
 
   const togglePlaylistVisibility = async (playlistId: string, currentPrivateState: boolean) => {
     try {
-      await updateDoc(doc(db, 'playlists', playlistId), { 
-        isPrivate: !currentPrivateState 
+      await updateDoc(doc(db, 'playlists', playlistId), {
+        isPrivate: !currentPrivateState
       });
-      
-      // Mettre à jour l'état local
-      setPlaylists(playlists.map(p => 
-        p.id === playlistId 
+      setPlaylists(playlists.map(p =>
+        p.id === playlistId
           ? { ...p, isPrivate: !currentPrivateState }
           : p
       ));
-      
       const statusText = !currentPrivateState ? 'privée' : 'publique';
       Alert.alert('Succès', `Playlist maintenant ${statusText} !`);
     } catch (error) {
@@ -276,309 +195,312 @@ const Profile: React.FC = () => {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {/* Banner avec bouton de modification */}
-      <View style={styles.bannerContainer}>
-        <Image source={{ uri: bannerURL || 'https://images.unsplash.com/photo-1503264116251-35a269479413?auto=format&fit=crop&w=1200&q=60' }} style={styles.banner} />
-        <TouchableOpacity style={styles.bannerEditBtn} onPress={async () => {
-          try {
-            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (!(permission.granted || permission.status === 'granted')) {
-              Alert.alert('Permission requise', 'Autorisez l\'accès à la galerie pour changer la bannière.');
-              return;
-            }
-            // Forcer un ratio paysage large pour la bannière (recadrage horizontal)
-            const res = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images,
-              quality: 0.9,
-              allowsEditing: true,
-              aspect: [16, 5], // ratio horizontal large
-            });
-            if (res.canceled) return;
-            const asset = res.assets && res.assets[0];
-            const uri = asset?.uri;
-            if (!uri) {
-              Alert.alert('Erreur', 'Impossible de récupérer l\'image.');
-              return;
-            }
-            setUploading(true);
-            // Resize & compress
-            const manipResult = await ImageManipulator.manipulateAsync(
-              uri,
-              [{ resize: { width: 1200 } }],
-              { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
-            );
-            const finalUri = manipResult.uri;
-            // Read as base64
-            const base64 = await FileSystem.readAsStringAsync(finalUri, { encoding: 'base64' });
-            const dataUrl = `data:image/jpeg;base64,${base64}`;
-            // Check size
-            const approxBytes = Math.floor((dataUrl.length - 22) * 3 / 4);
-            const MAX_BYTES = 1800000; // 1.8MB
-            if (approxBytes > MAX_BYTES) {
-              Alert.alert('Image trop lourde', 'Choisis une image plus petite ou réduis la qualité.');
-              setUploading(false);
-              return;
-            }
-            const auth = getAuth(app);
-            const user = auth.currentUser;
-            if (!user) throw new Error('Utilisateur non authentifié');
-            // Save in Firestore user doc
-            const qUser = query(collection(db, 'users'), where('uid', '==', user.uid));
-            const snapUser = await getDocs(qUser);
-            if (!snapUser.empty) {
-              const userDocRef = doc(db, 'users', snapUser.docs[0].id);
-              await updateDoc(userDocRef, { bannerURL: dataUrl });
-            }
-            setBannerURL(dataUrl);
-          } catch (e) {
-            Alert.alert('Erreur', 'Impossible de sélectionner la bannière.');
-          } finally {
-            setUploading(false);
-          }
-        }}>
-          <View style={styles.bannerEditIcon}>
-            <Image source={{ uri: 'https://img.icons8.com/ios-filled/50/FFA94D/camera.png' }} style={{ width: 22, height: 22, tintColor: '#FFA94D' }} />
-          </View>
+    <View style={{ flex: 1, backgroundColor: '#181818' }}>
+      {/* Header avec engrenage en haut à droite */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 48, paddingBottom: 12, backgroundColor: '#181818' }}>
+        <View />
+        <Text style={{ color: '#FFA94D', fontSize: 20, fontWeight: 'bold' }}>Mon profil</Text>
+        <TouchableOpacity onPress={() => router.push('/settings')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="settings" size={28} color="#FFA94D" />
         </TouchableOpacity>
       </View>
-
-
-      {/* Avatar overlapping banner */}
-      <View style={styles.metaRow}>
-        <TouchableOpacity onPress={async () => {
-          // Flow B: pick image, resize/compress, convert to base64 and store data URL in Firestore
-          try {
-            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (!(permission.granted || permission.status === 'granted')) {
-              Alert.alert('Permission requise', 'Autorisez l\'accès à la galerie pour changer la photo de profil.');
-              return;
-            }
-            const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.9, allowsEditing: true, aspect: [1, 1] });
-            if (res.canceled) return;
-            const asset = res.assets && res.assets[0];
-            const uri = asset?.uri;
-            if (!uri) {
-              Alert.alert('Erreur', 'Impossible de récupérer l\'image.');
-              return;
-            }
-            setUploading(true);
-
-            // Resize & compress the image to reduce size
-            const manipResult = await ImageManipulator.manipulateAsync(
-              uri,
-              [{ resize: { width: 800 } }],
-              { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
-            );
-            const finalUri = manipResult.uri;
-
-            // Read final file as base64
-            const base64 = await FileSystem.readAsStringAsync(finalUri, { encoding: 'base64' });
-            const dataUrl = `data:image/jpeg;base64,${base64}`;
-
-            // Check approximate size (base64 length -> bytes = length * 3/4)
-            const approxBytes = Math.floor((dataUrl.length - 22) * 3 / 4); // remove data:... prefix roughly
-            const MAX_BYTES = 900000; // ~900 KB
-            if (approxBytes > MAX_BYTES) {
-              Alert.alert('Image trop lourde', 'Choisis une image plus petite ou réduis la qualité.');
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* Banner avec bouton de modification */}
+        <View style={styles.bannerContainer}>
+          <Image source={{ uri: bannerURL || 'https://images.unsplash.com/photo-1503264116251-35a269479413?auto=format&fit=crop&w=1200&q=60' }} style={styles.banner} />
+          <TouchableOpacity style={styles.bannerEditBtn} onPress={async () => {
+            try {
+              const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (!(permission.granted || permission.status === 'granted')) {
+                Alert.alert('Permission requise', 'Autorisez l\'accès à la galerie pour changer la bannière.');
+                return;
+              }
+              const res = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                quality: 0.9,
+                allowsEditing: true,
+                aspect: [16, 5],
+              });
+              if (res.canceled) return;
+              const asset = res.assets && res.assets[0];
+              const uri = asset?.uri;
+              if (!uri) {
+                Alert.alert('Erreur', 'Impossible de récupérer l\'image.');
+                return;
+              }
+              setUploading(true);
+              const manipResult = await ImageManipulator.manipulateAsync(
+                uri,
+                [{ resize: { width: 1200 } }],
+                { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+              );
+              const finalUri = manipResult.uri;
+              const base64 = await FileSystem.readAsStringAsync(finalUri, { encoding: 'base64' });
+              const dataUrl = `data:image/jpeg;base64,${base64}`;
+              const approxBytes = Math.floor((dataUrl.length - 22) * 3 / 4);
+              const MAX_BYTES = 1800000;
+              if (approxBytes > MAX_BYTES) {
+                Alert.alert('Image trop lourde', 'Choisis une image plus petite ou réduis la qualité.');
+                setUploading(false);
+                return;
+              }
+              const auth = getAuth(app);
+              const user = auth.currentUser;
+              if (!user) throw new Error('Utilisateur non authentifié');
+              const qUser = query(collection(db, 'users'), where('uid', '==', user.uid));
+              const snapUser = await getDocs(qUser);
+              if (!snapUser.empty) {
+                const userDocRef = doc(db, 'users', snapUser.docs[0].id);
+                await updateDoc(userDocRef, { bannerURL: dataUrl });
+              }
+              setBannerURL(dataUrl);
+            } catch (e) {
+              Alert.alert('Erreur', 'Impossible de sélectionner la bannière.');
+            } finally {
               setUploading(false);
-              return;
             }
+          }}>
+            <View style={styles.bannerEditIcon}>
+              <Image source={{ uri: 'https://img.icons8.com/ios-filled/50/FFA94D/camera.png' }} style={{ width: 22, height: 22, tintColor: '#FFA94D' }} />
+            </View>
+          </TouchableOpacity>
+        </View>
 
-            const auth = getAuth(app);
-            const user = auth.currentUser;
-            if (!user) throw new Error('Utilisateur non authentifié');
-
-            // Save data URL in Firestore user doc
-            const qUser = query(collection(db, 'users'), where('uid', '==', user.uid));
-            const snapUser = await getDocs(qUser);
-            if (!snapUser.empty) {
-              const userDocRef = doc(db, 'users', snapUser.docs[0].id);
-              await updateDoc(userDocRef, { photoURL: dataUrl });
-            } else {
-              console.warn('No user doc to update, photoURL stored only locally');
+        {/* Avatar overlapping banner */}
+        <View style={styles.metaRow}>
+          <TouchableOpacity onPress={async () => {
+            try {
+              const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (!(permission.granted || permission.status === 'granted')) {
+                Alert.alert('Permission requise', 'Autorisez l\'accès à la galerie pour changer la photo de profil.');
+                return;
+              }
+              const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.9, allowsEditing: true, aspect: [1, 1] });
+              if (res.canceled) return;
+              const asset = res.assets && res.assets[0];
+              const uri = asset?.uri;
+              if (!uri) {
+                Alert.alert('Erreur', 'Impossible de récupérer l\'image.');
+                return;
+              }
+              setUploading(true);
+              const manipResult = await ImageManipulator.manipulateAsync(
+                uri,
+                [{ resize: { width: 800 } }],
+                { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
+              );
+              const finalUri = manipResult.uri;
+              const base64 = await FileSystem.readAsStringAsync(finalUri, { encoding: 'base64' });
+              const dataUrl = `data:image/jpeg;base64,${base64}`;
+              const approxBytes = Math.floor((dataUrl.length - 22) * 3 / 4);
+              const MAX_BYTES = 900000;
+              if (approxBytes > MAX_BYTES) {
+                Alert.alert('Image trop lourde', 'Choisis une image plus petite ou réduis la qualité.');
+                setUploading(false);
+                return;
+              }
+              const auth = getAuth(app);
+              const user = auth.currentUser;
+              if (!user) throw new Error('Utilisateur non authentifié');
+              const qUser = query(collection(db, 'users'), where('uid', '==', user.uid));
+              const snapUser = await getDocs(qUser);
+              if (!snapUser.empty) {
+                const userDocRef = doc(db, 'users', snapUser.docs[0].id);
+                await updateDoc(userDocRef, { photoURL: dataUrl });
+              }
+              setPhotoURL(dataUrl);
+              Alert.alert('Succès', 'Photo convertie et enregistrée (base64) dans votre profil.');
+            } catch (e: any) {
+              Alert.alert('Erreur', `Impossible de sauvegarder la photo: ${e?.message ?? String(e)}`);
+            } finally {
+              setUploading(false);
             }
-
-            // Update local state to display
-            setPhotoURL(dataUrl);
-            Alert.alert('Succès', 'Photo convertie et enregistrée (base64) dans votre profil.');
-          } catch (e: any) {
-            console.warn('Save avatar dataURL failed', e);
-            Alert.alert('Erreur', `Impossible de sauvegarder la photo: ${e?.message ?? String(e)}`);
-          } finally {
-            setUploading(false);
-          }
-        }}>
-          {(() => {
-            const name = (displayName || email || 'User') as string;
-            const len = name.trim().includes(' ') ? 2 : 1;
-            return (
-              <Image source={{ uri: photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&length=${String(len)}&background=FFA94D&color=181818&size=128` }} style={styles.avatarLarge} />
-            );
-          })()}
-        </TouchableOpacity>
-        {uploading ? <ActivityIndicator style={{ marginLeft: 12 }} color="#FFA94D" /> : null}
-        <View style={styles.metaText}>
-          <Text style={styles.nameLarge}>{displayName || 'Utilisateur'}</Text>
-          <Text style={styles.email}>{email}</Text>
-          {/* debug info removed for production */}
-        </View>
-      </View>
-
-      {/* bio */}
-      {bio ? (
-        <View style={styles.bioBubble}>
-          <Text style={styles.bioBubbleText}>{bio}</Text>
-        </View>
-      ) : null}
-
-      {/* Stats + actions */}
-      <View style={styles.rowBetween}>
-        <View style={styles.statsRowSmall}>
-          <View style={styles.statBoxSmall}>
-            <Text style={styles.statNumber}>{String(worksCount ?? '-')}</Text>
-            <Text style={styles.statLabel}>Œuvres</Text>
-          </View>
-          <View style={styles.statBoxSmall}>
-            <Text style={styles.statNumber}>{String(followersCount ?? '-')}</Text>
-            <Text style={styles.statLabel}>Abonnés</Text>
-          </View>
-          <View style={styles.statBoxSmall}>
-            <Text style={styles.statNumber}>{String(friendsCount ?? '-')}</Text>
-            <Text style={styles.statLabel}>Amis</Text>
-          </View>
-        </View>
-
-        <View style={styles.actionColumnSingle}>
-          <TouchableOpacity style={styles.primaryButtonSingle} onPress={() => router.push('/EditProfile')}>
-            <Text style={styles.primaryText}>Éditer le profil</Text>
+          }}>
+            {(() => {
+              const name = (displayName || email || 'User') as string;
+              const len = name.trim().includes(' ') ? 2 : 1;
+              return (
+                <Image source={{ uri: photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&length=${String(len)}&background=FFA94D&color=181818&size=128` }} style={styles.avatarLarge} />
+              );
+            })()}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryButtonSmall} onPress={() => router.push('/write')}>
-            <Text style={styles.secondaryText}>Commencer à écrire</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.themeButtonSmall} onPress={() => setShowThemeSelector(true)}>
-            <Ionicons name="color-palette" size={16} color="#FFA94D" style={{ marginRight: 8 }} />
-            <Text style={styles.themeButtonText}>Thèmes</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Œuvres */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Mes œuvres</Text>
-        {(works && works.length) === 0 ? (
-          <Text style={styles.placeholder}>Tu n'as pas encore d'œuvres publiées.</Text>
-        ) : (
-          <FlatList
-            horizontal
-            data={works}
-            keyExtractor={(i) => String(i.id)}
-            renderItem={renderWork}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingVertical: 8 }}
-          />
-        )}
-      </View>
-
-      {/* Continuez à lire */}
-      <View style={[styles.section, { marginTop: 10 }]}>
-        <Text style={styles.sectionTitle}>Continuez à lire</Text>
-        {(recentReads && recentReads.length) === 0 ? (
-          <Text style={styles.placeholder}>Aucune lecture récente.</Text>
-        ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {recentReads.map(r => (
-              <View key={String(r.id)} style={styles.workCard}>
-                <Image source={{ uri: r.couverture || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80' }} style={styles.workCover} />
-                <Text style={styles.workTitle} numberOfLines={2}>{r.titre || 'Titre'}</Text>
+          {uploading ? <ActivityIndicator style={{ marginLeft: 12 }} color="#FFA94D" /> : null}
+          <View style={styles.metaText}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.nameLarge}>{displayName || 'Utilisateur'}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
+                {isPrivate ? (
+                  <>
+                    <Ionicons name="lock-closed" size={16} color="#FFA94D" style={{ marginRight: 4 }} />
+                    <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 12 }}>Compte privé</Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="earth" size={16} color="#4FC3F7" style={{ marginRight: 4 }} />
+                    <Text style={{ color: '#4FC3F7', fontWeight: 'bold', fontSize: 12 }}>Compte public</Text>
+                  </>
+                )}
               </View>
-            ))}
-          </ScrollView>
-        )}
-      </View>
-
-      {/* Section Playlists */}
-      <View style={[styles.section, { marginTop: 15 }]}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Mes playlists</Text>
-          <TouchableOpacity style={styles.addPlaylistBtn} onPress={addPlaylist}>
-            <Text style={styles.addPlaylistText}>+ Ajouter</Text>
-          </TouchableOpacity>
-        </View>
-        
-        {playlists.length === 0 ? (
-          <View style={styles.emptyPlaylistContainer}>
-            <Text style={styles.placeholder}>Aucune playlist ajoutée.</Text>
-            <Text style={styles.placeholderSubtext}>
-              Ajoutez vos playlists Spotify, Apple Music, YouTube Music ou Deezer pour les écouter pendant la lecture.
-            </Text>
+            </View>
+            <Text style={styles.email}>{email}</Text>
           </View>
-        ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.playlistsContainer}>
-            {playlists.map((playlist) => (
-              <View key={playlist.id} style={styles.playlistCard}>
-                <TouchableOpacity 
-                  style={styles.playlistMain}
-                  onPress={() => openPlaylist(playlist)}
-                  onLongPress={() => deletePlaylist(playlist.id)}
-                >
-                  <View style={styles.playlistHeader}>
-                    <TouchableOpacity
-                      style={styles.lockButton}
-                      onPress={() => togglePlaylistVisibility(playlist.id, playlist.isPrivate)}
-                    >
-                      <Text style={styles.lockIcon}>
-                        {playlist.isPrivate ? '🔒' : '🌐'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                  
-                  <View style={styles.playlistIconContainer}>
-                    {renderPlatformIcon(playlist.platform, playlist.icon)}
-                    <View style={[styles.platformBadge, { backgroundColor: getPlatformColor(playlist.platform) }]}>
-                      <Text style={styles.platformText}>{playlist.platform.toUpperCase()}</Text>
+        </View>
+
+        {/* bio */}
+        {bio ? (
+          <View style={styles.bioBubble}>
+            <Text style={styles.bioBubbleText}>{bio}</Text>
+          </View>
+        ) : null}
+
+        {/* Stats + actions */}
+        <View style={styles.rowBetween}>
+          <View style={styles.statsRowSmall}>
+            <View style={styles.statBoxSmall}>
+              <Text style={styles.statNumber}>{String(worksCount ?? '-')}</Text>
+              <Text style={styles.statLabel}>Œuvres</Text>
+            </View>
+            <View style={styles.statBoxSmall}>
+              <Text style={styles.statNumber}>{String(followersCount ?? '-')}</Text>
+              <Text style={styles.statLabel}>Abonnés</Text>
+            </View>
+            <View style={styles.statBoxSmall}>
+              <Text style={styles.statNumber}>{String(friendsCount ?? '-')}</Text>
+              <Text style={styles.statLabel}>Amis</Text>
+            </View>
+          </View>
+
+          <View style={styles.actionColumnSingle}>
+            <TouchableOpacity style={styles.primaryButtonSingle} onPress={() => router.push('/EditProfile')}>
+              <Text style={styles.primaryText}>Éditer le profil</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryButtonSmall} onPress={() => router.push('/write')}>
+              <Text style={styles.secondaryText}>Commencer à écrire</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.themeButtonSmall} onPress={() => setShowThemeSelector(true)}>
+              <Ionicons name="color-palette" size={16} color="#FFA94D" style={{ marginRight: 8 }} />
+              <Text style={styles.themeButtonText}>Thèmes</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.themeButtonSmall} onPress={() => router.push('/settings')}>
+              <Ionicons name="settings" size={16} color="#FFA94D" style={{ marginRight: 8 }} />
+              <Text style={styles.themeButtonText}>Réglages</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Œuvres */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Mes œuvres</Text>
+          {(works && works.length) === 0 ? (
+            <Text style={styles.placeholder}>Tu n'as pas encore d'œuvres publiées.</Text>
+          ) : (
+            <FlatList
+              horizontal
+              data={works}
+              keyExtractor={(i) => String(i.id)}
+              renderItem={renderWork}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingVertical: 8 }}
+            />
+          )}
+        </View>
+
+        {/* Continuez à lire */}
+        <View style={[styles.section, { marginTop: 10 }]}>
+          <Text style={styles.sectionTitle}>Continuez à lire</Text>
+          {(recentReads && recentReads.length) === 0 ? (
+            <Text style={styles.placeholder}>Aucune lecture récente.</Text>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {recentReads.map(r => (
+                <View key={String(r.id)} style={styles.workCard}>
+                  <Image source={{ uri: r.couverture || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80' }} style={styles.workCover} />
+                  <Text style={styles.workTitle} numberOfLines={2}>{r.titre || 'Titre'}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+
+        {/* Section Playlists */}
+        <View style={[styles.section, { marginTop: 15 }]}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Mes playlists</Text>
+            <TouchableOpacity style={styles.addPlaylistBtn} onPress={() => Alert.alert('Ajout playlist', 'Ajout de playlist non implémenté ici.')}>
+              <Text style={styles.addPlaylistText}>+ Ajouter</Text>
+            </TouchableOpacity>
+          </View>
+          {playlists.length === 0 ? (
+            <View style={styles.emptyPlaylistContainer}>
+              <Text style={styles.placeholder}>Aucune playlist ajoutée.</Text>
+              <Text style={styles.placeholderSubtext}>
+                Ajoutez vos playlists Spotify, Apple Music, YouTube Music ou Deezer pour les écouter pendant la lecture.
+              </Text>
+            </View>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.playlistsContainer}>
+              {playlists.map((playlist) => (
+                <View key={playlist.id} style={styles.playlistCard}>
+                  <TouchableOpacity
+                    style={styles.playlistMain}
+                    onPress={() => openPlaylist(playlist)}
+                    onLongPress={() => deletePlaylist(playlist.id)}
+                  >
+                    <View style={styles.playlistHeader}>
+                      <TouchableOpacity
+                        style={styles.lockButton}
+                        onPress={() => togglePlaylistVisibility(playlist.id, playlist.isPrivate)}
+                      >
+                        <Text style={styles.lockIcon}>
+                          {playlist.isPrivate ? '🔒' : '🌐'}
+                        </Text>
+                      </TouchableOpacity>
                     </View>
-                  </View>
-                  <Text style={styles.playlistName} numberOfLines={2}>{playlist.name}</Text>
-                  <Text style={styles.playlistPlatform}>
-                    {playlist.isPrivate ? 'Privée' : 'Publique'} • Appuyez pour ouvrir
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </ScrollView>
-        )}
-      </View>
-      {/* Bouton de déconnexion */}
-      <TouchableOpacity
-        style={{
-          backgroundColor: '#FFA94D',
-          padding: 12,
-          borderRadius: 8,
-          alignItems: 'center',
-          margin: 24,
-        }}
-        onPress={async () => {
-          try {
-            const auth = getAuth(app);
-            await auth.signOut();
-            router.replace('../index');
-          } catch (e) {
-            Alert.alert('Erreur', 'Impossible de se déconnecter.');
-          }
-        }}
-      >
-        <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 16 }}>Se déconnecter</Text>
-      </TouchableOpacity>
-      {/* Espace pour éviter le chevauchement avec la barre de navigation */}
-      <View style={{ height: 80 }} />
+                    <View style={styles.playlistIconContainer}>
+                      {renderPlatformIcon(playlist.platform, playlist.icon)}
+                      <View style={[styles.platformBadge, { backgroundColor: getPlatformColor(playlist.platform) }]}>
+                        <Text style={styles.platformText}>{playlist.platform.toUpperCase()}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.playlistName} numberOfLines={2}>{playlist.name}</Text>
+                    <Text style={styles.playlistPlatform}>
+                      {playlist.isPrivate ? 'Privée' : 'Publique'} • Appuyez pour ouvrir
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+        </View>
 
-      {/* Sélecteur de thèmes */}
-      <ThemeSelector 
-        visible={showThemeSelector}
-        onClose={() => setShowThemeSelector(false)}
-      />
-    </ScrollView>
+        {/* Bouton de déconnexion */}
+        <TouchableOpacity
+          style={{
+            backgroundColor: '#FFA94D',
+            padding: 12,
+            borderRadius: 8,
+            alignItems: 'center',
+            margin: 24,
+          }}
+          onPress={async () => {
+            try {
+              const auth = getAuth(app);
+              await auth.signOut();
+              router.replace('../index');
+            } catch (e) {
+              Alert.alert('Erreur', 'Impossible de se déconnecter.');
+            }
+          }}
+        >
+          <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 16 }}>Se déconnecter</Text>
+        </TouchableOpacity>
+        <View style={{ height: 80 }} />
+        <ThemeSelector
+          visible={showThemeSelector}
+          onClose={() => setShowThemeSelector(false)}
+        />
+      </ScrollView>
+    </View>
   );
 };
 
@@ -683,8 +605,6 @@ const styles = StyleSheet.create({
   workCard: { width: 120, marginRight: 12, alignItems: 'center' },
   workCover: { width: 100, height: 150, borderRadius: 8, backgroundColor: '#232323' },
   workTitle: { color: '#fff', fontSize: 13, marginTop: 6, textAlign: 'center' },
-  
-  // Styles pour les playlists
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
