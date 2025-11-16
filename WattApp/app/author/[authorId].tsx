@@ -1,4 +1,11 @@
 import React, { useState, useEffect } from 'react';
+// Imports uniques déjà présents plus haut
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { getAuth } from 'firebase/auth';
+import app, { db } from '../../constants/firebaseConfig';
+import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import FollowService from '../../services/FollowService';
+
 import {
   View,
   Text,
@@ -12,25 +19,12 @@ import {
   FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { getAuth } from 'firebase/auth';
-import app, { db } from '../../constants/firebaseConfig';
-import { 
-  doc, 
-  getDoc, 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  onSnapshot,
-  orderBy,
-} from 'firebase/firestore';
-import FollowService from '../../services/FollowService';
-
 const AuthorProfileScreen: React.FC = () => {
   const { authorId } = useLocalSearchParams();
   const router = useRouter();
   const [author, setAuthor] = useState<any>(null);
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
   const [authorBooks, setAuthorBooks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -40,133 +34,104 @@ const AuthorProfileScreen: React.FC = () => {
   const [totalReads, setTotalReads] = useState(0);
 
   useEffect(() => {
-    if (!authorId || typeof authorId !== 'string') {
-      Alert.alert('Erreur', 'ID auteur invalide');
-      router.back();
-      return;
-    }
-    loadAuthorProfile();
-    loadAuthorBooks();
-    checkFollowStatus();
-    listenToFollowersCount();
-  }, [authorId]);
-
-  const loadAuthorProfile = async () => {
-    try {
-      const authorRef = doc(db, 'users', authorId as string);
-      const authorDoc = await getDoc(authorRef);
-      
-      if (authorDoc.exists()) {
-        const authorData = { id: authorDoc.id, ...authorDoc.data() };
-        setAuthor(authorData);
-        
-        // Charger les statistiques de l'auteur
-        const statsRef = doc(db, 'userStats', authorId as string);
-        const statsDoc = await getDoc(statsRef);
-        if (statsDoc.exists()) {
-          const stats = statsDoc.data();
-          setFollowingCount(stats.followingCount || 0);
-        }
-      } else {
-        Alert.alert('Erreur', 'Auteur introuvable');
+    async function loadAll() {
+      if (!authorId || typeof authorId !== 'string') {
+        Alert.alert('Erreur', 'ID auteur invalide');
         router.back();
+        return;
       }
-    } catch (error) {
-      console.error('Erreur lors du chargement du profil:', error);
-      Alert.alert('Erreur', 'Impossible de charger le profil de l\'auteur');
+      try {
+        // Profil
+        const authorRef = doc(db, 'users', authorId as string);
+        const authorDoc = await getDoc(authorRef);
+        if (authorDoc.exists()) {
+          const authorData = { id: authorDoc.id, ...authorDoc.data() };
+          setAuthor(authorData);
+          setIsPrivate(!!(authorData as any).isPrivate);
+          // Propriétaire ?
+          const auth = getAuth(app);
+          const currentUser = auth.currentUser;
+          setIsOwner(currentUser && currentUser.uid === authorId);
+          // Stats
+          const statsRef = doc(db, 'userStats', authorId as string);
+          const statsDoc = await getDoc(statsRef);
+          if (statsDoc.exists()) {
+            const stats = statsDoc.data();
+            setFollowingCount(stats.followingCount || 0);
+          }
+        } else {
+          Alert.alert('Erreur', 'Auteur introuvable');
+          router.back();
+        }
+        // Livres
+        const booksQuery = query(
+          collection(db, 'books'),
+          where('authorUid', '==', authorId),
+          where('status', '==', 'published')
+        );
+        const booksSnapshot = await getDocs(booksQuery);
+        let books = booksSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        books = books.sort((a: any, b: any) => {
+          const aDate = a.publishedAt?.toDate?.() || a.publishedAt || new Date(0);
+          const bDate = b.publishedAt?.toDate?.() || b.publishedAt || new Date(0);
+          return bDate - aDate;
+        });
+        setAuthorBooks(books);
+        setTotalBooks(books.length);
+        const totalReadsCount = books.reduce((sum, book: any) => sum + (book.reads || 0), 0);
+        setTotalReads(totalReadsCount);
+        // Suivi
+        const auth = getAuth(app);
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          const isFollowingUser = await FollowService.isFollowing(currentUser.uid, authorId as string);
+          setIsFollowing(isFollowingUser);
+        }
+      } catch (error) {
+        Alert.alert('Erreur', 'Impossible de charger le profil.');
+      } finally {
+        setLoading(false);
+      }
     }
-  };
-
-  const loadAuthorBooks = async () => {
-    try {
-      // Requête simplifiée pour éviter l'index composite
-      const booksQuery = query(
-        collection(db, 'books'),
-        where('authorUid', '==', authorId),
-        where('status', '==', 'published')
-      );
-      
-      const booksSnapshot = await getDocs(booksQuery);
-      let books = booksSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      
-      // Trier côté client par date de publication (desc)
-      books = books.sort((a: any, b: any) => {
-        const aDate = a.publishedAt?.toDate?.() || a.publishedAt || new Date(0);
-        const bDate = b.publishedAt?.toDate?.() || b.publishedAt || new Date(0);
-        return bDate - aDate;
-      });
-      
-      setAuthorBooks(books);
-      setTotalBooks(books.length);
-      
-      // Calculer le total des lectures
-      const totalReadsCount = books.reduce((sum, book: any) => sum + (book.reads || 0), 0);
-      setTotalReads(totalReadsCount);
-      
-    } catch (error) {
-      console.error('Erreur lors du chargement des livres:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const checkFollowStatus = async () => {
-    try {
-      const auth = getAuth(app);
-      const currentUser = auth.currentUser;
-      if (!currentUser) return;
-
-      const isFollowingUser = await FollowService.isFollowing(currentUser.uid, authorId as string);
-      setIsFollowing(isFollowingUser);
-    } catch (error) {
-      console.error('Erreur lors de la vérification du suivi:', error);
-    }
-  };
-
-  const listenToFollowersCount = () => {
+    loadAll();
+    // Ecoute le nombre d'abonnés
     const followersQuery = query(
       collection(db, 'follows'),
       where('followedUserId', '==', authorId)
     );
-
-    return onSnapshot(followersQuery, (snapshot) => {
+    const unsubscribe = onSnapshot(followersQuery, (snapshot) => {
       setFollowersCount(snapshot.size);
     });
-  };
+    return () => unsubscribe();
+  }, [authorId]);
 
-  const toggleFollow = async () => {
+  const handleFollow = async () => {
     try {
       const auth = getAuth(app);
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
+      const user = auth.currentUser;
+      if (!user) {
         Alert.alert('Connexion requise', 'Vous devez être connecté pour suivre un auteur');
         return;
       }
-
-      if (currentUser.uid === authorId) {
+      if (user.uid === authorId) {
         Alert.alert('Action impossible', 'Vous ne pouvez pas vous suivre vous-même');
         return;
       }
-
       if (isFollowing) {
-        // Ne plus suivre
-        await FollowService.unfollowUser(currentUser.uid, authorId as string);
+        await FollowService.unfollowUser(user.uid, authorId as string);
         setIsFollowing(false);
         Alert.alert('✅', `Vous ne suivez plus ${author?.displayName || author?.email || 'cet auteur'}`);
       } else {
-        // Suivre
-        const followerName = currentUser.displayName || currentUser.email || 'Utilisateur';
+        const followerName = user.displayName || user.email || 'Utilisateur';
         const followedName = author?.displayName || author?.email || 'Auteur';
-        
-        await FollowService.followUser(currentUser.uid, followerName, authorId as string, followedName);
+        await FollowService.followUser(user.uid, followerName, authorId as string, followedName);
         setIsFollowing(true);
         Alert.alert('🎉', `Vous suivez maintenant ${author?.displayName || author?.email || 'cet auteur'} !`);
       }
     } catch (error) {
-      console.error('Erreur lors du suivi/désuivi:', error);
       Alert.alert('Erreur', 'Impossible de modifier le suivi');
     }
   };
@@ -174,24 +139,18 @@ const AuthorProfileScreen: React.FC = () => {
   const sendMessage = async () => {
     try {
       const auth = getAuth(app);
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
+      const user = auth.currentUser;
+      if (!user) {
         Alert.alert('Connexion requise', 'Vous devez être connecté pour envoyer un message');
         return;
       }
-
-      if (currentUser.uid === authorId) {
+      if (user.uid === authorId) {
         Alert.alert('Action impossible', 'Vous ne pouvez pas vous envoyer un message');
         return;
       }
-
-      // Créer ou récupérer la conversation
-      const chatId = [currentUser.uid, authorId].sort().join('_');
-      
-      // Rediriger vers la page de chat
+      const chatId = [user.uid, authorId].sort().join('_');
       router.push(`/chat/${chatId}`);
     } catch (error) {
-      console.error('Erreur lors de l\'envoi du message:', error);
       Alert.alert('Erreur', 'Impossible d\'ouvrir la conversation');
     }
   };
@@ -249,6 +208,141 @@ const AuthorProfileScreen: React.FC = () => {
     );
   }
 
+  // Si le compte est privé et ce n'est pas le propriétaire, masquer les infos
+  if (isPrivate && !isOwner) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" />
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back-outline" size={24} color="#FFA94D" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Profil Auteur</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <View style={[styles.profileSection, { alignItems: 'center', justifyContent: 'center', flex: 1 }]}>  
+          <View style={styles.avatarContainer}>
+            {author.photoURL ? (
+              <Image source={{ uri: author.photoURL }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                <Text style={styles.avatarText}>
+                  {(author.displayName || author.email || 'A').charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.authorName}>{author.displayName || author.email || 'Auteur'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+            <Ionicons name="lock-closed" size={16} color="#FFA94D" style={{ marginRight: 6 }} />
+            <Text style={{ color: '#FFA94D', fontWeight: 'bold' }}>Ce compte est privé</Text>
+          </View>
+          <Text style={{ color: '#aaa', marginTop: 16, textAlign: 'center', fontStyle: 'italic' }}>
+            Vous devez suivre cette personne pour voir son profil et ses œuvres.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back-outline" size={24} color="#FFA94D" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Profil Auteur</Text>
+        <View style={{ width: 24 }} />
+      </View>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.profileSection}>
+          <View style={styles.avatarContainer}>
+            {author.photoURL ? (
+              <Image source={{ uri: author.photoURL }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                <Text style={styles.avatarText}>
+                  {(author.displayName || author.email || 'A').charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.authorName}>{author.displayName || author.email || 'Auteur'}</Text>
+          {author.bio && (
+            <Text style={styles.authorBio}>{author.bio}</Text>
+          )}
+          <View style={[styles.statsContainer, { alignItems: 'center' }]}>  
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{totalBooks}</Text>
+              <Text style={styles.statLabel}>Livres</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{followersCount}</Text>
+              <Text style={styles.statLabel}>Abonnés</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{totalReads}</Text>
+              <Text style={styles.statLabel}>Lectures</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 12 }}>
+              <Ionicons name={isPrivate ? 'lock-closed' : 'earth'} size={16} color={isPrivate ? '#FFA94D' : '#4FC3F7'} style={{ marginRight: 4 }} />
+              <Text style={{ color: isPrivate ? '#FFA94D' : '#4FC3F7', fontWeight: 'bold', fontSize: 12 }}>
+                {isPrivate ? 'Compte privé' : 'Compte public'}
+              </Text>
+            </View>
+          </View>
+          {!isOwner && (
+            <View style={styles.actionButtons}>
+              <TouchableOpacity
+                style={[styles.followButton, isFollowing && styles.followingButton]}
+                onPress={handleFollow}
+                activeOpacity={0.8}
+              >
+                <Ionicons 
+                  name={isFollowing ? "checkmark" : "person-add"} 
+                  size={20} 
+                  color={isFollowing ? "#181818" : "#FFA94D"} 
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={[styles.followButtonText, isFollowing && styles.followingButtonText]}>
+                  {isFollowing ? 'Suivi' : 'Suivre'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.messageButton}
+                onPress={sendMessage}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="chatbubble-outline" size={20} color="#4FC3F7" style={{ marginRight: 8 }} />
+                <Text style={styles.messageButtonText}>Message</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+        <View style={styles.booksSection}>
+          <Text style={styles.sectionTitle}>Livres publiés ({totalBooks})</Text>
+          {authorBooks.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="book-outline" size={48} color="#888" />
+              <Text style={styles.emptyStateText}>Aucun livre publié</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={authorBooks}
+              renderItem={renderBookItem}
+              keyExtractor={(item) => item.id}
+              numColumns={2}
+              columnWrapperStyle={styles.bookRow}
+              showsVerticalScrollIndicator={false}
+              scrollEnabled={false}
+            />
+          )}
+        </View>
+      </ScrollView>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -287,8 +381,9 @@ const AuthorProfileScreen: React.FC = () => {
             <Text style={styles.authorBio}>{author.bio}</Text>
           )}
 
-          {/* Statistiques */}
-          <View style={styles.statsContainer}>
+
+          {/* Statistiques + badge privé/public */}
+          <View style={[styles.statsContainer, { alignItems: 'center' }]}>  
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>{totalBooks}</Text>
               <Text style={styles.statLabel}>Livres</Text>
@@ -301,13 +396,19 @@ const AuthorProfileScreen: React.FC = () => {
               <Text style={styles.statNumber}>{totalReads}</Text>
               <Text style={styles.statLabel}>Lectures</Text>
             </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 12 }}>
+              <Ionicons name={isPrivate ? 'lock-closed' : 'earth'} size={16} color={isPrivate ? '#FFA94D' : '#4FC3F7'} style={{ marginRight: 4 }} />
+              <Text style={{ color: isPrivate ? '#FFA94D' : '#4FC3F7', fontWeight: 'bold', fontSize: 12 }}>
+                {isPrivate ? 'Compte privé' : 'Compte public'}
+              </Text>
+            </View>
           </View>
 
           {/* Boutons d'action */}
           <View style={styles.actionButtons}>
             <TouchableOpacity
               style={[styles.followButton, isFollowing && styles.followingButton]}
-              onPress={toggleFollow}
+              onPress={handleFollow}
               activeOpacity={0.8}
             >
               <Ionicons 
