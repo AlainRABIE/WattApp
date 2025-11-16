@@ -959,24 +959,44 @@ const BookEditor: React.FC = () => {
           {/* Logique différente selon si c'est l'auteur, livre gratuit, payant non acheté, ou payant acheté */}
           {isAuthor ? (
             // L'auteur peut toujours lire son livre
-            <TouchableOpacity
-              style={{ backgroundColor: '#FFA94D', borderRadius: 32, paddingVertical: 20, paddingHorizontal: 54, shadowColor: '#FFA94D', shadowOpacity: 0.22, shadowRadius: 12, elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 10 }}
-              onPress={() => {
-                // Reprendre la lecture là où l'utilisateur s'est arrêté ou commencer
-                if (readingProgress && readingProgress.position) {
-                  router.push(`/book/${bookId}/read?position=${readingProgress.position}`);
-                } else {
-                  router.push(`/book/${bookId}/read`);
-
-                }
-              }}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="book-outline" size={26} color="#181818" style={{ marginRight: 8 }} />
-              <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 21, letterSpacing: 0.3 }}>
-                {readingProgress && readingProgress.position ? 'Reprendre la lecture' : 'Lire mon livre'}
-              </Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={{ backgroundColor: '#FFA94D', borderRadius: 32, paddingVertical: 20, paddingHorizontal: 54, shadowColor: '#FFA94D', shadowOpacity: 0.22, shadowRadius: 12, elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+                onPress={() => {
+                  // Reprendre la lecture là où l'utilisateur s'est arrêté ou commencer
+                  if (readingProgress && readingProgress.position) {
+                    router.push(`/book/${bookId}/read?position=${readingProgress.position}`);
+                  } else {
+                    router.push(`/book/${bookId}/read`);
+                  }
+                }}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="book-outline" size={26} color="#181818" style={{ marginRight: 8 }} />
+                <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 21, letterSpacing: 0.3 }}>
+                  {readingProgress && readingProgress.position ? 'Reprendre la lecture' : 'Lire mon livre'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#4FC3F7',
+                  borderRadius: 32,
+                  paddingVertical: 20,
+                  paddingHorizontal: 32,
+                  marginLeft: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 10,
+                }}
+                onPress={() => router.push(`/dashboard?bookId=${bookId}`)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="stats-chart-outline" size={26} color="#181818" style={{ marginRight: 8 }} />
+                <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 18 }}>
+                  Statistiques
+                </Text>
+              </TouchableOpacity>
+            </>
           ) : book && book.price && book.price > 0 ? (
             // Livre payant
             hasPurchased ? (
