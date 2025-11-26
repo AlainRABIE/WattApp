@@ -16,16 +16,23 @@ interface TouchData {
   timestamp: number;
 }
 
-import React, { useState, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useImperativeHandle, forwardRef, useEffect } from 'react';
+// Firebase imports
+import { getFirestore, doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
+import { getApp } from 'firebase/app';
 import { View, StyleSheet, PanResponder } from 'react-native';
 import { Canvas, Path, Skia, Group } from '@shopify/react-native-skia';
 
+
+// Props: roomId (string, obligatoire pour la collab)
 const DrawingCanvas = forwardRef(function DrawingCanvas(props: any, ref) {
   const {
     initialPaths = [],
     penColor = '#222',
     penSize = 3,
     onChange,
+    roomId, // identifiant de la room collaborative
+    collaborative = false, // activer/désactiver la collab
   } = props;
 
   const [paths, setPaths] = useState(initialPaths);
@@ -33,6 +40,32 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(props: any, ref) {
   const [currentColor, setCurrentColor] = useState(penColor);
   const [currentSize, setCurrentSize] = useState(penSize);
   const [currentTouchData, setCurrentTouchData] = useState<TouchData | null>(null);
+
+  // Firestore setup
+  const db = collaborative ? getFirestore(getApp()) : null;
+  const roomDocRef = collaborative && roomId ? doc(db, 'drawingRooms', roomId) : null;
+  // Ecoute Firestore pour la collaboration
+  useEffect(() => {
+    if (!collaborative || !roomDocRef) return;
+    // Ecoute les changements sur le document de la room
+    const unsub = onSnapshot(roomDocRef, (docSnap) => {
+      const data = docSnap.data();
+      if (data && Array.isArray(data.paths)) {
+        setPaths(data.paths);
+      }
+    });
+    return () => unsub();
+  }, [collaborative, roomId]);
+
+  // Push les paths sur Firestore à chaque changement
+  const syncPathsToFirestore = async (updatedPaths: PathType[]) => {
+    if (!collaborative || !roomDocRef) return;
+    try {
+      await setDoc(roomDocRef, { paths: updatedPaths }, { merge: true });
+    } catch (e) {
+      console.warn('Erreur sync Firestore:', e);
+    }
+  };
 
   // Fonction pour détecter le type de toucher et extraire les données
   const extractTouchData = (evt: any): TouchData => {
@@ -101,15 +134,16 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(props: any, ref) {
           setPaths((prev: PathType[]) => {
             const updated = [
               ...prev,
-              { 
-                path: currentPath, 
-                color: currentColor, 
+              {
+                path: currentPath,
+                color: currentColor,
                 strokeWidth: dynamicStrokeWidth,
                 pressure: currentTouchData.pressure,
                 touchType: currentTouchData.touchType
               },
             ];
             onChange && onChange(updated);
+            if (collaborative) syncPathsToFirestore(updated);
             return updated;
           });
           setCurrentPath(null);
@@ -141,15 +175,16 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(props: any, ref) {
           setPaths((prev: PathType[]) => {
             const updated = [
               ...prev,
-              { 
-                path: p.toSVGString(), 
-                color: currentColor, 
+              {
+                path: p.toSVGString(),
+                color: currentColor,
                 strokeWidth: dynamicStrokeWidth,
                 pressure: touchData.pressure,
                 touchType: touchData.touchType
               },
             ];
             onChange && onChange(updated);
+            if (collaborative) syncPathsToFirestore(updated);
             return updated;
           });
         }
@@ -166,12 +201,14 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(props: any, ref) {
   setPaths((prev: PathType[]) => {
         const updated = prev.slice(0, -1);
         onChange && onChange(updated);
+        if (collaborative) syncPathsToFirestore(updated);
         return updated;
       });
     },
     clear: () => {
       setPaths([]);
       onChange && onChange([]);
+      if (collaborative) syncPathsToFirestore([]);
     },
     setPenColor: setCurrentColor,
     setPenSize: setCurrentSize,

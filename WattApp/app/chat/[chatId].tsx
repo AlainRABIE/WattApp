@@ -1,4 +1,41 @@
 import React, { useEffect, useRef, useState } from 'react';
+import * as Linking from 'expo-linking';
+// Utilitaire pour détecter un lien d'invitation à dessiner
+function extractDrawInviteUrl(text: string): string | null {
+  const match = text.match(/https?:\/\/[^\s]+\/draw\?roomId=[a-zA-Z0-9\-]+/);
+  return match ? match[0] : null;
+}
+import { v4 as uuidv4 } from 'uuid';
+// Génère un roomId unique (UUID v4)
+function generateRoomId() {
+  return uuidv4();
+}
+  // Envoi d'une invitation à dessiner
+  const sendDrawInvite = async () => {
+    const roomId = generateRoomId();
+    // Lien d'invitation (adapter le schéma si besoin)
+    const inviteUrl = Linking.createURL(`/draw?roomId=${roomId}`);
+    const auth = getAuth(app);
+    const current = auth.currentUser;
+    if (!current) return;
+    try {
+      await addDoc(collection(db, 'chats', chatId, 'messages'), {
+        sender: current.uid,
+        text: `🎨 Invitation à dessiner ensemble : ${inviteUrl}`,
+        createdAt: serverTimestamp(),
+        type: 'draw-invite',
+        roomId,
+      });
+      // update last message in chat doc
+      const chatRef = doc(db, 'chats', chatId);
+      await updateDoc(chatRef, {
+        lastMessageText: '[Invitation à dessiner]',
+        lastMessageAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.warn('Erreur envoi invitation dessin', err);
+    }
+  };
 import {
   View,
   Text,
@@ -257,6 +294,8 @@ export default function ChatThread() {
                       'User') as string
                   )}&background=FFA94D&color=181818&size=128`
                 : undefined;
+            // Détection du lien d'invitation à dessiner
+            const drawInviteUrl = extractDrawInviteUrl(item.text);
             return (
               <View
                 style={[
@@ -277,7 +316,20 @@ export default function ChatThread() {
                     isMe ? styles.messageBubbleMe : styles.messageBubbleOther,
                   ]}
                 >
-                  <Text style={styles.messageText}>{item.text}</Text>
+                  {drawInviteUrl ? (
+                    <TouchableOpacity
+                      onPress={() => {
+                        // Ouvre la page de dessin collaborative dans l'app
+                        const url = drawInviteUrl;
+                        // Si tu utilises un router interne, adapte ici
+                        Linking.openURL(url);
+                      }}
+                    >
+                      <Text style={[styles.messageText, { color: '#FFA94D', textDecorationLine: 'underline' }]}>🎨 Invitation à dessiner (cliquer ici)</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={styles.messageText}>{item.text}</Text>
+                  )}
                 </View>
                 {isMe && (
                   <Image
@@ -294,6 +346,15 @@ export default function ChatThread() {
           scrollEventThrottle={16}
         />
 
+        {/* Bouton d'invitation à dessiner */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 10, marginBottom: 2 }}>
+          <TouchableOpacity
+            style={{ backgroundColor: '#FFA94D', borderRadius: 20, paddingVertical: 6, paddingHorizontal: 14, marginRight: 6 }}
+            onPress={sendDrawInvite}
+          >
+            <Text style={{ color: '#181818', fontWeight: 'bold' }}>Inviter à dessiner</Text>
+          </TouchableOpacity>
+        </View>
         {/* Zone de saisie */}
         <View
           style={[
