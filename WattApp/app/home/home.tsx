@@ -10,31 +10,21 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 
 const Home: React.FC = () => {
 	const router = useRouter();
-	// helper to open explore
 	const openExplore = () => (router as any).push('/explore');
-
-	// State pour les livres dynamiques
 	const [books, setBooks] = useState<any[]>([]);
 	const [loadingBooks, setLoadingBooks] = useState(true);
 	const [email, setEmail] = useState('');
 	const [displayName, setDisplayName] = useState('');
 	const [photoURL, setPhotoURL] = useState<string | null>(null);
 	const [walletBalance, setWalletBalance] = useState<number>(0);
-
-	// compute a fallback avatar URL based on the loaded user name so Home matches Profile
 	const nameForAvatar = (displayName || email || 'User') as string;
 	const avatarLen = nameForAvatar.trim().includes(' ') ? 2 : 1;
 	const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(nameForAvatar)}&length=${avatarLen}&background=FFA94D&color=181818&size=128`;
-
 	const { width, height } = useWindowDimensions();
-	// treat as tablet when the longest side is >= 768
 	const isTablet = Math.max(width, height) >= 768;
-
-	// Avatar placement: compute top offset so the avatar stays fixed below the status bar
 	const avatarSize = 48; // size of the fixed profile circle
 	const topOffset = Platform.OS === 'ios' ? 44 : (StatusBar.currentHeight ?? 0) + 8;
 	const contentPaddingTop = topOffset + avatarSize + 12; // keep content from being hidden under avatar
-
 	const renderBookItem = (item: any) => {
 		// Champs Firestore adaptés : title, coverImage
 		let couverture = item.coverImage;
