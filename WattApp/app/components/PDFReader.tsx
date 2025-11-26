@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   useWindowDimensions,
   ScrollView,
 } from 'react-native';
+import * as ScreenCapture from 'expo-screen-capture'; // Keep this import
+import { Image as RNImage } from 'react-native'; // Rename this import to avoid conflict
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -35,6 +37,32 @@ export default function PDFReader({
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(initialTotalPages || pagesImagePaths?.length || 1);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Protection contre la capture d'écran (Android) et détection (iOS)
+  const [showScreenWarning, setShowScreenWarning] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      ScreenCapture.preventScreenCaptureAsync();
+    }
+
+    let subscription: any;
+    if (Platform.OS === 'ios') {
+      // iOS : détecter le screenshot (nécessite expo-screen-capture >= 7.0.0)
+      subscription = ScreenCapture.addScreenshotListener(() => {
+        setShowScreenWarning(true);
+        setTimeout(() => setShowScreenWarning(false), 2000);
+      });
+    }
+    return () => {
+      if (Platform.OS === 'android') {
+        ScreenCapture.allowScreenCaptureAsync();
+      }
+      if (subscription && subscription.remove) {
+        subscription.remove();
+      }
+    };
+  }, []);
 
   // Détermine si on utilise les pages extraites ou le PDF original
   const usePagesImages = pagesImagePaths && pagesImagePaths.length > 0;
@@ -132,7 +160,23 @@ export default function PDFReader({
 
   return (
     <View style={styles.container}>
+      {/* Filigrane permanent en haut */}
+      <View style={styles.watermarkContainer} pointerEvents="none">
+        <Text style={styles.watermarkText}>⚠️ Interdiction de capturer l'écran ou de partager ce contenu</Text>
+      </View>
       <StatusBar barStyle="light-content" backgroundColor="#181818" />
+
+      {/* Overlay d'avertissement lors d'une capture d'écran */}
+      {showScreenWarning && (
+        <View style={styles.screenshotWarningOverlay}>
+          <RNImage
+            source={require('../../assets/images/icons8-warning-48.png')}
+            style={{ width: 120, height: 120, marginBottom: 20 }}
+            resizeMode="contain"
+          />
+          <Text style={styles.screenshotWarningText}>Vous n'avez pas le droit de screen le livre</Text>
+        </View>
+      )}
       
       {/* Header */}
       <View style={styles.header}>
@@ -298,6 +342,41 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#181818',
+  },
+  watermarkContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10000,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  watermarkText: {
+    color: '#FFA94D',
+    fontWeight: 'bold',
+    fontSize: 14,
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  screenshotWarningOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    zIndex: 9999,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  screenshotWarningText: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 10,
   },
   header: {
     flexDirection: 'row',

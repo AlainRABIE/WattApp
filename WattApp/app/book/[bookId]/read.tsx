@@ -1,5 +1,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
+import * as ScreenCapture from 'expo-screen-capture';
+import { Platform, Image as RNImage } from 'react-native';
 import { View, Text, StyleSheet, ActivityIndicator, StatusBar, TouchableOpacity, useWindowDimensions, Modal, ScrollView } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +13,29 @@ import StarRating from '../../components/StarRating';
 
 
 const BookReadScreen: React.FC<any> = () => {
+  // Protection contre la capture d'écran (Android) et détection (iOS)
+  const [showScreenWarning, setShowScreenWarning] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      ScreenCapture.preventScreenCaptureAsync();
+    }
+    let subscription: any;
+    if (Platform.OS === 'ios') {
+      subscription = ScreenCapture.addScreenshotListener(() => {
+        setShowScreenWarning(true);
+        setTimeout(() => setShowScreenWarning(false), 2000);
+      });
+    }
+    return () => {
+      if (Platform.OS === 'android') {
+        ScreenCapture.allowScreenCaptureAsync();
+      }
+      if (subscription && subscription.remove) {
+        subscription.remove();
+      }
+    };
+  }, []);
   const { bookId, preview, previewBody, position } = useLocalSearchParams();
   const router = useRouter();
   const [book, setBook] = useState<any>(null);
@@ -274,7 +299,30 @@ const BookReadScreen: React.FC<any> = () => {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: themes[currentTheme as keyof typeof themes].background }}>
+      <View style={{ flex: 1, backgroundColor: themes[currentTheme as keyof typeof themes].background }}>
+        {/* Overlay d'avertissement lors d'une capture d'écran */}
+        {showScreenWarning && (
+          <View style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.85)',
+            zIndex: 9999,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+            <RNImage
+              source={require('../../../assets/images/icons8-warning-48.png')}
+              style={{ width: 80, height: 80, marginBottom: 20 }}
+              resizeMode="contain"
+            />
+            <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginTop: 10 }}>
+              Vous n'avez pas le droit de screen le livre
+            </Text>
+          </View>
+        )}
       <StatusBar barStyle={currentTheme === 'light' ? "dark-content" : "light-content"} />
       {/* Affichage notation et stats */}
       <TouchableOpacity activeOpacity={1} style={{ flex: 1 }} onPress={handleToggleBack}>

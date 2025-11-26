@@ -1638,8 +1638,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
-
-  // Creation cards (Mes créations) - Style similaire mais avec plus d'infos
   creationCard: {
     width: 160,
     marginRight: 16,
@@ -1677,8 +1675,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 6,
   },
-
-  // Draft cards (Mes brouillons)
   draftCard: {
     width: 160,
     marginRight: 16,
@@ -1816,7 +1812,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
-  // Context Menu styles
   contextMenuOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
