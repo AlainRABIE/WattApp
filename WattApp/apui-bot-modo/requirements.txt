@@ -1,0 +1,4 @@
+detoxify
+torch
+nudenet
+flask

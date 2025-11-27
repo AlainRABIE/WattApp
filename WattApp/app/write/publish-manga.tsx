@@ -1,4 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { collection, addDoc, query, orderBy, onSnapshot, updateDoc, doc } from 'firebase/firestore';
+  // Marquer une tâche comme terminée
+  const toggleTodoDone = async (todo: any) => {
+    if (!projectId) return;
+    const todoRef = doc(db, 'projects', projectId as string, 'todos', todo.id);
+    await updateDoc(todoRef, {
+      status: todo.status === 'terminé' ? 'à faire' : 'terminé'
+    });
+  };
 import {
   View,
   Text,
@@ -146,6 +155,44 @@ interface MangaPublication {
 }
 
 const MangaPublisher: React.FC = () => {
+    // Sidebar (menu latéral) pour le suivi
+    const [showSidebar, setShowSidebar] = useState(false);
+    const [todos, setTodos] = useState<any[]>([]);
+    const [newTask, setNewTask] = useState('');
+    const [activity, setActivity] = useState<any[]>([]);
+
+    // Charger la to-do list collaborative
+    useEffect(() => {
+      if (!projectId) return;
+      const q = query(collection(db, 'projects', projectId as string, 'todos'), orderBy('createdAt', 'desc'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        setTodos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      });
+      return unsubscribe;
+    }, [projectId]);
+
+    // Charger l'historique des modifications
+    useEffect(() => {
+      if (!projectId) return;
+      const q = query(collection(db, 'projects', projectId as string, 'activity'), orderBy('timestamp', 'desc'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        setActivity(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      });
+      return unsubscribe;
+    }, [projectId]);
+
+    // Ajouter une tâche à la to-do list
+    const addTodo = async () => {
+      if (!newTask.trim() || !projectId) return;
+      await addDoc(collection(db, 'projects', projectId as string, 'todos'), {
+        title: newTask,
+        status: 'à faire',
+        createdBy: getAuth(app).currentUser?.uid,
+        createdAt: new Date()
+      });
+      setNewTask('');
+    };
+
   const router = useRouter();
   const { projectId } = useLocalSearchParams();
   
@@ -761,6 +808,87 @@ const MangaPublisher: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      {/* Bouton Suivi (sidebar) */}
+      <TouchableOpacity
+        style={{ position: 'absolute', top: 60, right: 20, zIndex: 10, backgroundColor: '#FFA94D', borderRadius: 20, padding: 10 }}
+        onPress={() => setShowSidebar(true)}
+      >
+        <Ionicons name="list-outline" size={22} color="#181818" />
+      </TouchableOpacity>
+
+      {/* Sidebar latéral pour le suivi */}
+      <Modal
+        visible={showSidebar}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowSidebar(false)}
+      >
+        <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+          <View style={{ width: 320, backgroundColor: '#232323', height: '100%', padding: 18, borderTopLeftRadius: 18, borderBottomLeftRadius: 18, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 18 }}>Suivi du projet</Text>
+              <TouchableOpacity onPress={() => setShowSidebar(false)}>
+                <Ionicons name="close" size={22} color="#FFA94D" />
+              </TouchableOpacity>
+            </View>
+            {/* To-Do List collaborative */}
+            <Text style={{ color: '#fff', fontWeight: 'bold', marginBottom: 6 }}>To-Do List</Text>
+            <View style={{ backgroundColor: '#181818', borderRadius: 8, padding: 8, marginBottom: 16, minHeight: 60 }}>
+              {todos.length === 0 ? (
+                <Text style={{ color: '#aaa' }}>Aucune tâche pour ce projet.</Text>
+              ) : (
+                todos.map(todo => (
+                  <TouchableOpacity
+                    key={todo.id}
+                    onPress={() => toggleTodoDone(todo)}
+                    style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}
+                  >
+                    <Ionicons
+                      name={todo.status === 'terminé' ? 'checkbox-outline' : 'square-outline'}
+                      size={18}
+                      color={todo.status === 'terminé' ? '#4CAF50' : '#FFA94D'}
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text style={{ color: todo.status === 'terminé' ? '#4CAF50' : '#fff', textDecorationLine: todo.status === 'terminé' ? 'line-through' : 'none' }}>
+                      {todo.title}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              )}
+              <View style={{ flexDirection: 'row', marginTop: 8 }}>
+                <TextInput
+                  value={newTask}
+                  onChangeText={setNewTask}
+                  placeholder="Nouvelle tâche"
+                  placeholderTextColor="#888"
+                  style={{ flex: 1, backgroundColor: '#232323', color: '#fff', borderRadius: 6, padding: 6, marginRight: 6 }}
+                />
+                <TouchableOpacity onPress={addTodo} style={{ backgroundColor: '#FFA94D', borderRadius: 6, padding: 8 }}>
+                  <Ionicons name="add" size={18} color="#181818" />
+                </TouchableOpacity>
+              </View>
+            </View>
+            {/* Historique des modifications */}
+            <Text style={{ color: '#fff', fontWeight: 'bold', marginBottom: 6 }}>Historique</Text>
+            <View style={{ backgroundColor: '#181818', borderRadius: 8, padding: 8, marginBottom: 16, minHeight: 60, maxHeight: 120 }}>
+              {activity.length === 0 ? (
+                <Text style={{ color: '#aaa' }}>Aucune activité récente.</Text>
+              ) : (
+                activity.map(act => (
+                  <Text key={act.id} style={{ color: '#fff', marginBottom: 4 }}>
+                    {act.action} <Text style={{ color: '#FFA94D' }}>{act.userName || act.userId}</Text> <Text style={{ color: '#aaa' }}>{act.timestamp && new Date(act.timestamp.seconds * 1000).toLocaleString()}</Text>
+                  </Text>
+                ))
+              )}
+            </View>
+            {/* Notes de suivi (champ à intégrer plus tard) */}
+            <Text style={{ color: '#fff', fontWeight: 'bold', marginBottom: 6 }}>Notes de suivi</Text>
+            <View style={{ backgroundColor: '#181818', borderRadius: 8, padding: 8, marginBottom: 16 }}>
+              <Text style={{ color: '#aaa' }}>[À intégrer: champ de notes/commentaires]</Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <StatusBar barStyle="light-content" backgroundColor="#181818" />
 
       {/* Header */}
