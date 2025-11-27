@@ -1,3 +1,5 @@
+import * as Linking from 'expo-linking';
+import { v4 as uuidv4 } from 'uuid';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -34,6 +36,126 @@ interface DrawingTool {
 }
 
 const MangaEditorSimple: React.FC = () => {
+  // --- Partage collaboratif ---
+  const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [friendsList, setFriendsList] = useState<any[]>([]);
+  const [loadingFriends, setLoadingFriends] = useState(false);
+  const [friendsError, setFriendsError] = useState<string | null>(null);
+
+  // Charge la liste des amis (même logique que friends.tsx)
+  const loadFriends = async () => {
+    setLoadingFriends(true);
+    setFriendsError(null);
+    try {
+      const auth = getAuth(app);
+      const current = auth.currentUser;
+      if (!current) {
+        setFriendsError('Utilisateur non connecté.');
+        setFriendsList([]);
+        return;
+      }
+      const { collection, getDocs, where, query } = await import('firebase/firestore');
+      const db = (await import('../../../constants/firebaseConfig')).db;
+      // Récupère uniquement les amis de l'utilisateur courant
+      const qFriends = query(collection(db, 'friends'), where('uids', 'array-contains', current.uid));
+      const snap = await getDocs(qFriends);
+      console.log('Amis trouvés (docs):', snap.docs.length);
+      const myFriendDocs = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })).filter((f: any) => Array.isArray(f.uids) && f.uids.includes(current.uid));
+      console.log('myFriendDocs:', myFriendDocs);
+      const enriched = await Promise.all(myFriendDocs.map(async (fd: any) => {
+        const otherUid = (fd.uids || []).find((u: string) => u !== current.uid);
+        if (!otherUid) return { ...fd, otherUser: null };
+        try {
+          const uSnap = await getDocs(query(collection(db, 'users'), where('uid', '==', otherUid)));
+          if (!uSnap.empty) {
+            const userData = uSnap.docs[0].data();
+            console.log('Profil ami:', userData);
+            return { ...fd, otherUser: { id: uSnap.docs[0].id, uid: otherUid, ...userData } };
+          }
+        } catch (e) { console.warn('Erreur profil ami', e); }
+        return { ...fd, otherUser: { uid: otherUid } };
+      }));
+      console.log('Liste enrichie:', enriched);
+      setFriendsList(enriched);
+    } catch (e) {
+      console.warn('Erreur loadFriends:', e);
+      setFriendsList([]);
+      setFriendsError('Erreur lors du chargement des amis.');
+    } finally {
+      setLoadingFriends(false);
+    }
+  };
+
+  // Ouvre le modal de partage et charge les amis
+  const openShareModal = () => {
+    setShareModalVisible(true);
+    loadFriends();
+  };
+
+  // Envoie le lien de collaboration en DM (chat privé)
+  const sendCollabLinkToFriend = async (friend: any) => {
+    const roomId = project?.id || uuidv4();
+    const url = Linking.createURL(`/draw?roomId=${roomId}`);
+    try {
+      const { addDoc, collection, serverTimestamp, doc, updateDoc } = await import('firebase/firestore');
+      const db = (await import('../../../constants/firebaseConfig')).db;
+      const auth = getAuth(app);
+      const current = auth.currentUser;
+      console.log('Envoi DM à:', friend.otherUser);
+      if (!current || !friend?.otherUser?.uid) {
+        console.warn('Utilisateur courant ou ami manquant', { current, friend });
+        return;
+      }
+      const chatId = [current.uid, friend.otherUser.uid].sort().join('_');
+      console.log('chatId:', chatId);
+      // Vérifie si le chat existe, sinon le crée
+      const chatDocRef = doc(db, 'chats', chatId);
+      const { getDoc, setDoc } = await import('firebase/firestore');
+      const chatSnap = await getDoc(chatDocRef);
+      if (!chatSnap.exists()) {
+        // Crée le chat avec les participants
+        const participantsMeta = {};
+        participantsMeta[current.uid] = { displayName: current.displayName || current.email || 'Moi', photoURL: current.photoURL || null };
+        participantsMeta[friend.otherUser.uid] = { displayName: friend.otherUser.displayName || friend.otherUser.email || 'Ami', photoURL: friend.otherUser.photoURL || null };
+        await setDoc(chatDocRef, {
+          participants: [current.uid, friend.otherUser.uid],
+          participantsMeta,
+          createdAt: new Date(),
+        });
+        console.log('Chat créé');
+      }
+      // Envoie le message
+      try {
+        await addDoc(collection(db, 'chats', chatId, 'messages'), {
+          sender: current.uid,
+          text: `🎨 Invitation à dessiner ensemble : ${url}`,
+          createdAt: serverTimestamp(),
+          type: 'draw-invite',
+          roomId,
+        });
+        console.log('Message envoyé');
+      } catch (err) {
+        console.warn('Erreur addDoc message:', err);
+        throw err;
+      }
+      // Met à jour le chat principal
+      try {
+        await updateDoc(chatDocRef, {
+          lastMessageText: '[Invitation à dessiner]',
+          lastMessageAt: serverTimestamp(),
+        });
+        console.log('Chat principal mis à jour');
+      } catch (err) {
+        console.warn('Erreur updateDoc chat:', err);
+        throw err;
+      }
+      Alert.alert('Invitation envoyée', `Lien envoyé à ${friend.otherUser?.displayName || 'ton ami'}`);
+      setShareModalVisible(false);
+    } catch (e) {
+      console.warn('Erreur globale envoi DM:', e);
+      Alert.alert('Erreur', `Impossible d'envoyer le lien.\n${e?.message || e}`);
+    }
+  };
   const router = useRouter();
   const { templateId, projectId } = useLocalSearchParams();
   
@@ -465,6 +587,50 @@ const MangaEditorSimple: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      {/* Bouton de partage */}
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', padding: 12 }}>
+        <TouchableOpacity
+          style={{ backgroundColor: '#FFA94D', borderRadius: 20, paddingVertical: 8, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+          onPress={openShareModal}
+        >
+          <Ionicons name="share-social" size={18} color="#181818" />
+          <Text style={{ color: '#181818', fontWeight: 'bold' }}>Partager</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Modal de partage */}
+      <Modal visible={shareModalVisible} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: '#23232a', borderRadius: 16, padding: 24, width: width * 0.8, maxHeight: height * 0.7 }}>
+            <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 18, marginBottom: 16 }}>Partager avec un ami</Text>
+            {loadingFriends ? (
+              <Text style={{ color: '#fff' }}>Chargement...</Text>
+            ) : friendsError ? (
+              <Text style={{ color: 'red', marginBottom: 10 }}>{friendsError}</Text>
+            ) : friendsList.length === 0 ? (
+              <Text style={{ color: '#fff' }}>Aucun ami trouvé.</Text>
+            ) : (
+              <ScrollView style={{ maxHeight: height * 0.5 }}>
+                {friendsList.map((friend, idx) => (
+                  <View key={friend.id || idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                    <Ionicons name="person-circle" size={32} color="#FFA94D" style={{ marginRight: 10 }} />
+                    <Text style={{ color: '#fff', flex: 1 }}>{friend.otherUser?.displayName || friend.otherUser?.pseudo || friend.otherUser?.email || 'Ami'}</Text>
+                    <TouchableOpacity
+                      style={{ backgroundColor: '#FFA94D', borderRadius: 16, paddingVertical: 6, paddingHorizontal: 14, marginLeft: 8 }}
+                      onPress={() => sendCollabLinkToFriend(friend)}
+                    >
+                      <Text style={{ color: '#181818', fontWeight: 'bold' }}>Envoyer en DM</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+            <TouchableOpacity style={{ marginTop: 18, alignSelf: 'center' }} onPress={() => setShareModalVisible(false)}>
+              <Text style={{ color: '#FFA94D', fontWeight: 'bold' }}>Fermer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       <StatusBar barStyle="light-content" backgroundColor="#181818" />
       
       {/* Header */}

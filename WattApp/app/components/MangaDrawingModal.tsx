@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Linking from 'expo-linking';
+import { v4 as uuidv4 } from 'uuid';
 import Svg, { Path, Rect } from 'react-native-svg';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -109,6 +111,13 @@ export const MangaDrawingModal: React.FC<MangaDrawingModalProps> = ({
       }
     },
   });
+
+  // Partage de la session collaborative
+  const handleShare = () => {
+    const roomId = panelData?.id || uuidv4();
+    const url = Linking.createURL(`/draw?roomId=${roomId}`);
+    Linking.openURL(url); // Ouvre le lien (ou utilise Share API pour partager)
+  };
 
   const handleSave = () => {
     if (onSaveDrawing) {
@@ -247,6 +256,10 @@ export const MangaDrawingModal: React.FC<MangaDrawingModalProps> = ({
             </TouchableOpacity>
           )}
 
+            {/* Bouton de partage */}
+            <TouchableOpacity style={[styles.controlButton, { backgroundColor: '#FFA94D' }]} onPress={handleShare}>
+              <Ionicons name="share-social" size={22} color="#181818" />
+            </TouchableOpacity>
           <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
             <LinearGradient
               colors={['#4CAF50', '#66BB6A']}
