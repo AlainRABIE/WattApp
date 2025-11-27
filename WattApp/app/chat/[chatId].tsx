@@ -319,13 +319,14 @@ export default function ChatThread() {
                   {drawInviteUrl ? (
                     <TouchableOpacity
                       onPress={() => {
-                        // Ouvre la page de dessin collaborative dans l'app
-                        const url = drawInviteUrl;
-                        // Si tu utilises un router interne, adapte ici
-                        Linking.openURL(url);
+                        Linking.openURL(drawInviteUrl);
                       }}
                     >
-                      <Text style={[styles.messageText, { color: '#FFA94D', textDecorationLine: 'underline' }]}>🎨 Invitation à dessiner (cliquer ici)</Text>
+                      <Text style={[styles.messageText, { color: '#FFA94D', textDecorationLine: 'underline' }]}>
+                        {item.text.split(drawInviteUrl)[0]}
+                        <Text style={{ color: '#FFA94D', textDecorationLine: 'underline' }}>{drawInviteUrl}</Text>
+                        {item.text.split(drawInviteUrl)[1]}
+                      </Text>
                     </TouchableOpacity>
                   ) : (
                     <Text style={styles.messageText}>{item.text}</Text>

@@ -1,6 +1,43 @@
 import * as Linking from 'expo-linking';
 import { v4 as uuidv4 } from 'uuid';
 import React, { useState, useEffect } from 'react';
+import { doc, getDoc, onSnapshot, collection, query as firestoreQuery, orderBy } from 'firebase/firestore';
+  // --- Notification acceptation collaboration ---
+  const [collabAccepted, setCollabAccepted] = useState(false);
+  const [collabAcceptedBy, setCollabAcceptedBy] = useState<string | null>(null);
+
+  // États principaux
+  const [project, setProject] = useState<MangaProject | null>(null);
+  // ...existing code...
+
+  // Vérifie s'il y a un message d'acceptation dans le chat lié à la room collaborative
+  useEffect(() => {
+    let unsub: any;
+    if (!project?.id) return;
+    const checkCollabAccept = async () => {
+      try {
+        const db = (await import('../../../constants/firebaseConfig')).db;
+        const roomDocRef = doc(db, 'drawingRooms', project.id);
+        const roomSnap = await getDoc(roomDocRef);
+        if (!roomSnap.exists()) return;
+        const roomData = roomSnap.data();
+        const chatId = roomData?.chatId;
+        if (!chatId) return;
+        const q = firestoreQuery(collection(db, 'chats', chatId, 'messages'), orderBy('createdAt', 'asc'));
+        unsub = onSnapshot(q, (snap) => {
+          const acceptMsg = snap.docs.find(d => d.data().type === 'draw-accept');
+          if (acceptMsg) {
+            setCollabAccepted(true);
+            setCollabAcceptedBy(acceptMsg.data().text || null);
+          }
+        });
+      } catch (e) {
+        // ignore
+      }
+    };
+    checkCollabAccept();
+    return () => { if (unsub) unsub(); };
+  }, [project?.id]);
 import {
   View,
   Text,
@@ -124,11 +161,32 @@ const MangaEditorSimple: React.FC = () => {
         });
         console.log('Chat créé');
       }
+      // Crée ou met à jour la room collaborative Firestore pour stocker inviterUid et chatId
+      try {
+        const { setDoc: setDocRoom, doc: docRoom, getDoc: getDocRoom } = await import('firebase/firestore');
+        const roomDocRef = docRoom(db, 'drawingRooms', roomId);
+        const roomSnap = await getDocRoom(roomDocRef);
+        if (!roomSnap.exists()) {
+          await setDocRoom(roomDocRef, {
+            inviterUid: current.uid,
+            chatId,
+            createdAt: new Date(),
+          });
+        } else {
+          await setDocRoom(roomDocRef, {
+            inviterUid: current.uid,
+            chatId,
+            updatedAt: new Date(),
+          }, { merge: true });
+        }
+      } catch (e) {
+        console.warn('Erreur création room collaborative:', e);
+      }
       // Envoie le message
       try {
         await addDoc(collection(db, 'chats', chatId, 'messages'), {
           sender: current.uid,
-          text: `🎨 Invitation à dessiner ensemble : ${url}`,
+          text: `Tu veux bien m'aider à concevoir un manga ? Clique ici pour collaborer : ${url}`,
           createdAt: serverTimestamp(),
           type: 'draw-invite',
           roomId,
@@ -587,6 +645,14 @@ const MangaEditorSimple: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      {/* Notification acceptation collaboration */}
+      {collabAccepted && (
+        <View style={{ backgroundColor: '#4CAF50', padding: 12, borderRadius: 8, margin: 12 }}>
+          <Text style={{ color: '#fff', fontWeight: 'bold', textAlign: 'center' }}>
+            {collabAcceptedBy ? collabAcceptedBy : "Un collaborateur a accepté l'invitation à dessiner !"}
+          </Text>
+        </View>
+      )}
       {/* Bouton de partage */}
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', padding: 12 }}>
         <TouchableOpacity
