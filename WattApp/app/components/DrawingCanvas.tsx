@@ -5,6 +5,7 @@ interface PathType {
   strokeWidth: number;
   pressure?: number;
   touchType?: string; // 'touch' | 'pen' | 'mouse'
+  userId?: string; // Ajout pour collaboration
 }
 
 interface TouchData {
@@ -21,7 +22,7 @@ import React, { useState, useImperativeHandle, forwardRef, useEffect } from 'rea
 import { getFirestore, doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
 import { View, StyleSheet, PanResponder } from 'react-native';
-import { Canvas, Path, Skia, Group } from '@shopify/react-native-skia';
+import { Canvas, Path, Skia, Group, Text as SkiaText } from '@shopify/react-native-skia';
 
 
 // Props: roomId (string, obligatoire pour la collab)
@@ -42,8 +43,35 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(props: any, ref) {
   const [currentTouchData, setCurrentTouchData] = useState<TouchData | null>(null);
 
   // Firestore setup
+    // Pour afficher le pseudo de chaque utilisateur (cache local)
+    const [userMap, setUserMap] = useState<{ [uid: string]: string }>({});
+    // Récupère le pseudo d'un utilisateur depuis Firestore
+    const fetchUserDisplayName = async (uid: string) => {
+      if (!uid || userMap[uid]) return;
+      try {
+        const { getFirestore, collection, query, where, getDocs } = await import('firebase/firestore');
+        const db = getFirestore(getApp());
+        const q = query(collection(db, 'users'), where('uid', '==', uid));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const data = snap.docs[0].data();
+          setUserMap(prev => ({ ...prev, [uid]: data.displayName || data.pseudo || data.email || uid }));
+        }
+      } catch {}
+    };
   const db = collaborative ? getFirestore(getApp()) : null;
   const roomDocRef = collaborative && roomId ? doc(db, 'drawingRooms', roomId) : null;
+  // Auth pour récupérer l'utilisateur courant
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!collaborative) return;
+    import('firebase/auth').then(({ getAuth }) => {
+      try {
+        const auth = getAuth();
+        setCurrentUserId(auth.currentUser?.uid || null);
+      } catch {}
+    });
+  }, [collaborative]);
   // Ecoute Firestore pour la collaboration
   useEffect(() => {
     if (!collaborative || !roomDocRef) return;
@@ -139,7 +167,8 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(props: any, ref) {
                 color: currentColor,
                 strokeWidth: dynamicStrokeWidth,
                 pressure: currentTouchData.pressure,
-                touchType: currentTouchData.touchType
+                touchType: currentTouchData.touchType,
+                userId: collaborative ? currentUserId : undefined,
               },
             ];
             onChange && onChange(updated);
@@ -180,7 +209,8 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(props: any, ref) {
                 color: currentColor,
                 strokeWidth: dynamicStrokeWidth,
                 pressure: touchData.pressure,
-                touchType: touchData.touchType
+                touchType: touchData.touchType,
+                userId: collaborative ? currentUserId : undefined,
               },
             ];
             onChange && onChange(updated);
@@ -222,19 +252,45 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(props: any, ref) {
     >
       <Canvas style={styles.canvas}>
         <Group>
-          {paths.map((p: PathType, i: number) => (
-            <Path
-              key={i}
-              path={p.path}
-              color={p.color}
-              style="stroke"
-              strokeWidth={p.strokeWidth}
-              strokeJoin="round"
-              strokeCap="round"
-              // Ajouter de la transparence pour les traits de stylet
-              opacity={p.touchType === 'pen' ? 0.8 : 1.0}
-            />
-          ))}
+          {paths.map((p: PathType, i: number) => {
+            // Si collaboration, on affiche le pseudo de l'auteur
+            if (collaborative && p.userId) fetchUserDisplayName(p.userId);
+            return (
+              <>
+                <Path
+                  key={i}
+                  path={p.path}
+                  color={p.color}
+                  style="stroke"
+                  strokeWidth={p.strokeWidth}
+                  strokeJoin="round"
+                  strokeCap="round"
+                  opacity={p.touchType === 'pen' ? 0.8 : 1.0}
+                />
+                {/* Affiche le pseudo à côté du début du trait */}
+                {collaborative && p.userId && userMap[p.userId] && (() => {
+                  // On essaye d'extraire le premier point du path SVG
+                  const match = p.path.match(/M\s*([\d.]+)[, ]([\d.]+)/i);
+                  if (match) {
+                    const x = parseFloat(match[1]);
+                    const y = parseFloat(match[2]);
+                    return (
+                      <SkiaText
+                        key={i + '-label'}
+                        x={x + 8}
+                        y={y - 8}
+                        text={userMap[p.userId]}
+                        color="#FFA94D"
+                        fontSize={12}
+                        opacity={0.85}
+                      />
+                    );
+                  }
+                  return null;
+                })()}
+              </>
+            );
+          })}
           {currentPath && currentTouchData && (
             <Path
               path={currentPath}
