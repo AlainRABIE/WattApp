@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Alert } from 'react-native';
+import { View, Alert, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../../constants/firebaseConfig';
 import PDFReader from '../../components/PDFReader';
+import AnnotationPanel from '../../components/AnnotationPanel';
 import { NativePDFService, PDFBookData } from '../../services/NativePDFService';
+import HighlightableText from '../../components/HighlightableText';
 
 type BookType = {
   id: string;
@@ -113,12 +115,29 @@ export default function PDFReadPage() {
     return <View style={{ flex: 1, backgroundColor: '#1a1a1a' }} />;
   }
 
+  // Exemple de texte de chapitre (à remplacer par le vrai contenu si besoin)
+  const chapterText = 'Ceci est un exemple de texte de chapitre. Sélectionnez un passage pour le surligner et ajouter une note collaborative.';
+
   return (
-    <PDFReader
-      source={{ uri: bookData.filePath }}
-      title={bookData.titre || bookData.title || 'PDF'}
-      pagesImagePaths={localBookData?.pagesImagePaths}
-      totalPages={localBookData?.totalPages}
-    />
+    <ScrollView style={{ flex: 1, backgroundColor: '#1a1a1a' }}>
+      <PDFReader
+        source={{ uri: bookData.filePath }}
+        title={bookData.titre || bookData.title || 'PDF'}
+        pagesImagePaths={localBookData?.pagesImagePaths}
+        totalPages={localBookData?.totalPages}
+      />
+      {/* Annotation collaborative sur le PDF (par page) */}
+      <AnnotationPanel
+        projectId={bookData.id}
+        page={1} // À remplacer par la page courante si tu veux une annotation par page
+        type="texte"
+      />
+      {/* Surlignement collaboratif sur le texte du chapitre */}
+      <HighlightableText
+        projectId={bookData.id}
+        page={1}
+        text={chapterText}
+      />
+    </ScrollView>
   );
 }
