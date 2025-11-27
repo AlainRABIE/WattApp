@@ -20,7 +20,100 @@ import * as DocumentPicker from 'expo-document-picker';
 import { mangaProjectService } from '../services/MangaProjectService';
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { Linking, Alert } from 'react-native';
+    // Ouvre les réglages sur la section paiement
+    const goToSettings = () => router.push('/settings');
+
+    // Lancer onboarding Stripe depuis la page de publication
+    const handleStripeConnect = async () => {
+      try {
+        const auth = getAuth(app);
+        const user = auth.currentUser;
+        if (!user) throw new Error('Non connecté');
+        const res = await fetch('/api/stripe/onboard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid: user.uid, email: user.email }),
+        });
+        const data = await res.json();
+        if (data.url) {
+          Linking.openURL(data.url);
+        } else {
+          Alert.alert('Erreur', 'Impossible de générer le lien Stripe.');
+        }
+      } catch (e) {
+        Alert.alert('Erreur', 'Impossible de se connecter à Stripe.');
+      }
+    };
+
+    // Connexion PayPal (simple: demande l'email)
+    const handlePaypalConnect = async () => {
+      Alert.prompt(
+        'Connecter PayPal',
+        'Entrez votre adresse email PayPal pour recevoir vos paiements.',
+        async (email) => {
+          if (!email) return;
+          try {
+            const auth = getAuth(app);
+            const user = auth.currentUser;
+            if (!user) throw new Error('Non connecté');
+            const userRef = doc(db, 'users', user.uid);
+            await updateDoc(userRef, { paypalEmail: email });
+            setPaypalStatus('connected');
+            setPaypalEmail(email);
+            Alert.alert('Succès', 'Votre compte PayPal est connecté.');
+          } catch (e) {
+            Alert.alert('Erreur', 'Impossible de connecter PayPal.');
+            setPaypalStatus('not-connected');
+          }
+        },
+        'plain-text',
+        paypalEmail || ''
+      );
+    };
+  // Paiement vendeur (Stripe/PayPal)
+  const [stripeStatus, setStripeStatus] = useState<'not-connected' | 'connected' | 'loading'>('loading');
+  const [paypalStatus, setPaypalStatus] = useState<'not-connected' | 'connected' | 'loading'>('loading');
+  const [paypalEmail, setPaypalEmail] = useState<string | null>(null);
+  const [stripeId, setStripeId] = useState<string | null>(null);
+
+  // Récupère le compte de paiement de l'utilisateur
+  useEffect(() => {
+    const fetchPaymentAccounts = async () => {
+      try {
+        const auth = getAuth(app);
+        const user = auth.currentUser;
+        if (!user) return;
+        const userRef = doc(db, 'users', user.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          const data = userSnap.data();
+          if (data.stripeAccountId) {
+            setStripeStatus('connected');
+            setStripeId(data.stripeAccountId);
+          } else {
+            setStripeStatus('not-connected');
+            setStripeId(null);
+          }
+          if (data.paypalEmail) {
+            setPaypalStatus('connected');
+            setPaypalEmail(data.paypalEmail);
+          } else {
+            setPaypalStatus('not-connected');
+            setPaypalEmail(null);
+          }
+        } else {
+          setStripeStatus('not-connected');
+          setPaypalStatus('not-connected');
+        }
+      } catch {
+        setStripeStatus('not-connected');
+        setPaypalStatus('not-connected');
+      }
+    };
+    fetchPaymentAccounts();
+  }, []);
 
 interface MangaPublication {
   id: string;
@@ -669,7 +762,7 @@ const MangaPublisher: React.FC = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#181818" />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
@@ -677,6 +770,37 @@ const MangaPublisher: React.FC = () => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Publier le Manga</Text>
         <View style={{ width: 24 }} />
+      </View>
+
+      {/* Bloc récapitulatif paiement */}
+      <View style={{ backgroundColor: '#232323', borderRadius: 12, margin: 18, padding: 16, borderWidth: 1, borderColor: '#FFA94D' }}>
+        <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>Compte de paiement sélectionné</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+          <Ionicons name="card-outline" size={20} color="#FFA94D" style={{ marginRight: 8 }} />
+          {stripeStatus === 'connected' ? (
+            <Text style={{ color: '#4CAF50' }}>Stripe connecté (ID: {stripeId})</Text>
+          ) : (
+            <TouchableOpacity style={{ backgroundColor: '#FFA94D', borderRadius: 16, paddingVertical: 6, paddingHorizontal: 14, marginLeft: 8 }} onPress={handleStripeConnect}>
+              <Text style={{ color: '#181818', fontWeight: 'bold' }}>Connecter Stripe</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+          <Ionicons name="logo-paypal" size={20} color="#0070BA" style={{ marginRight: 8 }} />
+          {paypalStatus === 'connected' ? (
+            <Text style={{ color: '#4CAF50' }}>PayPal connecté ({paypalEmail})</Text>
+          ) : (
+            <TouchableOpacity style={{ backgroundColor: '#0070BA', borderRadius: 16, paddingVertical: 6, paddingHorizontal: 14, marginLeft: 8 }} onPress={handlePaypalConnect}>
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Connecter PayPal</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        <Text style={{ color: '#aaa', fontSize: 13, marginTop: 4 }}>
+          Le paiement de vos ventes sera envoyé sur le compte connecté ci-dessus. Vous pouvez modifier ce choix dans les réglages.
+        </Text>
+        <TouchableOpacity onPress={goToSettings} style={{ alignSelf: 'flex-end', marginTop: 8 }}>
+          <Text style={{ color: '#FFA94D', fontWeight: 'bold' }}>Modifier dans les réglages</Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (
