@@ -9,7 +9,6 @@ import app, { db } from '../constants/firebaseConfig';
 import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
-import { ThemeSelector } from './components/ThemeSelector';
 import { useTheme } from '../hooks/useTheme';
 
 const Profile: React.FC = () => {
@@ -27,7 +26,6 @@ const Profile: React.FC = () => {
   const [recentReads, setRecentReads] = useState<any[]>([]);
   const [uploading, setUploading] = useState<boolean>(false);
   const [playlists, setPlaylists] = useState<any[]>([]);
-  const [showThemeSelector, setShowThemeSelector] = useState(false);
   const { theme } = useTheme();
 
   useEffect(() => {
@@ -195,84 +193,20 @@ const Profile: React.FC = () => {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#181818' }}>
-      {/* Header avec engrenage en haut à droite */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 48, paddingBottom: 12, backgroundColor: '#181818' }}>
-        <View />
-        <Text style={{ color: '#FFA94D', fontSize: 20, fontWeight: 'bold' }}>Mon profil</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity onPress={() => router.push('/dashboard')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ marginRight: 8 }}>
-            <Ionicons name="stats-chart-outline" size={28} color="#4FC3F7" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/settings')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name="settings" size={28} color="#FFA94D" />
-          </TouchableOpacity>
-        </View>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      {/* Header minimaliste */}
+      <View style={[styles.header, { backgroundColor: theme.colors.background, borderBottomColor: theme.colors.border }]}>
+        <TouchableOpacity onPress={() => router.push('/dashboard')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="stats-chart-outline" size={24} color={theme.colors.primary} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: theme.colors.primary }]}>Profil</Text>
+        <TouchableOpacity onPress={() => router.push('/settings')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="settings-outline" size={24} color={theme.colors.primary} />
+        </TouchableOpacity>
       </View>
-      <ScrollView contentContainerStyle={styles.container}>
-        {/* Banner avec bouton de modification */}
-        <View style={styles.bannerContainer}>
-          <Image source={{ uri: bannerURL || 'https://images.unsplash.com/photo-1503264116251-35a269479413?auto=format&fit=crop&w=1200&q=60' }} style={styles.banner} />
-          <TouchableOpacity style={styles.bannerEditBtn} onPress={async () => {
-            try {
-              const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-              if (!(permission.granted || permission.status === 'granted')) {
-                Alert.alert('Permission requise', 'Autorisez l\'accès à la galerie pour changer la bannière.');
-                return;
-              }
-              const res = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                quality: 0.9,
-                allowsEditing: true,
-                aspect: [16, 5],
-              });
-              if (res.canceled) return;
-              const asset = res.assets && res.assets[0];
-              const uri = asset?.uri;
-              if (!uri) {
-                Alert.alert('Erreur', 'Impossible de récupérer l\'image.');
-                return;
-              }
-              setUploading(true);
-              const manipResult = await ImageManipulator.manipulateAsync(
-                uri,
-                [{ resize: { width: 1200 } }],
-                { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
-              );
-              const finalUri = manipResult.uri;
-              const base64 = await FileSystem.readAsStringAsync(finalUri, { encoding: 'base64' });
-              const dataUrl = `data:image/jpeg;base64,${base64}`;
-              const approxBytes = Math.floor((dataUrl.length - 22) * 3 / 4);
-              const MAX_BYTES = 1800000;
-              if (approxBytes > MAX_BYTES) {
-                Alert.alert('Image trop lourde', 'Choisis une image plus petite ou réduis la qualité.');
-                setUploading(false);
-                return;
-              }
-              const auth = getAuth(app);
-              const user = auth.currentUser;
-              if (!user) throw new Error('Utilisateur non authentifié');
-              const qUser = query(collection(db, 'users'), where('uid', '==', user.uid));
-              const snapUser = await getDocs(qUser);
-              if (!snapUser.empty) {
-                const userDocRef = doc(db, 'users', snapUser.docs[0].id);
-                await updateDoc(userDocRef, { bannerURL: dataUrl });
-              }
-              setBannerURL(dataUrl);
-            } catch (e) {
-              Alert.alert('Erreur', 'Impossible de sélectionner la bannière.');
-            } finally {
-              setUploading(false);
-            }
-          }}>
-            <View style={styles.bannerEditIcon}>
-              <Image source={{ uri: 'https://img.icons8.com/ios-filled/50/FFA94D/camera.png' }} style={{ width: 22, height: 22, tintColor: '#FFA94D' }} />
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Avatar overlapping banner */}
-        <View style={styles.metaRow}>
+      <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.colors.background }]}>
+        {/* Avatar centré minimaliste */}
+        <View style={styles.profileSection}>
           <TouchableOpacity onPress={async () => {
             try {
               const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -325,102 +259,121 @@ const Profile: React.FC = () => {
               const name = (displayName || email || 'User') as string;
               const len = name.trim().includes(' ') ? 2 : 1;
               return (
-                <Image source={{ uri: photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&length=${String(len)}&background=FFA94D&color=181818&size=128` }} style={styles.avatarLarge} />
+                <View style={styles.avatarContainer}>
+                  <Image source={{ uri: photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&length=${String(len)}&background=${theme.colors.primary.replace('#', '')}&color=${theme.colors.background.replace('#', '')}&size=200` }} style={[styles.avatar, { borderColor: theme.colors.primary }]} />
+                  {uploading ? (
+                    <View style={[styles.editBadge, { backgroundColor: theme.colors.surface }]}>
+                      <ActivityIndicator size="small" color={theme.colors.primary} />
+                    </View>
+                  ) : (
+                    <View style={[styles.editBadge, { backgroundColor: theme.colors.primary }]}>
+                      <Ionicons name="camera" size={18} color={theme.colors.background} />
+                    </View>
+                  )}
+                </View>
               );
             })()}
           </TouchableOpacity>
-          {uploading ? <ActivityIndicator style={{ marginLeft: 12 }} color="#FFA94D" /> : null}
-          <View style={styles.metaText}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={styles.nameLarge}>{displayName || 'Utilisateur'}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
-                {isPrivate ? (
-                  <>
-                    <Ionicons name="lock-closed" size={16} color="#FFA94D" style={{ marginRight: 4 }} />
-                    <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 12 }}>Compte privé</Text>
-                  </>
-                ) : (
-                  <>
-                    <Ionicons name="earth" size={16} color="#4FC3F7" style={{ marginRight: 4 }} />
-                    <Text style={{ color: '#4FC3F7', fontWeight: 'bold', fontSize: 12 }}>Compte public</Text>
-                  </>
-                )}
-              </View>
-            </View>
-            <Text style={styles.email}>{email}</Text>
+
+          {/* Nom et email centrés */}
+          <Text style={[styles.name, { color: theme.colors.text }]}>{displayName || 'Utilisateur'}</Text>
+          <Text style={[styles.emailText, { color: theme.colors.textSecondary }]}>{email}</Text>
+          
+          {/* Badge compte privé/public minimaliste */}
+          <View style={[styles.privacyBadge, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <Ionicons 
+              name={isPrivate ? "lock-closed" : "globe-outline"} 
+              size={14} 
+              color={theme.colors.primary} 
+              style={{ marginRight: 4 }} 
+            />
+            <Text style={[styles.privacyText, { color: theme.colors.textSecondary }]}>
+              {isPrivate ? 'Privé' : 'Public'}
+            </Text>
           </View>
         </View>
 
-        {/* bio */}
+        {/* Bio minimaliste */}
         {bio ? (
-          <View style={styles.bioBubble}>
-            <Text style={styles.bioBubbleText}>{bio}</Text>
+          <View style={[styles.bioContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <Text style={[styles.bioText, { color: theme.colors.textSecondary }]}>{bio}</Text>
           </View>
         ) : null}
 
-        {/* Stats + actions */}
-        <View style={styles.rowBetween}>
-          <View style={styles.statsRowSmall}>
-            <View style={styles.statBoxSmall}>
-              <Text style={styles.statNumber}>{String(worksCount ?? '-')}</Text>
-              <Text style={styles.statLabel}>Œuvres</Text>
-            </View>
-            <View style={styles.statBoxSmall}>
-              <Text style={styles.statNumber}>{String(followersCount ?? '-')}</Text>
-              <Text style={styles.statLabel}>Abonnés</Text>
-            </View>
-            <View style={styles.statBoxSmall}>
-              <Text style={styles.statNumber}>{String(friendsCount ?? '-')}</Text>
-              <Text style={styles.statLabel}>Amis</Text>
-            </View>
+        {/* Stats en cartes minimalistes */}
+        <View style={styles.statsContainer}>
+          <View style={[styles.statCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <Text style={[styles.statValue, { color: theme.colors.primary }]}>{String(worksCount ?? '0')}</Text>
+            <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Œuvres</Text>
           </View>
+          <View style={[styles.statCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <Text style={[styles.statValue, { color: theme.colors.primary }]}>{String(followersCount ?? '0')}</Text>
+            <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Abonnés</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <Text style={[styles.statValue, { color: theme.colors.primary }]}>{String(friendsCount ?? '0')}</Text>
+            <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Amis</Text>
+          </View>
+        </View>
 
-          <View style={styles.actionColumnSingle}>
-            <TouchableOpacity style={styles.primaryButtonSingle} onPress={() => router.push('/EditProfile')}>
-              <Text style={styles.primaryText}>Éditer le profil</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.secondaryButtonSmall} onPress={() => router.push('/write')}>
-              <Text style={styles.secondaryText}>Commencer à écrire</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.themeButtonSmall} onPress={() => setShowThemeSelector(true)}>
-              <Ionicons name="color-palette" size={16} color="#FFA94D" style={{ marginRight: 8 }} />
-              <Text style={styles.themeButtonText}>Thèmes</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.themeButtonSmall} onPress={() => router.push('/settings')}>
-              <Ionicons name="settings" size={16} color="#FFA94D" style={{ marginRight: 8 }} />
-              <Text style={styles.themeButtonText}>Réglages</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Actions minimalistes */}
+        <View style={styles.actionsContainer}>
+          <TouchableOpacity 
+            style={[styles.primaryBtn, { backgroundColor: theme.colors.primary }]} 
+            onPress={() => router.push('/EditProfile')}
+          >
+            <Ionicons name="create-outline" size={18} color={theme.colors.background} style={{ marginRight: 6 }} />
+            <Text style={[styles.primaryBtnText, { color: theme.colors.background }]}>Éditer profil</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.secondaryBtn, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]} 
+            onPress={() => router.push('/write')}
+          >
+            <Ionicons name="pencil-outline" size={18} color={theme.colors.primary} style={{ marginRight: 6 }} />
+            <Text style={[styles.secondaryBtnText, { color: theme.colors.primary }]}>Écrire</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Œuvres */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mes œuvres</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Mes œuvres</Text>
           {(works && works.length) === 0 ? (
-            <Text style={styles.placeholder}>Tu n'as pas encore d'œuvres publiées.</Text>
+            <View style={[styles.emptyState, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+              <Ionicons name="book-outline" size={32} color={theme.colors.textSecondary} />
+              <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>Aucune œuvre publiée</Text>
+            </View>
           ) : (
-            <FlatList
-              horizontal
-              data={works}
-              keyExtractor={(i) => String(i.id)}
-              renderItem={renderWork}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingVertical: 8 }}
-            />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {works.map((item) => (
+                <TouchableOpacity key={String(item.id)} style={styles.bookCard} onPress={() => router.push(`../book/${item.id}`)}>
+                  {item.coverImage ? (
+                    <Image source={{ uri: item.coverImage }} style={[styles.bookCover, { borderColor: theme.colors.border }]} />
+                  ) : (
+                    <View style={[styles.bookCover, styles.bookCoverPlaceholder, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+                      <Ionicons name="book" size={28} color={theme.colors.textSecondary} />
+                    </View>
+                  )}
+                  <Text style={[styles.bookTitle, { color: theme.colors.text }]} numberOfLines={2}>{item.title || 'Sans titre'}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           )}
         </View>
 
         {/* Continuez à lire */}
-        <View style={[styles.section, { marginTop: 10 }]}>
-          <Text style={styles.sectionTitle}>Continuez à lire</Text>
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Continuez à lire</Text>
           {(recentReads && recentReads.length) === 0 ? (
-            <Text style={styles.placeholder}>Aucune lecture récente.</Text>
+            <View style={[styles.emptyState, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+              <Ionicons name="time-outline" size={32} color={theme.colors.textSecondary} />
+              <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>Aucune lecture récente</Text>
+            </View>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {recentReads.map(r => (
-                <View key={String(r.id)} style={styles.workCard}>
-                  <Image source={{ uri: r.couverture || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80' }} style={styles.workCover} />
-                  <Text style={styles.workTitle} numberOfLines={2}>{r.titre || 'Titre'}</Text>
+                <View key={String(r.id)} style={styles.bookCard}>
+                  <Image source={{ uri: r.couverture || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80' }} style={[styles.bookCover, { borderColor: theme.colors.border }]} />
+                  <Text style={[styles.bookTitle, { color: theme.colors.text }]} numberOfLines={2}>{r.titre || 'Titre'}</Text>
                 </View>
               ))}
             </ScrollView>
@@ -428,65 +381,58 @@ const Profile: React.FC = () => {
         </View>
 
         {/* Section Playlists */}
-        <View style={[styles.section, { marginTop: 15 }]}>
+        <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Mes playlists</Text>
-            <TouchableOpacity style={styles.addPlaylistBtn} onPress={() => Alert.alert('Ajout playlist', 'Ajout de playlist non implémenté ici.')}>
-              <Text style={styles.addPlaylistText}>+ Ajouter</Text>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Playlists</Text>
+            <TouchableOpacity 
+              style={[styles.addBtn, { backgroundColor: theme.colors.primary }]} 
+              onPress={() => Alert.alert('Ajout playlist', 'Ajout de playlist non implémenté ici.')}
+            >
+              <Ionicons name="add" size={18} color={theme.colors.background} />
             </TouchableOpacity>
           </View>
           {playlists.length === 0 ? (
-            <View style={styles.emptyPlaylistContainer}>
-              <Text style={styles.placeholder}>Aucune playlist ajoutée.</Text>
-              <Text style={styles.placeholderSubtext}>
-                Ajoutez vos playlists Spotify, Apple Music, YouTube Music ou Deezer pour les écouter pendant la lecture.
-              </Text>
+            <View style={[styles.emptyState, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+              <Ionicons name="musical-notes-outline" size={32} color={theme.colors.textSecondary} />
+              <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>Aucune playlist</Text>
             </View>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.playlistsContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {playlists.map((playlist) => (
-                <View key={playlist.id} style={styles.playlistCard}>
-                  <TouchableOpacity
-                    style={styles.playlistMain}
-                    onPress={() => openPlaylist(playlist)}
-                    onLongPress={() => deletePlaylist(playlist.id)}
-                  >
-                    <View style={styles.playlistHeader}>
-                      <TouchableOpacity
-                        style={styles.lockButton}
-                        onPress={() => togglePlaylistVisibility(playlist.id, playlist.isPrivate)}
-                      >
-                        <Text style={styles.lockIcon}>
-                          {playlist.isPrivate ? '🔒' : '🌐'}
-                        </Text>
-                      </TouchableOpacity>
+                <TouchableOpacity
+                  key={playlist.id}
+                  style={[styles.playlistCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+                  onPress={() => openPlaylist(playlist)}
+                  onLongPress={() => deletePlaylist(playlist.id)}
+                >
+                  <View style={styles.playlistTop}>
+                    <TouchableOpacity
+                      style={[styles.playlistLock, { backgroundColor: theme.colors.background }]}
+                      onPress={() => togglePlaylistVisibility(playlist.id, playlist.isPrivate)}
+                    >
+                      <Ionicons 
+                        name={playlist.isPrivate ? "lock-closed" : "globe-outline"} 
+                        size={12} 
+                        color={theme.colors.primary} 
+                      />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.playlistContent}>
+                    {renderPlatformIcon(playlist.platform, playlist.icon)}
+                    <View style={[styles.platformTag, { backgroundColor: getPlatformColor(playlist.platform) }]}>
+                      <Text style={styles.platformLabel}>{playlist.platform.toUpperCase()}</Text>
                     </View>
-                    <View style={styles.playlistIconContainer}>
-                      {renderPlatformIcon(playlist.platform, playlist.icon)}
-                      <View style={[styles.platformBadge, { backgroundColor: getPlatformColor(playlist.platform) }]}>
-                        <Text style={styles.platformText}>{playlist.platform.toUpperCase()}</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.playlistName} numberOfLines={2}>{playlist.name}</Text>
-                    <Text style={styles.playlistPlatform}>
-                      {playlist.isPrivate ? 'Privée' : 'Publique'} • Appuyez pour ouvrir
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                  </View>
+                  <Text style={[styles.playlistTitle, { color: theme.colors.text }]} numberOfLines={2}>{playlist.name}</Text>
+                </TouchableOpacity>
               ))}
             </ScrollView>
           )}
         </View>
 
-        {/* Bouton de déconnexion */}
+        {/* Bouton de déconnexion minimaliste */}
         <TouchableOpacity
-          style={{
-            backgroundColor: '#FFA94D',
-            padding: 12,
-            borderRadius: 8,
-            alignItems: 'center',
-            margin: 24,
-          }}
+          style={[styles.logoutBtn, { backgroundColor: theme.colors.surface, borderColor: theme.colors.error }]}
           onPress={async () => {
             try {
               const auth = getAuth(app);
@@ -497,13 +443,10 @@ const Profile: React.FC = () => {
             }
           }}
         >
-          <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 16 }}>Se déconnecter</Text>
+          <Ionicons name="log-out-outline" size={18} color={theme.colors.error} style={{ marginRight: 6 }} />
+          <Text style={[styles.logoutText, { color: theme.colors.error }]}>Se déconnecter</Text>
         </TouchableOpacity>
         <View style={{ height: 80 }} />
-        <ThemeSelector
-          visible={showThemeSelector}
-          onClose={() => setShowThemeSelector(false)}
-        />
       </ScrollView>
     </View>
   );
@@ -512,220 +455,246 @@ const Profile: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     padding: 0,
-    backgroundColor: '#181818',
-    minHeight: '100%',
-    alignItems: 'center',
+    paddingBottom: 20,
   },
-  bannerContainer: {
-    width: '100%',
-    height: 140,
-    position: 'relative',
-    marginBottom: -40,
-  },
-  banner: {
-    width: '100%',
-    height: 140,
-    resizeMode: 'cover',
-  },
-  bannerEditBtn: {
-    position: 'absolute',
-    right: 18,
-    bottom: 12,
-    backgroundColor: 'rgba(24,24,24,0.85)',
-    borderRadius: 18,
-    padding: 6,
-    zIndex: 2,
-    borderWidth: 1,
-    borderColor: '#FFA94D',
-  },
-  bannerEditIcon: {
-    width: 22,
-    height: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  metaRow: {
-    width: '100%',
-    paddingHorizontal: 20,
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: -30,
-  },
-  avatarLarge: {
-    width: 86,
-    height: 86,
-    borderRadius: 43,
-    borderWidth: 3,
-    borderColor: '#181818',
-    marginRight: 12,
-    backgroundColor: '#232323',
-  },
-  metaText: { flex: 1 },
-  nameLarge: { color: '#FFA94D', fontSize: 20, fontWeight: '700' },
-  email: { color: '#fff', fontSize: 13, marginTop: 4 },
-  bio: { color: '#fff', paddingHorizontal: 20, marginTop: 12, lineHeight: 20 },
-  bioBubble: {
-    backgroundColor: 'rgba(40, 40, 40, 0.85)',
-    borderRadius: 18,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    marginTop: 12,
-    marginBottom: 2,
-    alignSelf: 'stretch',
-    minHeight: 38,
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 1,
-  },
-  bioBubbleText: {
-    color: '#FFA94D',
-    fontSize: 15,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  rowBetween: { width: '100%', paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
-  statsRowSmall: { flexDirection: 'row', alignItems: 'center' },
-  statBoxSmall: { alignItems: 'center', marginRight: 18 },
-  statNumber: { color: '#FFA94D', fontSize: 18, fontWeight: '700' },
-  statLabel: { color: '#fff', fontSize: 12 },
-  actionColumn: { flexDirection: 'column' },
-  actionColumnSingle: { flexDirection: 'column', alignItems: 'flex-end' },
-  primaryButton: { backgroundColor: '#FFA94D', padding: 10, borderRadius: 8, alignItems: 'center', marginBottom: 8, minWidth: 100 },
-  primaryText: { color: '#181818', fontWeight: '700' },
-  primaryButtonSingle: { backgroundColor: '#FFA94D', padding: 12, borderRadius: 8, alignItems: 'center', minWidth: 160 },
-  secondaryButton: { borderColor: '#FFA94D', borderWidth: 1, padding: 8, borderRadius: 8, alignItems: 'center', minWidth: 100 },
-  secondaryText: { color: '#FFA94D' },
-  secondaryButtonSmall: { borderColor: '#FFA94D', borderWidth: 1, padding: 10, borderRadius: 8, alignItems: 'center', minWidth: 160, marginTop: 8 },
-  tabsRow: { width: '100%', flexDirection: 'row', paddingHorizontal: 10, marginTop: 18 },
-  tabButton: { flex: 1, paddingVertical: 10, alignItems: 'center' },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: '#FFA94D' },
-  tabText: { color: '#fff' },
-  tabTextActive: { color: '#FFA94D', fontWeight: '700' },
-  section: { width: '100%', marginTop: 12, paddingHorizontal: 20 },
-  sectionTitle: { color: '#FFA94D', fontWeight: 'bold', marginBottom: 8 },
-  placeholder: { color: '#888', fontStyle: 'italic' },
-  workCard: { width: 120, marginRight: 12, alignItems: 'center' },
-  workCover: { width: 100, height: 150, borderRadius: 8, backgroundColor: '#232323' },
-  workTitle: { color: '#fff', fontSize: 13, marginTop: 6, textAlign: 'center' },
-  sectionHeader: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    paddingHorizontal: 20,
+    paddingTop: 48,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
   },
-  addPlaylistBtn: {
-    backgroundColor: '#FFA94D',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-  },
-  addPlaylistText: {
-    color: '#181818',
+  headerTitle: {
+    fontSize: 18,
     fontWeight: '600',
-    fontSize: 12,
+    letterSpacing: 0.5,
   },
-  emptyPlaylistContainer: {
+  profileSection: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingTop: 32,
+    paddingBottom: 24,
   },
-  placeholderSubtext: {
-    color: '#666',
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 8,
-    fontStyle: 'italic',
-  },
-  playlistsContainer: {
-    paddingVertical: 8,
-  },
-  playlistCard: {
-    width: 160,
-    marginRight: 15,
-  },
-  playlistMain: {
-    backgroundColor: '#232323',
-    borderRadius: 12,
-    padding: 15,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  playlistIconContainer: {
-    alignItems: 'center',
-    marginBottom: 10,
+  avatarContainer: {
     position: 'relative',
   },
-  playlistIcon: {
-    fontSize: 30,
-    marginBottom: 8,
+  avatar: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 3,
   },
-  playlistIconImage: {
+  editBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
     width: 32,
     height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  name: {
+    fontSize: 22,
+    fontWeight: '700',
+    marginTop: 16,
+    letterSpacing: 0.3,
+  },
+  emailText: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+  privacyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginTop: 12,
+  },
+  privacyText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  bioContainer: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  bioText: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  actionsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginBottom: 24,
+    gap: 12,
+  },
+  primaryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  primaryBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  secondaryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  secondaryBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  addBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  emptyText: {
+    fontSize: 14,
+    marginTop: 8,
+    fontWeight: '500',
+  },
+  bookCard: {
+    width: 110,
+    marginRight: 16,
+  },
+  bookCover: {
+    width: 110,
+    height: 160,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  bookCoverPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bookTitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 8,
+    lineHeight: 18,
+  },
+  playlistCard: {
+    width: 140,
+    marginRight: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+  },
+  playlistTop: {
+    alignItems: 'flex-end',
     marginBottom: 8,
-    alignSelf: 'center',
   },
-  platformBadge: {
+  playlistLock: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playlistContent: {
+    alignItems: 'center',
+    marginBottom: 12,
+    position: 'relative',
+  },
+  playlistIconImage: {
+    width: 40,
+    height: 40,
+  },
+  platformTag: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    position: 'absolute',
-    bottom: -5,
-    right: -15,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 8,
   },
-  platformText: {
+  platformLabel: {
     color: '#fff',
     fontSize: 9,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
-  playlistName: {
-    color: '#FFA94D',
-    fontSize: 14,
+  playlistTitle: {
+    fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
-    marginBottom: 5,
+    lineHeight: 18,
   },
-  playlistPlatform: {
-    color: '#888',
-    fontSize: 10,
-    textAlign: 'center',
-  },
-  playlistHeader: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    zIndex: 1,
-  },
-  lockButton: {
-    backgroundColor: 'rgba(24, 24, 24, 0.8)',
-    borderRadius: 15,
-    width: 30,
-    height: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#FFA94D',
-  },
-  lockIcon: {
-    fontSize: 14,
-  },
-  themeButtonSmall: {
-    borderColor: '#FFA94D',
-    borderWidth: 1,
-    padding: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 160,
-    marginTop: 8,
+  logoutBtn: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 20,
+    marginTop: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
   },
-  themeButtonText: {
-    color: '#FFA94D',
-    fontSize: 14,
+  logoutText: {
+    fontSize: 15,
     fontWeight: '600',
   },
 });
