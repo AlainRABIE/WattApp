@@ -987,55 +987,53 @@ Variables d'état:
       
       {/* Header avec padding pour éviter la BottomNav */}
       <View style={styles.headerSection}>
-        <View style={styles.headerRow}>
-          <Text style={styles.title}>Bibliothèque</Text>
-          <View style={styles.actionButtons}>
-            <TouchableOpacity 
-              onPress={showDownloadManager} 
-              style={[styles.actionBtn, styles.downloadManagerBtn]}
-            >
-              <Ionicons name="cloud-done-outline" size={16} color="#181818" />
-              <Text style={styles.actionText}>{downloadedBooks.size}/{MAX_DOWNLOADS}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              onPress={handleImportPDF} 
-              style={[styles.actionBtn, styles.importBtn]}
-              disabled={importing}
-            >
-              {importing ? (
-                <ActivityIndicator size="small" color="#181818" />
-              ) : (
-                <>
-                  <Ionicons name="cloud-upload-outline" size={16} color="#181818" />
-                  <Text style={styles.actionText}>Importer</Text>
-                </>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/write')} style={[styles.actionBtn, styles.addBtn]}>
-              <Ionicons name="add" size={16} color="#181818" />
-              <Text style={styles.actionText}>Nouveau</Text>
-            </TouchableOpacity>
-            {/* Bouton de diagnostic temporaire */}
-            <TouchableOpacity onPress={diagnosticPDFCapabilities} style={[styles.actionBtn, { backgroundColor: '#4A90E2' }]}>
-              <Ionicons name="bug-outline" size={16} color="#fff" />
-              <Text style={[styles.actionText, { color: '#fff' }]}>Debug</Text>
-            </TouchableOpacity>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.title}>Ma Bibliothèque</Text>
+            <Text style={styles.subtitle}>{books.length + localBooks.length} livre{books.length + localBooks.length > 1 ? 's' : ''}</Text>
           </View>
+          <TouchableOpacity 
+            onPress={showDownloadManager} 
+            style={styles.downloadManagerBtn}
+          >
+            <Ionicons name="cloud-done" size={20} color="#4CAF50" />
+            <Text style={styles.downloadCountText}>{downloadedBooks.size}</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.searchRow}>
-          <View style={styles.searchContainer}>
-            <TextInput
-              placeholder="Rechercher titre, auteur, tag..."
-              placeholderTextColor="#888"
-              value={search}
-              onChangeText={setSearch}
-              style={styles.searchInput}
-            />
-            <View style={styles.searchIcon}>
-              <Text style={styles.searchIconText}>🔍</Text>
-            </View>
-          </View>
+          <Ionicons name="search" size={18} color="#666" style={styles.searchIconLeft} />
+          <TextInput
+            placeholder="Rechercher un livre..."
+            placeholderTextColor="#666"
+            value={search}
+            onChangeText={setSearch}
+            style={styles.searchInput}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')} style={styles.clearBtn}>
+              <Ionicons name="close-circle" size={18} color="#666" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.actionButtons}>
+          <TouchableOpacity 
+            onPress={handleImportPDF} 
+            style={styles.actionBtn}
+            disabled={importing}
+          >
+            {importing ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons name="add-circle" size={20} color="#fff" />
+            )}
+            <Text style={styles.actionBtnText}>Importer PDF</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/write')} style={styles.actionBtn}>
+            <Ionicons name="create" size={20} color="#fff" />
+            <Text style={styles.actionBtnText}>Nouveau livre</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -1391,79 +1389,88 @@ Variables d'état:
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#181818',
+    backgroundColor: '#0f0f0f',
   },
   headerSection: {
-    paddingTop: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 80, // Plus d'espace pour la BottomNav
+    paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 0) + 60,
     paddingHorizontal: 20,
-    paddingBottom: 16,
-    backgroundColor: '#181818',
+    paddingBottom: 20,
+    backgroundColor: '#0f0f0f',
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
   },
-  headerRow: {
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 20,
   },
   title: {
-    color: '#FFA94D',
-    fontSize: 28,
+    color: '#fff',
+    fontSize: 32,
     fontWeight: 'bold',
+    marginBottom: 4,
   },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-    minWidth: 80,
-    justifyContent: 'center',
-  },
-  importBtn: {
-    backgroundColor: '#4FC3F7',
+  subtitle: {
+    color: '#888',
+    fontSize: 14,
   },
   downloadManagerBtn: {
-    backgroundColor: '#9C27B0',
-  },
-  addBtn: {
-    backgroundColor: '#FFA94D',
-  },
-  actionText: { 
-    color: '#181818', 
-    fontWeight: '600',
-    fontSize: 13,
-    marginLeft: 4,
-  },
-  searchRow: {
-    marginBottom: 8,
-  },
-  searchContainer: {
-    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+  downloadCountText: {
+    color: '#4CAF50',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 6,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+  searchIconLeft: {
+    marginRight: 10,
   },
   searchInput: {
     flex: 1,
-    backgroundColor: '#232323',
     color: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#333',
+    fontSize: 15,
   },
-  searchIcon: {
-    position: 'absolute',
-    right: 12,
+  clearBtn: {
     padding: 4,
   },
-  searchIconText: {
-    fontSize: 16,
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFA94D',
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  actionBtnText: {
+    color: '#000',
+    fontWeight: '600',
+    fontSize: 14,
   },
   loader: { 
     flex: 1, 
@@ -1481,53 +1488,48 @@ const styles = StyleSheet.create({
   
   // Section styles
   section: {
-    marginBottom: 32,
+    marginBottom: 28,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     marginBottom: 16,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFA94D',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+    flex: 1,
   },
   sectionCount: {
-    backgroundColor: 'rgba(255, 169, 77, 0.1)',
-    color: '#FFA94D',
-    paddingHorizontal: 8,
+    backgroundColor: '#2a2a2a',
+    color: '#888',
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 12,
     fontSize: 12,
     fontWeight: '600',
+    marginLeft: 8,
   },
 
   // Horizontal cards (Livres lus)
   horizontalList: {
     paddingRight: 20,
+    gap: 12,
   },
   horizontalCard: {
-    width: 140,
-    marginRight: 16,
-    backgroundColor: '#232323',
+    width: 130,
+    backgroundColor: '#1a1a1a',
     borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#333',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    overflow: 'hidden',
   },
   horizontalCover: {
     width: '100%',
-    height: 160,
-    borderRadius: 8,
-    backgroundColor: '#181818',
-    marginBottom: 8,
+    height: 180,
+    backgroundColor: '#0f0f0f',
   },
   pdfIndicator: {
     width: '100%',
@@ -1615,28 +1617,26 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   horizontalCardContent: {
-    alignItems: 'center',
+    padding: 10,
   },
   titleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
+    alignItems: 'flex-start',
+    marginBottom: 4,
   },
   typeIcon: {
     marginLeft: 4,
   },
   horizontalBookTitle: {
-    color: '#FFA94D',
-    fontSize: 14,
+    color: '#fff',
+    fontSize: 13,
     fontWeight: '600',
-    textAlign: 'center',
     marginBottom: 4,
+    lineHeight: 18,
   },
   horizontalBookAuthor: {
-    color: '#ccc',
-    fontSize: 12,
-    textAlign: 'center',
+    color: '#888',
+    fontSize: 11,
   },
   creationCard: {
     width: 160,
@@ -1676,28 +1676,17 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   draftCard: {
-    width: 160,
-    marginRight: 16,
-    backgroundColor: '#2A2A2A',
+    width: 150,
+    backgroundColor: '#1a1a1a',
     borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#444',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    overflow: 'hidden',
   },
   draftCover: {
     width: '100%',
-    height: 140,
-    borderRadius: 8,
-    backgroundColor: '#1A1A1A',
-    marginBottom: 8,
+    height: 160,
+    backgroundColor: '#0f0f0f',
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
   },
   draftCoverImage: {
     width: '100%',
@@ -1709,32 +1698,28 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   draftCardContent: {
-    alignItems: 'center',
+    padding: 12,
   },
   draftTitle: {
-    color: '#FFA94D',
-    fontSize: 14,
+    color: '#fff',
+    fontSize: 13,
     fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
+    lineHeight: 18,
   },
   draftTemplate: {
-    color: '#999',
+    color: '#666',
     fontSize: 11,
-    textAlign: 'center',
     marginBottom: 4,
-    fontStyle: 'italic',
   },
   draftDate: {
     color: '#666',
     fontSize: 10,
-    textAlign: 'center',
     marginBottom: 2,
   },
   draftUpdatedDate: {
-    color: '#FFA94D',
-    fontSize: 9,
-    textAlign: 'center',
+    color: '#888',
+    fontSize: 10,
     fontWeight: '500',
   },
 

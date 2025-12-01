@@ -187,7 +187,10 @@ export default function MessengerList() {
   return (
     <View style={{ flex: 1 }}>
       <View style={styles.container}>
-        <Text style={styles.header}>Tous mes messages</Text>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Messages</Text>
+          <Text style={styles.headerSubtitle}>{chats.length} conversation{chats.length > 1 ? 's' : ''}</Text>
+        </View>
         <FlatList
           data={chats}
           keyExtractor={(item, idx) => item.id + '-' + idx}
@@ -207,14 +210,17 @@ export default function MessengerList() {
               >
                 <TouchableOpacity
                   style={styles.chatRow}
-                  activeOpacity={0.85}
+                  activeOpacity={0.7}
                   onPress={() => router.push({ pathname: `/chat/[chatId]`, params: { chatId: item.id } })}
                 >
-                  <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                  <View style={styles.avatarContainer}>
+                    <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                    <View style={styles.onlineIndicator} />
+                  </View>
                   <View style={styles.chatContent}>
                     <View style={styles.chatHeaderRow}>
                       <Text style={styles.chatName}>{item.name}</Text>
-                      <Text style={styles.chatTime}>14:32</Text>
+                      <Text style={styles.chatTime}>{item.lastMsgAt ? new Date(item.lastMsgAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}</Text>
                     </View>
                     <View style={styles.chatFooterRow}>
                       <Text style={styles.chatLastMsg} numberOfLines={1}>{item.lastMsg}</Text>
@@ -223,19 +229,25 @@ export default function MessengerList() {
                       )}
                     </View>
                   </View>
+                  <Ionicons name="chevron-forward" size={20} color="#444" />
                 </TouchableOpacity>
               </Swipeable>
             ) : (
               <TouchableOpacity
                 style={styles.chatRow}
-                activeOpacity={0.85}
+                activeOpacity={0.7}
                 onPress={() => router.push({ pathname: `/community/[category]`, params: { category: item.id } })}
               >
-                <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                <View style={styles.avatarContainer}>
+                  <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                  <View style={styles.groupBadge}>
+                    <Ionicons name="people" size={12} color="#fff" />
+                  </View>
+                </View>
                 <View style={styles.chatContent}>
                   <View style={styles.chatHeaderRow}>
                     <Text style={styles.chatName}>{item.name}</Text>
-                    <Text style={styles.chatTime}>14:32</Text>
+                    <Text style={styles.chatTime}>{item.lastMsgAt ? new Date(item.lastMsgAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}</Text>
                   </View>
                   <View style={styles.chatFooterRow}>
                     <Text style={styles.chatLastMsg} numberOfLines={1}>{item.lastMsg}</Text>
@@ -244,6 +256,7 @@ export default function MessengerList() {
                     )}
                   </View>
                 </View>
+                <Ionicons name="chevron-forward" size={20} color="#444" />
               </TouchableOpacity>
             )
           }
@@ -337,38 +350,68 @@ export default function MessengerList() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#181818',
-    paddingTop: 24,
+    backgroundColor: '#0f0f0f',
   },
   header: {
-    color: '#FFA94D',
-    fontSize: 22,
+    paddingTop: 60,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    backgroundColor: '#181818',
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+  },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 28,
     fontWeight: 'bold',
-    marginTop: 18,
-    marginBottom: 10,
-    marginLeft: 18,
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    color: '#888',
+    fontSize: 14,
   },
   chatRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#232323',
-    borderRadius: 16,
-    marginHorizontal: 14,
-    marginBottom: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    backgroundColor: '#181818',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 14,
   },
   avatar: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    marginRight: 14,
-    backgroundColor: '#FFA94D33',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#2a2a2a',
+  },
+  onlineIndicator: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#4CAF50',
+    borderWidth: 2,
+    borderColor: '#181818',
+  },
+  groupBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#FFA94D',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#181818',
   },
   chatContent: {
     flex: 1,
@@ -382,12 +425,12 @@ const styles = StyleSheet.create({
   },
   chatName: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontWeight: '600',
     fontSize: 16,
     flex: 1,
   },
   chatTime: {
-    color: '#aaa',
+    color: '#666',
     fontSize: 12,
     marginLeft: 8,
   },
@@ -397,41 +440,41 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   chatLastMsg: {
-    color: '#aaa',
+    color: '#888',
     fontSize: 14,
     flex: 1,
     marginRight: 8,
   },
   badgeUnread: {
     backgroundColor: '#FFA94D',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    borderRadius: 12,
+    minWidth: 22,
+    height: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 6,
-    marginLeft: 4,
+    paddingHorizontal: 7,
+    marginLeft: 6,
   },
   badgeUnreadText: {
-    color: '#181818',
+    color: '#000',
     fontWeight: 'bold',
-    fontSize: 12,
+    fontSize: 11,
   },
   fab: {
     position: 'absolute',
-    right: 24,
-    bottom: 32,
+    right: 20,
+    bottom: 90,
     backgroundColor: '#FFA94D',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
+    shadowColor: '#FFA94D',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
   },
   empty: {
     color: '#888',
@@ -443,11 +486,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E53935',
     justifyContent: 'center',
     alignItems: 'center',
-    width: 70,
-    height: '90%',
-    marginVertical: 6,
-    borderRadius: 16,
-    alignSelf: 'flex-end',
-    marginRight: 10,
+    width: 80,
+    height: '100%',
   },
 });
