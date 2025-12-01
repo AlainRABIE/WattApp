@@ -1,7 +1,7 @@
 import * as Linking from 'expo-linking';
 import { v4 as uuidv4 } from 'uuid';
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, onSnapshot, collection, query as firestoreQuery, orderBy } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, collection, query as firestoreQuery, orderBy, where, addDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
   // --- Notification acceptation collaboration ---
   const [collabAccepted, setCollabAccepted] = useState(false);
   const [collabAcceptedBy, setCollabAcceptedBy] = useState<string | null>(null);
@@ -238,6 +238,11 @@ const MangaEditorSimple: React.FC = () => {
   const [showTitleEditor, setShowTitleEditor] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
+  // États pour la to-do list
+  const [showTasksSidebar, setShowTasksSidebar] = useState(false);
+  const [todos, setTodos] = useState<any[]>([]);
+  const [newTask, setNewTask] = useState('');
+  
   // Fonction pour obtenir l'utilisateur actuel
   const getCurrentUser = () => {
     const auth = getAuth(app);
@@ -248,6 +253,74 @@ const MangaEditorSimple: React.FC = () => {
   const generateDefaultTitle = () => {
     return `Mon Manga ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}`;
   };
+
+  // Marquer une tâche comme terminée
+  const toggleTodoDone = async (todo: any) => {
+    if (!project?.id || project.id === 'new') return;
+    try {
+      const { db } = await import('../../../constants/firebaseConfig');
+      const todoRef = doc(db, 'projects', project.id, 'todos', todo.id);
+      await updateDoc(todoRef, {
+        status: todo.status === 'terminé' ? 'à faire' : 'terminé'
+      });
+    } catch (error) {
+      console.error('Erreur toggle todo:', error);
+    }
+  };
+
+  // Ajouter une tâche à la to-do list
+  const addTodo = async () => {
+    if (!newTask.trim() || !project?.id || project.id === 'new') {
+      if (!project?.id || project.id === 'new') {
+        Alert.alert('Sauvegarde nécessaire', 'Veuillez d\'abord sauvegarder votre manga pour ajouter des tâches.');
+      }
+      return;
+    }
+    try {
+      const { db } = await import('../../../constants/firebaseConfig');
+      const auth = getAuth(app);
+      await addDoc(collection(db, 'projects', project.id, 'todos'), {
+        title: newTask,
+        status: 'à faire',
+        createdBy: auth.currentUser?.uid,
+        createdAt: new Date(),
+        deleted: false
+      });
+      setNewTask('');
+    } catch (error) {
+      console.error('Erreur ajout todo:', error);
+      Alert.alert('Erreur', 'Impossible d\'ajouter la tâche');
+    }
+  };
+
+  // Charger la to-do list collaborative en temps réel
+  useEffect(() => {
+    if (!project?.id || project.id === 'new') return;
+    
+    const loadTodos = async () => {
+      try {
+        const { db } = await import('../../../constants/firebaseConfig');
+        const q = firestoreQuery(
+          collection(db, 'projects', project.id, 'todos'),
+          where('deleted', '!=', true),
+          orderBy('deleted'),
+          orderBy('createdAt', 'desc')
+        );
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+          setTodos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+        return unsubscribe;
+      } catch (error) {
+        console.error('Erreur chargement todos:', error);
+        return undefined;
+      }
+    };
+    
+    const unsubPromise = loadTodos();
+    return () => {
+      unsubPromise?.then(unsub => unsub?.());
+    };
+  }, [project?.id]);
 
   // Initialiser avec un template ou créer vide
   useEffect(() => {
@@ -370,9 +443,14 @@ const MangaEditorSimple: React.FC = () => {
 
   // Gestion des gestes de swipe
   const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
     onMoveShouldSetPanResponder: (evt, gestureState) => {
-      return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 20;
+      // Ne capture que les mouvements horizontaux significatifs
+      const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+      const isSignificant = Math.abs(gestureState.dx) > 30;
+      return isHorizontal && isSignificant;
     },
+    onPanResponderTerminationRequest: () => true,
     onPanResponderMove: () => {},
     onPanResponderRelease: (evt, gestureState) => {
       if (gestureState.dx > 50) {
@@ -722,6 +800,13 @@ const MangaEditorSimple: React.FC = () => {
           
           <TouchableOpacity 
             style={styles.headerButton}
+            onPress={() => setShowTasksSidebar(true)}
+          >
+            <Ionicons name="checkbox-outline" size={20} color="#9C27B0" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.headerButton}
             onPress={saveProject}
             disabled={isSaving}
           >
@@ -817,6 +902,130 @@ const MangaEditorSimple: React.FC = () => {
         onSaveCover={handleSaveCover}
         initialTitle={project?.title || generateDefaultTitle()}
       />
+
+      {/* Sidebar des tâches */}
+      <Modal visible={showTasksSidebar} transparent animationType="slide">
+        <TouchableOpacity 
+          style={styles.sidebarOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowTasksSidebar(false)}
+        >
+          <TouchableOpacity 
+            style={styles.sidebarContainer} 
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {/* Header de la sidebar */}
+            <View style={styles.sidebarHeader}>
+              <View style={styles.sidebarTitleContainer}>
+                <Ionicons name="checkbox-outline" size={24} color="#9C27B0" />
+                <Text style={styles.sidebarTitle}>Mes Tâches</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowTasksSidebar(false)} style={styles.closeButton}>
+                <Ionicons name="close" size={24} color="#9C27B0" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.sidebarContent} showsVerticalScrollIndicator={false}>
+              {/* Formulaire d'ajout de tâche */}
+              <View style={styles.addTaskContainer}>
+                <TextInput
+                  value={newTask}
+                  onChangeText={setNewTask}
+                  placeholder="Nouvelle tâche..."
+                  placeholderTextColor="#666"
+                  style={styles.taskInput}
+                  onSubmitEditing={addTodo}
+                  returnKeyType="done"
+                />
+                <TouchableOpacity onPress={addTodo} style={styles.addButton}>
+                  <Ionicons name="add-circle" size={32} color="#9C27B0" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Liste des tâches */}
+              <View style={styles.tasksListContainer}>
+                {todos.length === 0 ? (
+                  <View style={styles.emptyStateContainer}>
+                    <Ionicons name="clipboard-outline" size={48} color="#444" />
+                    <Text style={styles.emptyStateText}>Aucune tâche pour le moment</Text>
+                    <Text style={styles.emptyStateSubtext}>Ajoutez votre première tâche ci-dessus</Text>
+                  </View>
+                ) : (
+                  todos.map((todo) => (
+                    <View key={todo.id} style={styles.taskItem}>
+                      <TouchableOpacity
+                        onPress={() => toggleTodoDone(todo)}
+                        style={styles.taskCheckbox}
+                      >
+                        <Ionicons
+                          name={todo.status === 'terminé' ? 'checkbox' : 'square-outline'}
+                          size={24}
+                          color={todo.status === 'terminé' ? '#4CAF50' : '#9C27B0'}
+                        />
+                      </TouchableOpacity>
+                      <Text style={[
+                        styles.taskText,
+                        todo.status === 'terminé' && styles.taskTextCompleted
+                      ]}>
+                        {todo.title}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={async () => {
+                          if (!project?.id || project.id === 'new') return;
+                          Alert.alert(
+                            'Supprimer la tâche',
+                            'Êtes-vous sûr de vouloir supprimer cette tâche ?',
+                            [
+                              { text: 'Annuler', style: 'cancel' },
+                              {
+                                text: 'Supprimer',
+                                style: 'destructive',
+                                onPress: async () => {
+                                  try {
+                                    const { db } = await import('../../../constants/firebaseConfig');
+                                    const todoRef = doc(db, 'projects', project.id, 'todos', todo.id);
+                                    await updateDoc(todoRef, { deleted: true });
+                                  } catch (error) {
+                                    console.error('Erreur suppression:', error);
+                                  }
+                                }
+                              }
+                            ]
+                          );
+                        }}
+                        style={styles.deleteTaskButton}
+                      >
+                        <Ionicons name="trash-outline" size={18} color="#FF6B6B" />
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
+              </View>
+
+              {/* Statistiques */}
+              {todos.length > 0 && (
+                <View style={styles.statsContainer}>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statNumber}>{todos.filter(t => t.status === 'terminé').length}</Text>
+                    <Text style={styles.statLabel}>Terminées</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statItem}>
+                    <Text style={styles.statNumber}>{todos.filter(t => t.status !== 'terminé').length}</Text>
+                    <Text style={styles.statLabel}>En cours</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statItem}>
+                    <Text style={styles.statNumber}>{todos.length}</Text>
+                    <Text style={styles.statLabel}>Total</Text>
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Modal d'édition du titre */}
       <Modal visible={showTitleEditor} transparent animationType="slide">
@@ -1083,6 +1292,143 @@ const styles = StyleSheet.create({
     color: '#181818',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  
+  // Sidebar des tâches
+  sidebarOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+  },
+  sidebarContainer: {
+    width: 360,
+    height: '100%',
+    backgroundColor: '#232323',
+    borderTopLeftRadius: 20,
+    borderBottomLeftRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: -2, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  sidebarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  sidebarTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  sidebarTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  sidebarContent: {
+    flex: 1,
+    padding: 20,
+  },
+  addTaskContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+    gap: 8,
+  },
+  taskInput: {
+    flex: 1,
+    backgroundColor: '#181818',
+    color: '#fff',
+    padding: 12,
+    borderRadius: 12,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  addButton: {
+    padding: 4,
+  },
+  tasksListContainer: {
+    flex: 1,
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyStateText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 16,
+  },
+  emptyStateSubtext: {
+    color: '#444',
+    fontSize: 14,
+    marginTop: 8,
+  },
+  taskItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#181818',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  taskCheckbox: {
+    marginRight: 12,
+  },
+  taskText: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 15,
+  },
+  taskTextCompleted: {
+    color: '#4CAF50',
+    textDecorationLine: 'line-through',
+    opacity: 0.7,
+  },
+  deleteTaskButton: {
+    padding: 8,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#181818',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: '#9C27B0',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statNumber: {
+    color: '#9C27B0',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  statLabel: {
+    color: '#888',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: '#333',
+    marginHorizontal: 8,
   },
 });
 

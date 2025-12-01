@@ -1,13 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, query, orderBy, onSnapshot, updateDoc, doc } from 'firebase/firestore';
-  // Marquer une tâche comme terminée
-  const toggleTodoDone = async (todo: any) => {
-    if (!projectId) return;
-    const todoRef = doc(db, 'projects', projectId as string, 'todos', todo.id);
-    await updateDoc(todoRef, {
-      status: todo.status === 'terminé' ? 'à faire' : 'terminé'
-    });
-  };
 import {
   View,
   Text,
@@ -20,72 +11,166 @@ import {
   StatusBar,
   Image,
   Switch,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
+import { collection, addDoc, query, orderBy, onSnapshot, updateDoc, doc, serverTimestamp, getDoc, where } from 'firebase/firestore';
 import { mangaProjectService } from '../services/MangaProjectService';
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
-import { doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
-import { Linking, Alert } from 'react-native';
-    // Ouvre les réglages sur la section paiement
-    const goToSettings = () => router.push('/settings');
 
-    // Lancer onboarding Stripe depuis la page de publication
-    const handleStripeConnect = async () => {
-      try {
-        const auth = getAuth(app);
-        const user = auth.currentUser;
-        if (!user) throw new Error('Non connecté');
-        const res = await fetch('/api/stripe/onboard', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ uid: user.uid, email: user.email }),
-        });
-        const data = await res.json();
-        if (data.url) {
-          Linking.openURL(data.url);
-        } else {
-          Alert.alert('Erreur', 'Impossible de générer le lien Stripe.');
-        }
-      } catch (e) {
-        Alert.alert('Erreur', 'Impossible de se connecter à Stripe.');
-      }
-    };
+interface MangaPublication {
+  id: string;
+  title: string;
+  synopsis: string;
+  description: string;
+  author: string;
+  price: number;
+  currency: 'EUR' | 'USD';
+  isFree: boolean;
+  tags: string[];
+  category: string;
+  genre: string[];
+  targetAudience: 'children' | 'teen' | 'adult' | 'all';
+  language: string;
+  coverImage?: string;
+  previewPages: number;
+  totalPages: number;
+  publishDate: Date;
+  isPublished: boolean;
+  isDraft: boolean;
+  rating: 'G' | 'PG' | 'PG-13' | 'R' | 'NC-17';
+  copyrightInfo: string;
+  collaborators: string[];
+  socialLinks: {
+    twitter?: string;
+    instagram?: string;
+    website?: string;
+  };
+}
 
-    // Connexion PayPal (simple: demande l'email)
-    const handlePaypalConnect = async () => {
-      Alert.prompt(
-        'Connecter PayPal',
-        'Entrez votre adresse email PayPal pour recevoir vos paiements.',
-        async (email) => {
-          if (!email) return;
-          try {
-            const auth = getAuth(app);
-            const user = auth.currentUser;
-            if (!user) throw new Error('Non connecté');
-            const userRef = doc(db, 'users', user.uid);
-            await updateDoc(userRef, { paypalEmail: email });
-            setPaypalStatus('connected');
-            setPaypalEmail(email);
-            Alert.alert('Succès', 'Votre compte PayPal est connecté.');
-          } catch (e) {
-            Alert.alert('Erreur', 'Impossible de connecter PayPal.');
-            setPaypalStatus('not-connected');
-          }
-        },
-        'plain-text',
-        paypalEmail || ''
-      );
-    };
+const MangaPublisher: React.FC = () => {
+  const router = useRouter();
+  const { projectId } = useLocalSearchParams();
+  
+  // Sidebar (menu latéral) pour le suivi
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [todos, setTodos] = useState<any[]>([]);
+  const [newTask, setNewTask] = useState('');
+  const [activity, setActivity] = useState<any[]>([]);
+  
   // Paiement vendeur (Stripe/PayPal)
   const [stripeStatus, setStripeStatus] = useState<'not-connected' | 'connected' | 'loading'>('loading');
   const [paypalStatus, setPaypalStatus] = useState<'not-connected' | 'connected' | 'loading'>('loading');
   const [paypalEmail, setPaypalEmail] = useState<string | null>(null);
   const [stripeId, setStripeId] = useState<string | null>(null);
+  
+  const [publication, setPublication] = useState<MangaPublication>({
+    id: '',
+    title: '',
+    synopsis: '',
+    description: '',
+    author: '',
+    price: 0,
+    currency: 'EUR',
+    isFree: true,
+    tags: [],
+    category: '',
+    genre: [],
+    targetAudience: 'all',
+    language: 'fr',
+    previewPages: 3,
+    totalPages: 0,
+    publishDate: new Date(),
+    isPublished: false,
+    isDraft: true,
+    rating: 'G',
+    copyrightInfo: '',
+    collaborators: [],
+    socialLinks: {},
+  });
+
+  const [showPreview, setShowPreview] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
+  const [newTag, setNewTag] = useState('');
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Marquer une tâche comme terminée
+  const toggleTodoDone = async (todo: any) => {
+    if (!projectId) return;
+    const todoRef = doc(db, 'projects', projectId as string, 'todos', todo.id);
+    await updateDoc(todoRef, {
+      status: todo.status === 'terminé' ? 'à faire' : 'terminé'
+    });
+  };
+
+  // Ajouter une tâche à la to-do list
+  const addTodo = async () => {
+    if (!newTask.trim() || !projectId) return;
+    await addDoc(collection(db, 'projects', projectId as string, 'todos'), {
+      title: newTask,
+      status: 'à faire',
+      createdBy: getAuth(app).currentUser?.uid,
+      createdAt: new Date()
+    });
+    setNewTask('');
+  };
+
+  // Ouvre les réglages sur la section paiement
+  const goToSettings = () => router.push('/settings');
+
+  // Lancer onboarding Stripe depuis la page de publication
+  const handleStripeConnect = async () => {
+    try {
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+      if (!user) throw new Error('Non connecté');
+      const res = await fetch('/api/stripe/onboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: user.uid, email: user.email }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        Linking.openURL(data.url);
+      } else {
+        Alert.alert('Erreur', 'Impossible de générer le lien Stripe.');
+      }
+    } catch (e) {
+      Alert.alert('Erreur', 'Impossible de se connecter à Stripe.');
+    }
+  };
+
+  // Connexion PayPal (simple: demande l'email)
+  const handlePaypalConnect = async () => {
+    Alert.prompt(
+      'Connecter PayPal',
+      'Entrez votre adresse email PayPal pour recevoir vos paiements.',
+      async (email) => {
+        if (!email) return;
+        try {
+          const auth = getAuth(app);
+          const user = auth.currentUser;
+          if (!user) throw new Error('Non connecté');
+          const userRef = doc(db, 'users', user.uid);
+          await updateDoc(userRef, { paypalEmail: email });
+          setPaypalStatus('connected');
+          setPaypalEmail(email);
+          Alert.alert('Succès', 'Votre compte PayPal est connecté.');
+        } catch (e) {
+          Alert.alert('Erreur', 'Impossible de connecter PayPal.');
+          setPaypalStatus('not-connected');
+        }
+      },
+      'plain-text',
+      paypalEmail || ''
+    );
+  };
 
   // Récupère le compte de paiement de l'utilisateur
   useEffect(() => {
@@ -124,108 +209,30 @@ import { Linking, Alert } from 'react-native';
     fetchPaymentAccounts();
   }, []);
 
-interface MangaPublication {
-  id: string;
-  title: string;
-  synopsis: string;
-  description: string;
-  author: string;
-  price: number;
-  currency: 'EUR' | 'USD';
-  isFree: boolean;
-  tags: string[];
-  category: string;
-  genre: string[];
-  targetAudience: 'children' | 'teen' | 'adult' | 'all';
-  language: string;
-  coverImage?: string;
-  previewPages: number;
-  totalPages: number;
-  publishDate: Date;
-  isPublished: boolean;
-  isDraft: boolean;
-  rating: 'G' | 'PG' | 'PG-13' | 'R' | 'NC-17';
-  copyrightInfo: string;
-  collaborators: string[];
-  socialLinks: {
-    twitter?: string;
-    instagram?: string;
-    website?: string;
-  };
-}
+  // Charger la to-do list collaborative
+  useEffect(() => {
+    if (!projectId) return;
+    const q = query(
+      collection(db, 'projects', projectId as string, 'todos'),
+      where('deleted', '!=', true),
+      orderBy('deleted'),
+      orderBy('createdAt', 'desc')
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setTodos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return unsubscribe;
+  }, [projectId]);
 
-const MangaPublisher: React.FC = () => {
-    // Sidebar (menu latéral) pour le suivi
-    const [showSidebar, setShowSidebar] = useState(false);
-    const [todos, setTodos] = useState<any[]>([]);
-    const [newTask, setNewTask] = useState('');
-    const [activity, setActivity] = useState<any[]>([]);
-
-    // Charger la to-do list collaborative
-    useEffect(() => {
-      if (!projectId) return;
-      const q = query(collection(db, 'projects', projectId as string, 'todos'), orderBy('createdAt', 'desc'));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        setTodos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      });
-      return unsubscribe;
-    }, [projectId]);
-
-    // Charger l'historique des modifications
-    useEffect(() => {
-      if (!projectId) return;
-      const q = query(collection(db, 'projects', projectId as string, 'activity'), orderBy('timestamp', 'desc'));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        setActivity(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      });
-      return unsubscribe;
-    }, [projectId]);
-
-    // Ajouter une tâche à la to-do list
-    const addTodo = async () => {
-      if (!newTask.trim() || !projectId) return;
-      await addDoc(collection(db, 'projects', projectId as string, 'todos'), {
-        title: newTask,
-        status: 'à faire',
-        createdBy: getAuth(app).currentUser?.uid,
-        createdAt: new Date()
-      });
-      setNewTask('');
-    };
-
-  const router = useRouter();
-  const { projectId } = useLocalSearchParams();
-  
-  const [publication, setPublication] = useState<MangaPublication>({
-    id: '',
-    title: '',
-    synopsis: '',
-    description: '',
-    author: '',
-    price: 0,
-    currency: 'EUR',
-    isFree: true,
-    tags: [],
-    category: '',
-    genre: [],
-    targetAudience: 'all',
-    language: 'fr',
-    previewPages: 3,
-    totalPages: 0,
-    publishDate: new Date(),
-    isPublished: false,
-    isDraft: true,
-    rating: 'G',
-    copyrightInfo: '',
-    collaborators: [],
-    socialLinks: {},
-  });
-
-  const [showPreview, setShowPreview] = useState(false);
-  const [showPricing, setShowPricing] = useState(false);
-  const [newTag, setNewTag] = useState('');
-  const [uploadingCover, setUploadingCover] = useState(false);
-  const [loading, setLoading] = useState(true);
+  // Charger l'historique des modifications
+  useEffect(() => {
+    if (!projectId) return;
+    const q = query(collection(db, 'projects', projectId as string, 'activity'), orderBy('timestamp', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setActivity(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return unsubscribe;
+  }, [projectId]);
 
   // Charger les données du projet de manga si projectId est fourni
   useEffect(() => {
@@ -808,86 +815,128 @@ const MangaPublisher: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Bouton Suivi (sidebar) */}
-      <TouchableOpacity
-        style={{ position: 'absolute', top: 60, right: 20, zIndex: 10, backgroundColor: '#FFA94D', borderRadius: 20, padding: 10 }}
-        onPress={() => setShowSidebar(true)}
-      >
-        <Ionicons name="list-outline" size={22} color="#181818" />
-      </TouchableOpacity>
-
-      {/* Sidebar latéral pour le suivi */}
+      {/* Sidebar latéral pour les tâches */}
       <Modal
         visible={showSidebar}
         animationType="slide"
         transparent
         onRequestClose={() => setShowSidebar(false)}
       >
-        <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.2)' }}>
-          <View style={{ width: 320, backgroundColor: '#232323', height: '100%', padding: 18, borderTopLeftRadius: 18, borderBottomLeftRadius: 18, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 18 }}>Suivi du projet</Text>
-              <TouchableOpacity onPress={() => setShowSidebar(false)}>
-                <Ionicons name="close" size={22} color="#FFA94D" />
+        <TouchableOpacity 
+          style={styles.sidebarOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowSidebar(false)}
+        >
+          <TouchableOpacity 
+            style={styles.sidebarContainer} 
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {/* Header de la sidebar */}
+            <View style={styles.sidebarHeader}>
+              <View style={styles.sidebarTitleContainer}>
+                <Ionicons name="checkbox-outline" size={24} color="#FFA94D" />
+                <Text style={styles.sidebarTitle}>Mes Tâches</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowSidebar(false)} style={styles.closeButton}>
+                <Ionicons name="close" size={24} color="#FFA94D" />
               </TouchableOpacity>
             </View>
-            {/* To-Do List collaborative */}
-            <Text style={{ color: '#fff', fontWeight: 'bold', marginBottom: 6 }}>To-Do List</Text>
-            <View style={{ backgroundColor: '#181818', borderRadius: 8, padding: 8, marginBottom: 16, minHeight: 60 }}>
-              {todos.length === 0 ? (
-                <Text style={{ color: '#aaa' }}>Aucune tâche pour ce projet.</Text>
-              ) : (
-                todos.map(todo => (
-                  <TouchableOpacity
-                    key={todo.id}
-                    onPress={() => toggleTodoDone(todo)}
-                    style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}
-                  >
-                    <Ionicons
-                      name={todo.status === 'terminé' ? 'checkbox-outline' : 'square-outline'}
-                      size={18}
-                      color={todo.status === 'terminé' ? '#4CAF50' : '#FFA94D'}
-                      style={{ marginRight: 6 }}
-                    />
-                    <Text style={{ color: todo.status === 'terminé' ? '#4CAF50' : '#fff', textDecorationLine: todo.status === 'terminé' ? 'line-through' : 'none' }}>
-                      {todo.title}
-                    </Text>
-                  </TouchableOpacity>
-                ))
-              )}
-              <View style={{ flexDirection: 'row', marginTop: 8 }}>
+
+            <ScrollView style={styles.sidebarContent} showsVerticalScrollIndicator={false}>
+              {/* Formulaire d'ajout de tâche */}
+              <View style={styles.addTaskContainer}>
                 <TextInput
                   value={newTask}
                   onChangeText={setNewTask}
-                  placeholder="Nouvelle tâche"
-                  placeholderTextColor="#888"
-                  style={{ flex: 1, backgroundColor: '#232323', color: '#fff', borderRadius: 6, padding: 6, marginRight: 6 }}
+                  placeholder="Nouvelle tâche..."
+                  placeholderTextColor="#666"
+                  style={styles.taskInput}
+                  onSubmitEditing={addTodo}
+                  returnKeyType="done"
                 />
-                <TouchableOpacity onPress={addTodo} style={{ backgroundColor: '#FFA94D', borderRadius: 6, padding: 8 }}>
-                  <Ionicons name="add" size={18} color="#181818" />
+                <TouchableOpacity onPress={addTodo} style={styles.addButton}>
+                  <Ionicons name="add-circle" size={32} color="#FFA94D" />
                 </TouchableOpacity>
               </View>
-            </View>
-            {/* Historique des modifications */}
-            <Text style={{ color: '#fff', fontWeight: 'bold', marginBottom: 6 }}>Historique</Text>
-            <View style={{ backgroundColor: '#181818', borderRadius: 8, padding: 8, marginBottom: 16, minHeight: 60, maxHeight: 120 }}>
-              {activity.length === 0 ? (
-                <Text style={{ color: '#aaa' }}>Aucune activité récente.</Text>
-              ) : (
-                activity.map(act => (
-                  <Text key={act.id} style={{ color: '#fff', marginBottom: 4 }}>
-                    {act.action} <Text style={{ color: '#FFA94D' }}>{act.userName || act.userId}</Text> <Text style={{ color: '#aaa' }}>{act.timestamp && new Date(act.timestamp.seconds * 1000).toLocaleString()}</Text>
-                  </Text>
-                ))
+
+              {/* Liste des tâches */}
+              <View style={styles.tasksListContainer}>
+                {todos.length === 0 ? (
+                  <View style={styles.emptyStateContainer}>
+                    <Ionicons name="clipboard-outline" size={48} color="#444" />
+                    <Text style={styles.emptyStateText}>Aucune tâche pour le moment</Text>
+                    <Text style={styles.emptyStateSubtext}>Ajoutez votre première tâche ci-dessus</Text>
+                  </View>
+                ) : (
+                  todos.map((todo) => (
+                    <View key={todo.id} style={styles.taskItem}>
+                      <TouchableOpacity
+                        onPress={() => toggleTodoDone(todo)}
+                        style={styles.taskCheckbox}
+                      >
+                        <Ionicons
+                          name={todo.status === 'terminé' ? 'checkbox' : 'square-outline'}
+                          size={24}
+                          color={todo.status === 'terminé' ? '#4CAF50' : '#FFA94D'}
+                        />
+                      </TouchableOpacity>
+                      <Text style={[
+                        styles.taskText,
+                        todo.status === 'terminé' && styles.taskTextCompleted
+                      ]}>
+                        {todo.title}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={async () => {
+                          if (!projectId) return;
+                          Alert.alert(
+                            'Supprimer la tâche',
+                            'Êtes-vous sûr de vouloir supprimer cette tâche ?',
+                            [
+                              { text: 'Annuler', style: 'cancel' },
+                              {
+                                text: 'Supprimer',
+                                style: 'destructive',
+                                onPress: async () => {
+                                  const todoRef = doc(db, 'projects', projectId as string, 'todos', todo.id);
+                                  await updateDoc(todoRef, { deleted: true });
+                                }
+                              }
+                            ]
+                          );
+                        }}
+                        style={styles.deleteTaskButton}
+                      >
+                        <Ionicons name="trash-outline" size={18} color="#FF6B6B" />
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
+              </View>
+
+              {/* Statistiques */}
+              {todos.length > 0 && (
+                <View style={styles.statsContainer}>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statNumber}>{todos.filter(t => t.status === 'terminé').length}</Text>
+                    <Text style={styles.statLabel}>Terminées</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statItem}>
+                    <Text style={styles.statNumber}>{todos.filter(t => t.status !== 'terminé').length}</Text>
+                    <Text style={styles.statLabel}>En cours</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statItem}>
+                    <Text style={styles.statNumber}>{todos.length}</Text>
+                    <Text style={styles.statLabel}>Total</Text>
+                  </View>
+                </View>
               )}
-            </View>
-            {/* Notes de suivi (champ à intégrer plus tard) */}
-            <Text style={{ color: '#fff', fontWeight: 'bold', marginBottom: 6 }}>Notes de suivi</Text>
-            <View style={{ backgroundColor: '#181818', borderRadius: 8, padding: 8, marginBottom: 16 }}>
-              <Text style={{ color: '#aaa' }}>[À intégrer: champ de notes/commentaires]</Text>
-            </View>
-          </View>
-        </View>
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
       <StatusBar barStyle="light-content" backgroundColor="#181818" />
 
@@ -897,7 +946,9 @@ const MangaPublisher: React.FC = () => {
           <Ionicons name="arrow-back" size={24} color="#FFA94D" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Publier le Manga</Text>
-        <View style={{ width: 24 }} />
+        <TouchableOpacity onPress={() => setShowSidebar(true)} style={styles.tasksButton}>
+          <Ionicons name="checkbox-outline" size={24} color="#FFA94D" />
+        </TouchableOpacity>
       </View>
 
       {/* Bloc récapitulatif paiement */}
@@ -979,6 +1030,145 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  tasksButton: {
+    padding: 4,
+  },
+  // Sidebar styles
+  sidebarOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+  },
+  sidebarContainer: {
+    width: 360,
+    height: '100%',
+    backgroundColor: '#232323',
+    borderTopLeftRadius: 20,
+    borderBottomLeftRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: -2, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  sidebarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  sidebarTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  sidebarTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  sidebarContent: {
+    flex: 1,
+    padding: 20,
+  },
+  addTaskContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+    gap: 8,
+  },
+  taskInput: {
+    flex: 1,
+    backgroundColor: '#181818',
+    color: '#fff',
+    padding: 12,
+    borderRadius: 12,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  addButton: {
+    padding: 4,
+  },
+  tasksListContainer: {
+    flex: 1,
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyStateText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 16,
+  },
+  emptyStateSubtext: {
+    color: '#444',
+    fontSize: 14,
+    marginTop: 8,
+  },
+  taskItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#181818',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  taskCheckbox: {
+    marginRight: 12,
+  },
+  taskText: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 15,
+  },
+  taskTextCompleted: {
+    color: '#4CAF50',
+    textDecorationLine: 'line-through',
+    opacity: 0.7,
+  },
+  deleteTaskButton: {
+    padding: 8,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#181818',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: '#FFA94D',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statNumber: {
+    color: '#FFA94D',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  statLabel: {
+    color: '#888',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: '#333',
+    marginHorizontal: 8,
   },
   content: {
     flex: 1,
