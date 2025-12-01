@@ -3,40 +3,40 @@ import { getAuth } from 'firebase/auth';
 import { db } from '../../constants/firebaseConfig';
 import { collectionGroup, getDocs, where, query as fsQuery, onSnapshot } from 'firebase/firestore';
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Image, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { BlurView } from 'expo-blur';
 
 const CATEGORIES = [
-  { name: "Roman d'amour", color: ["#FFB347", "#FFCC80"] },
-  { name: "Fanfiction", color: ["#6DD5FA", "#2980B9"] },
-  { name: "Fiction générale", color: ["#F7971E", "#FFD200"] },
-  { name: "Roman pour adolescents", color: ["#F857A6", "#FF5858"] },
-  { name: "Aléatoire", color: ["#43CEA2", "#185A9D"] },
-  { name: "Action", color: ["#FF5858", "#FBCA1F"] },
-  { name: "Aventure", color: ["#36D1C4", "#1E5799"] },
-  { name: "Nouvelles", color: ["#B06AB3", "#4568DC"] },
-  { name: "Fantasy", color: ["#F7971E", "#FFD200"] },
-  { name: "Non-Fiction", color: ["#43CEA2", "#185A9D"] },
-  { name: "Fantastique", color: ["#F857A6", "#FF5858"] },
-  { name: "Mystère", color: ["#6DD5FA", "#2980B9"] },
+  { name: "Roman d'amour", color: ["#FF6B9D", "#FF8E9E"], icon: "heart" },
+  { name: "Fanfiction", color: ["#6DD5FA", "#2980B9"], icon: "star" },
+  { name: "Fiction générale", color: ["#F7971E", "#FFD200"], icon: "book" },
+  { name: "Roman pour adolescents", color: ["#F857A6", "#FF5858"], icon: "school" },
+  { name: "Aléatoire", color: ["#43CEA2", "#185A9D"], icon: "shuffle" },
+  { name: "Action", color: ["#FF5858", "#FBCA1F"], icon: "flash" },
+  { name: "Aventure", color: ["#36D1C4", "#1E5799"], icon: "compass" },
+  { name: "Nouvelles", color: ["#B06AB3", "#4568DC"], icon: "newspaper" },
+  { name: "Fantasy", color: ["#F7971E", "#FFD200"], icon: "planet" },
+  { name: "Non-Fiction", color: ["#43CEA2", "#185A9D"], icon: "library" },
+  { name: "Fantastique", color: ["#F857A6", "#FF5858"], icon: "sparkles" },
+  { name: "Mystère", color: ["#6DD5FA", "#2980B9"], icon: "eye" },
 ];
 
-
-const CARD_SIZE = 120;
-const CARD_MARGIN = 12;
-const SCREEN_WIDTH = Dimensions.get('window').width;
+const { width } = Dimensions.get('window');
 
 
 export default function CommunityIndex() {
   const [myGroups, setMyGroups] = React.useState<any[]>([]);
-  // Placeholder for popular groups (replace with Firestore data as needed)
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const router = useRouter();
+
   const popularGroups = [
-    { name: 'Groupe A', cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80' },
-    { name: 'Groupe B', cover: 'https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80' },
-    { name: 'Groupe C', cover: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80' },
-    { name: 'Groupe D', cover: 'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&w=400&q=80' },
+    { name: 'Écrivains Passionnés', members: 1234, cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80' },
+    { name: 'Critiques Littéraires', members: 856, cover: 'https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80' },
+    { name: 'Créateurs de Manga', members: 2341, cover: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80' },
+    { name: 'Poètes Modernes', members: 567, cover: 'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&w=400&q=80' },
   ];
 
   React.useEffect(() => {
@@ -56,92 +56,144 @@ export default function CommunityIndex() {
     });
     return () => unsubscribe();
   }, []);
-  const router = useRouter();
+
+  const filteredCategories = CATEGORIES.filter(cat =>
+    cat.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
-      <Text style={styles.header}>Communauté</Text>
-
-      {/* Section: Groupes populaires */}
-      <View style={styles.sectionContainer}>
-        <Text style={styles.sectionTitle}>🔥 Groupes populaires</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
-          {popularGroups.map((group, idx) => (
-            <TouchableOpacity
-              key={group.name + '-' + idx}
-              style={[styles.cardModernWrapper, { width: CARD_SIZE, height: CARD_SIZE, marginRight: CARD_MARGIN }]}
-              activeOpacity={0.93}
-              onPress={() => router.push({ pathname: `/community/[category]`, params: { category: group.name } })}
-            >
-              <View style={styles.bookCard}>
-                <View style={styles.bookImageBox}>
-                  <Image
-                    source={{ uri: group.cover }}
-                    style={{ width: 80, height: 120, borderTopLeftRadius: 8, borderTopRightRadius: 8 }}
-                    resizeMode="cover"
-                  />
-                </View>
-                <Text style={styles.bookCardTitle} numberOfLines={2}>{group.name}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Communauté</Text>
+          <Text style={styles.headerSubtitle}>Découvrez et rejoignez des groupes passionnants</Text>
+          
+          {/* Barre de recherche */}
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Rechercher une catégorie..."
+              placeholderTextColor="#666"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={20} color="#888" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
       </View>
 
-      {/* Section: Mes groupes */}
-      {myGroups.length > 0 && (
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>👥 Mes groupes</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
-            {myGroups.map((item, idx) => (
+      <ScrollView 
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Groupes populaires */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleContainer}>
+              <Ionicons name="flame" size={24} color="#FFA94D" />
+              <Text style={styles.sectionTitle}>Groupes Populaires</Text>
+            </View>
+            <TouchableOpacity>
+              <Text style={styles.seeAllText}>Voir tout</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalScroll}
+          >
+            {popularGroups.map((group, idx) => (
               <TouchableOpacity
-                key={item.groupId + '-' + item.uid + '-' + idx}
-                style={[styles.cardModernWrapper, { width: CARD_SIZE, height: CARD_SIZE, marginRight: CARD_MARGIN }]}
-                activeOpacity={0.93}
-                onPress={() => router.push({ pathname: `/community/[category]`, params: { category: item.groupId } })}
+                key={idx}
+                style={styles.popularCard}
+                onPress={() => router.push({ pathname: `/community/[category]`, params: { category: group.name } })}
+                activeOpacity={0.9}
               >
-                <View style={styles.bookCard}>
-                  <View style={styles.bookImageBox}>
-                    <Image
-                      source={{ uri: 'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&w=400&q=80' }}
-                      style={{ width: 80, height: 120, borderTopLeftRadius: 8, borderTopRightRadius: 8 }}
-                      resizeMode="cover"
-                    />
+                <Image source={{ uri: group.cover }} style={styles.popularCardImage} />
+                <View style={styles.popularCardOverlay}>
+                  <Text style={styles.popularCardTitle}>{group.name}</Text>
+                  <View style={styles.popularCardInfo}>
+                    <Ionicons name="people" size={14} color="#FFA94D" />
+                    <Text style={styles.popularCardMembers}>{group.members} membres</Text>
                   </View>
-                  <Text style={styles.bookCardTitle} numberOfLines={2}>{item.groupId}</Text>
                 </View>
               </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
-      )}
 
-      {/* Section: Catégories */}
-      <View style={styles.sectionContainer}>
-        <Text style={styles.sectionTitle}>📚 Catégories</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
-          {CATEGORIES.map((cat, idx) => (
-            <TouchableOpacity
-              key={cat.name}
-              style={[styles.cardModernWrapper, { width: CARD_SIZE, height: CARD_SIZE, marginRight: CARD_MARGIN }]}
-              onPress={() => router.push({ pathname: `/community/[category]`, params: { category: cat.name } })}
-              activeOpacity={0.93}
-            >
-              <View style={styles.bookCard}>
-                <View style={styles.bookImageBox}>
-                  <Image
-                    source={{ uri: 'https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80' }}
-                    style={{ width: 80, height: 120, borderTopLeftRadius: 8, borderTopRightRadius: 8 }}
-                    resizeMode="cover"
-                  />
-                </View>
-                <Text style={styles.bookCardTitle} numberOfLines={2}>{cat.name}</Text>
+        {/* Mes groupes */}
+        {myGroups.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleContainer}>
+                <Ionicons name="people-circle" size={24} color="#FFA94D" />
+                <Text style={styles.sectionTitle}>Mes Groupes</Text>
               </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-    </ScrollView>
+              <TouchableOpacity onPress={() => router.push('/community/my-groups')}>
+                <Text style={styles.seeAllText}>Gérer</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalScroll}
+            >
+              {myGroups.map((item, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={styles.myGroupCard}
+                  onPress={() => router.push({ pathname: `/community/[category]`, params: { category: item.groupId } })}
+                  activeOpacity={0.9}
+                >
+                  <View style={styles.myGroupCardContent}>
+                    <Ionicons name="people" size={32} color="#FFA94D" />
+                    <Text style={styles.myGroupCardTitle}>{item.groupId}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Catégories */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleContainer}>
+              <Ionicons name="grid" size={24} color="#FFA94D" />
+              <Text style={styles.sectionTitle}>Catégories</Text>
+            </View>
+          </View>
+
+          <View style={styles.categoriesGrid}>
+            {filteredCategories.map((cat, idx) => (
+              <TouchableOpacity
+                key={idx}
+                style={styles.categoryCard}
+                onPress={() => router.push({ pathname: `/community/[category]`, params: { category: cat.name } })}
+                activeOpacity={0.9}
+              >
+                <View style={[styles.categoryContent, { backgroundColor: cat.color[0] }]}>
+                  <View style={styles.categoryIconContainer}>
+                    <Ionicons name={cat.icon as any} size={28} color="#fff" />
+                  </View>
+                  <Text style={styles.categoryTitle}>{cat.name}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -151,135 +203,168 @@ const styles = StyleSheet.create({
     backgroundColor: '#181818',
   },
   header: {
-    color: '#FFA94D',
-    fontSize: 28,
+    paddingTop: 60,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
+    backgroundColor: '#1a1a1a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+  },
+  headerContent: {
+    gap: 12,
+  },
+  headerTitle: {
+    fontSize: 32,
     fontWeight: 'bold',
-    textAlign: 'center',
-    marginTop: 38,
-    marginBottom: 18,
-    letterSpacing: 0.5,
-  },
-  sectionContainer: {
-    marginBottom: 28,
-    marginTop: 0,
-    paddingLeft: 18,
-  },
-  sectionTitle: {
     color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 20,
-    marginBottom: 12,
-    marginLeft: 2,
-    letterSpacing: 0.2,
+    letterSpacing: -0.5,
   },
-  horizontalList: {
+  headerSubtitle: {
+    fontSize: 15,
+    color: '#888',
+    marginBottom: 8,
+  },
+  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingRight: 18,
-  },
-  cardModernWrapper: {
-    borderRadius: 24,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.13,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    backgroundColor: 'transparent',
-  },
-  cardSimple: {
-    flex: 1,
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 6,
     backgroundColor: '#232323',
-    borderWidth: 1.5,
-    borderColor: '#FFA94D',
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    overflow: 'hidden',
-  },
-  iconSimpleCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#181818',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderWidth: 1,
-    borderColor: '#FFA94D',
+    borderColor: '#2a2a2a',
   },
-  cardSimpleTitle: {
-    color: '#FFA94D',
-    fontSize: 15,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    letterSpacing: 0.1,
-    marginTop: 2,
-    fontFamily: undefined, // Laisse la police par défaut de l'app
+  searchIcon: {
+    marginRight: 10,
   },
-  // Badge lecture supprimé pour un design plus épuré
-  iconModernCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.10,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  cardModernTitle: {
+  searchInput: {
+    flex: 1,
     color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    letterSpacing: 0.2,
-    textShadowColor: '#0006',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-    marginTop: 2,
+    fontSize: 15,
   },
-  bookCard: {
-    width: 80,
-    marginRight: 14,
-    backgroundColor: '#232323',
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: '#FFA94D',
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 32,
+  },
+  section: {
+    marginTop: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingBottom: 10,
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  seeAllText: {
+    color: '#FFA94D',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  horizontalScroll: {
+    paddingLeft: 20,
+    paddingRight: 20,
+    gap: 16,
+  },
+  popularCard: {
+    width: 280,
+    height: 160,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#232323',
+  },
+  popularCardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  popularCardOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+  },
+  popularCardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  popularCardInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  popularCardMembers: {
+    fontSize: 13,
+    color: '#FFA94D',
+    fontWeight: '600',
+  },
+  myGroupCard: {
+    width: 160,
+    height: 100,
+    borderRadius: 12,
+    backgroundColor: '#232323',
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
     overflow: 'hidden',
   },
-  bookImageBox: {
-    width: 80,
-    height: 120,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-    backgroundColor: '#181818',
+  myGroupCardContent: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    gap: 8,
+  },
+  myGroupCardTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  categoriesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  categoryCard: {
+    width: (width - 52) / 2,
+    height: 120,
+    borderRadius: 16,
     overflow: 'hidden',
   },
-  bookCardTitle: {
-    color: '#FFA94D',
-    fontSize: 13,
+  categoryContent: {
+    flex: 1,
+    padding: 16,
+    justifyContent: 'space-between',
+    borderRadius: 16,
+  },
+  categoryIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryTitle: {
+    fontSize: 16,
     fontWeight: 'bold',
-    textAlign: 'center',
-    marginHorizontal: 4,
-    marginTop: 2,
+    color: '#fff',
   },
 });

@@ -242,6 +242,11 @@ const MangaEditorSimple: React.FC = () => {
   const [showTasksSidebar, setShowTasksSidebar] = useState(false);
   const [todos, setTodos] = useState<any[]>([]);
   const [newTask, setNewTask] = useState('');
+  const [localTodos, setLocalTodos] = useState<any[]>([]);
+  const [showAddTaskModal, setShowAddTaskModal] = useState(false);
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskDescription, setTaskDescription] = useState('');
+  const [taskPriority, setTaskPriority] = useState<'basse' | 'moyenne' | 'haute'>('moyenne');
   
   // Fonction pour obtenir l'utilisateur actuel
   const getCurrentUser = () => {
@@ -256,7 +261,15 @@ const MangaEditorSimple: React.FC = () => {
 
   // Marquer une tâche comme terminée
   const toggleTodoDone = async (todo: any) => {
-    if (!project?.id || project.id === 'new') return;
+    if (!project?.id || project.id === 'new') {
+      // Mode local
+      setLocalTodos(localTodos.map(t => 
+        t.id === todo.id 
+          ? { ...t, status: t.status === 'terminé' ? 'à faire' : 'terminé' }
+          : t
+      ));
+      return;
+    }
     try {
       const { db } = await import('../../../constants/firebaseConfig');
       const todoRef = doc(db, 'projects', project.id, 'todos', todo.id);
@@ -270,26 +283,67 @@ const MangaEditorSimple: React.FC = () => {
 
   // Ajouter une tâche à la to-do list
   const addTodo = async () => {
-    if (!newTask.trim() || !project?.id || project.id === 'new') {
-      if (!project?.id || project.id === 'new') {
-        Alert.alert('Sauvegarde nécessaire', 'Veuillez d\'abord sauvegarder votre manga pour ajouter des tâches.');
-      }
+    if (!taskTitle.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer un titre pour la tâche');
       return;
     }
+    
+    if (!project?.id || project.id === 'new') {
+      // Mode local - stockage temporaire
+      const newTodo = {
+        id: `local-${Date.now()}`,
+        title: taskTitle,
+        description: taskDescription,
+        priority: taskPriority,
+        status: 'à faire',
+        createdBy: 'local',
+        createdAt: new Date(),
+        deleted: false
+      };
+      setLocalTodos([newTodo, ...localTodos]);
+      setTaskTitle('');
+      setTaskDescription('');
+      setTaskPriority('moyenne');
+      setShowAddTaskModal(false);
+      return;
+    }
+    
     try {
       const { db } = await import('../../../constants/firebaseConfig');
       const auth = getAuth(app);
       await addDoc(collection(db, 'projects', project.id, 'todos'), {
-        title: newTask,
+        title: taskTitle,
+        description: taskDescription,
+        priority: taskPriority,
         status: 'à faire',
         createdBy: auth.currentUser?.uid,
         createdAt: new Date(),
         deleted: false
       });
-      setNewTask('');
+      setTaskTitle('');
+      setTaskDescription('');
+      setTaskPriority('moyenne');
+      setShowAddTaskModal(false);
     } catch (error) {
       console.error('Erreur ajout todo:', error);
       Alert.alert('Erreur', 'Impossible d\'ajouter la tâche');
+    }
+  };
+
+  // Supprimer une tâche
+  const deleteTodo = async (todo: any) => {
+    if (!project?.id || project.id === 'new') {
+      // Mode local
+      setLocalTodos(localTodos.filter(t => t.id !== todo.id));
+      return;
+    }
+    
+    try {
+      const { db } = await import('../../../constants/firebaseConfig');
+      const todoRef = doc(db, 'projects', project.id, 'todos', todo.id);
+      await updateDoc(todoRef, { deleted: true });
+    } catch (error) {
+      console.error('Erreur suppression:', error);
     }
   };
 
@@ -307,7 +361,8 @@ const MangaEditorSimple: React.FC = () => {
           orderBy('createdAt', 'desc')
         );
         const unsubscribe = onSnapshot(q, (snapshot) => {
-          setTodos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          const firestoreTodos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setTodos(firestoreTodos);
         });
         return unsubscribe;
       } catch (error) {
@@ -321,6 +376,9 @@ const MangaEditorSimple: React.FC = () => {
       unsubPromise?.then(unsub => unsub?.());
     };
   }, [project?.id]);
+
+  // Combiner les tâches locales et Firestore
+  const allTodos = project?.id && project.id !== 'new' ? todos : localTodos;
 
   // Initialiser avec un template ou créer vide
   useEffect(() => {
@@ -911,7 +969,7 @@ const MangaEditorSimple: React.FC = () => {
           onPress={() => setShowTasksSidebar(false)}
         >
           <TouchableOpacity 
-            style={styles.sidebarContainer} 
+            style={styles.sidebarContainerLeft} 
             activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
           >
@@ -927,32 +985,25 @@ const MangaEditorSimple: React.FC = () => {
             </View>
 
             <ScrollView style={styles.sidebarContent} showsVerticalScrollIndicator={false}>
-              {/* Formulaire d'ajout de tâche */}
-              <View style={styles.addTaskContainer}>
-                <TextInput
-                  value={newTask}
-                  onChangeText={setNewTask}
-                  placeholder="Nouvelle tâche..."
-                  placeholderTextColor="#666"
-                  style={styles.taskInput}
-                  onSubmitEditing={addTodo}
-                  returnKeyType="done"
-                />
-                <TouchableOpacity onPress={addTodo} style={styles.addButton}>
-                  <Ionicons name="add-circle" size={32} color="#9C27B0" />
-                </TouchableOpacity>
-              </View>
+              {/* Bouton d'ajout de tâche */}
+              <TouchableOpacity 
+                onPress={() => setShowAddTaskModal(true)} 
+                style={styles.addTaskButton}
+              >
+                <Ionicons name="add-circle" size={24} color="#9C27B0" />
+                <Text style={styles.addTaskButtonText}>Ajouter une tâche</Text>
+              </TouchableOpacity>
 
               {/* Liste des tâches */}
               <View style={styles.tasksListContainer}>
-                {todos.length === 0 ? (
+                {allTodos.length === 0 ? (
                   <View style={styles.emptyStateContainer}>
                     <Ionicons name="clipboard-outline" size={48} color="#444" />
                     <Text style={styles.emptyStateText}>Aucune tâche pour le moment</Text>
                     <Text style={styles.emptyStateSubtext}>Ajoutez votre première tâche ci-dessus</Text>
                   </View>
                 ) : (
-                  todos.map((todo) => (
+                  allTodos.map((todo) => (
                     <View key={todo.id} style={styles.taskItem}>
                       <TouchableOpacity
                         onPress={() => toggleTodoDone(todo)}
@@ -964,15 +1015,27 @@ const MangaEditorSimple: React.FC = () => {
                           color={todo.status === 'terminé' ? '#4CAF50' : '#9C27B0'}
                         />
                       </TouchableOpacity>
-                      <Text style={[
-                        styles.taskText,
-                        todo.status === 'terminé' && styles.taskTextCompleted
-                      ]}>
-                        {todo.title}
-                      </Text>
+                      <View style={styles.taskContent}>
+                        <Text style={[
+                          styles.taskText,
+                          todo.status === 'terminé' && styles.taskTextCompleted
+                        ]}>
+                          {todo.title}
+                        </Text>
+                        {todo.description && (
+                          <Text style={styles.taskDescription}>{todo.description}</Text>
+                        )}
+                        {todo.priority && (
+                          <View style={[styles.priorityBadge, { backgroundColor: 
+                            todo.priority === 'haute' ? '#FF6B6B' : 
+                            todo.priority === 'moyenne' ? '#FFA94D' : '#4CAF50' 
+                          }]}>
+                            <Text style={styles.priorityText}>{todo.priority}</Text>
+                          </View>
+                        )}
+                      </View>
                       <TouchableOpacity
-                        onPress={async () => {
-                          if (!project?.id || project.id === 'new') return;
+                        onPress={() => {
                           Alert.alert(
                             'Supprimer la tâche',
                             'Êtes-vous sûr de vouloir supprimer cette tâche ?',
@@ -981,15 +1044,7 @@ const MangaEditorSimple: React.FC = () => {
                               {
                                 text: 'Supprimer',
                                 style: 'destructive',
-                                onPress: async () => {
-                                  try {
-                                    const { db } = await import('../../../constants/firebaseConfig');
-                                    const todoRef = doc(db, 'projects', project.id, 'todos', todo.id);
-                                    await updateDoc(todoRef, { deleted: true });
-                                  } catch (error) {
-                                    console.error('Erreur suppression:', error);
-                                  }
-                                }
+                                onPress: () => deleteTodo(todo)
                               }
                             ]
                           );
@@ -1004,20 +1059,20 @@ const MangaEditorSimple: React.FC = () => {
               </View>
 
               {/* Statistiques */}
-              {todos.length > 0 && (
+              {allTodos.length > 0 && (
                 <View style={styles.statsContainer}>
                   <View style={styles.statItem}>
-                    <Text style={styles.statNumber}>{todos.filter(t => t.status === 'terminé').length}</Text>
+                    <Text style={styles.statNumber}>{allTodos.filter(t => t.status === 'terminé').length}</Text>
                     <Text style={styles.statLabel}>Terminées</Text>
                   </View>
                   <View style={styles.statDivider} />
                   <View style={styles.statItem}>
-                    <Text style={styles.statNumber}>{todos.filter(t => t.status !== 'terminé').length}</Text>
+                    <Text style={styles.statNumber}>{allTodos.filter(t => t.status !== 'terminé').length}</Text>
                     <Text style={styles.statLabel}>En cours</Text>
                   </View>
                   <View style={styles.statDivider} />
                   <View style={styles.statItem}>
-                    <Text style={styles.statNumber}>{todos.length}</Text>
+                    <Text style={styles.statNumber}>{allTodos.length}</Text>
                     <Text style={styles.statLabel}>Total</Text>
                   </View>
                 </View>
@@ -1025,6 +1080,121 @@ const MangaEditorSimple: React.FC = () => {
             </ScrollView>
           </TouchableOpacity>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Modal d'ajout de tâche */}
+      <Modal visible={showAddTaskModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.addTaskModal}>
+            <View style={styles.addTaskModalHeader}>
+              <Text style={styles.addTaskModalTitle}>Nouvelle tâche</Text>
+              <TouchableOpacity onPress={() => {
+                setShowAddTaskModal(false);
+                setTaskTitle('');
+                setTaskDescription('');
+                setTaskPriority('moyenne');
+              }}>
+                <Ionicons name="close" size={24} color="#9C27B0" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.addTaskModalContent}>
+              {/* Titre */}
+              <Text style={styles.inputLabel}>Titre de la tâche *</Text>
+              <TextInput
+                value={taskTitle}
+                onChangeText={setTaskTitle}
+                placeholder="Ex: Dessiner la couverture"
+                placeholderTextColor="#666"
+                style={styles.modalInput}
+                autoFocus
+              />
+
+              {/* Description */}
+              <Text style={styles.inputLabel}>Description (optionnel)</Text>
+              <TextInput
+                value={taskDescription}
+                onChangeText={setTaskDescription}
+                placeholder="Ajoutez des détails..."
+                placeholderTextColor="#666"
+                style={[styles.modalInput, styles.textArea]}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+
+              {/* Priorité */}
+              <Text style={styles.inputLabel}>Priorité</Text>
+              <View style={styles.priorityContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.priorityOption,
+                    taskPriority === 'basse' && styles.priorityOptionSelected,
+                    { borderColor: '#4CAF50' }
+                  ]}
+                  onPress={() => setTaskPriority('basse')}
+                >
+                  <View style={[styles.priorityDot, { backgroundColor: '#4CAF50' }]} />
+                  <Text style={[
+                    styles.priorityOptionText,
+                    taskPriority === 'basse' && styles.priorityOptionTextSelected
+                  ]}>Basse</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.priorityOption,
+                    taskPriority === 'moyenne' && styles.priorityOptionSelected,
+                    { borderColor: '#FFA94D' }
+                  ]}
+                  onPress={() => setTaskPriority('moyenne')}
+                >
+                  <View style={[styles.priorityDot, { backgroundColor: '#FFA94D' }]} />
+                  <Text style={[
+                    styles.priorityOptionText,
+                    taskPriority === 'moyenne' && styles.priorityOptionTextSelected
+                  ]}>Moyenne</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.priorityOption,
+                    taskPriority === 'haute' && styles.priorityOptionSelected,
+                    { borderColor: '#FF6B6B' }
+                  ]}
+                  onPress={() => setTaskPriority('haute')}
+                >
+                  <View style={[styles.priorityDot, { backgroundColor: '#FF6B6B' }]} />
+                  <Text style={[
+                    styles.priorityOptionText,
+                    taskPriority === 'haute' && styles.priorityOptionTextSelected
+                  ]}>Haute</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.addTaskModalActions}>
+              <TouchableOpacity 
+                style={styles.cancelTaskButton}
+                onPress={() => {
+                  setShowAddTaskModal(false);
+                  setTaskTitle('');
+                  setTaskDescription('');
+                  setTaskPriority('moyenne');
+                }}
+              >
+                <Text style={styles.cancelTaskButtonText}>Annuler</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.saveTaskButton}
+                onPress={addTodo}
+              >
+                <Text style={styles.saveTaskButtonText}>Créer la tâche</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
 
       {/* Modal d'édition du titre */}
@@ -1298,17 +1468,17 @@ const styles = StyleSheet.create({
   sidebarOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-    alignItems: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
   },
-  sidebarContainer: {
+  sidebarContainerLeft: {
     width: 360,
     height: '100%',
     backgroundColor: '#232323',
-    borderTopLeftRadius: 20,
-    borderBottomLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 20,
     shadowColor: '#000',
-    shadowOffset: { width: -2, height: 0 },
+    shadowOffset: { width: 2, height: 0 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 10,
@@ -1337,6 +1507,24 @@ const styles = StyleSheet.create({
   sidebarContent: {
     flex: 1,
     padding: 20,
+  },
+  addTaskButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#181818',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 24,
+    borderWidth: 2,
+    borderColor: '#9C27B0',
+    borderStyle: 'dashed',
+  },
+  addTaskButtonText: {
+    color: '#9C27B0',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
   addTaskContainer: {
     flexDirection: 'row',
@@ -1389,15 +1577,37 @@ const styles = StyleSheet.create({
   taskCheckbox: {
     marginRight: 12,
   },
+  taskContent: {
+    flex: 1,
+  },
   taskText: {
     flex: 1,
     color: '#fff',
     fontSize: 15,
+    fontWeight: '600',
   },
   taskTextCompleted: {
     color: '#4CAF50',
     textDecorationLine: 'line-through',
     opacity: 0.7,
+  },
+  taskDescription: {
+    color: '#888',
+    fontSize: 13,
+    marginTop: 4,
+  },
+  priorityBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginTop: 6,
+  },
+  priorityText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
   },
   deleteTaskButton: {
     padding: 8,
@@ -1429,6 +1639,111 @@ const styles = StyleSheet.create({
     width: 1,
     backgroundColor: '#333',
     marginHorizontal: 8,
+  },
+
+  // Modal d'ajout de tâche
+  addTaskModal: {
+    backgroundColor: '#23232a',
+    borderRadius: 16,
+    padding: 24,
+    width: width * 0.9,
+    maxHeight: height * 0.8,
+  },
+  addTaskModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  addTaskModalTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  addTaskModalContent: {
+    flex: 1,
+  },
+  inputLabel: {
+    color: '#888',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  modalInput: {
+    backgroundColor: '#181818',
+    color: '#fff',
+    padding: 12,
+    borderRadius: 8,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  textArea: {
+    minHeight: 100,
+    paddingTop: 12,
+  },
+  priorityContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 20,
+  },
+  priorityOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 2,
+    backgroundColor: '#181818',
+  },
+  priorityOptionSelected: {
+    backgroundColor: 'rgba(156, 39, 176, 0.1)',
+  },
+  priorityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  priorityOptionText: {
+    color: '#888',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  priorityOptionTextSelected: {
+    color: '#fff',
+  },
+  addTaskModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  cancelTaskButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#666',
+    alignItems: 'center',
+  },
+  cancelTaskButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  saveTaskButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 8,
+    backgroundColor: '#9C27B0',
+    alignItems: 'center',
+  },
+  saveTaskButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 
