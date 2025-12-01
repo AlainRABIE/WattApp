@@ -5,11 +5,13 @@ import { useRouter } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
 import { collection, query, where, getDocs } from 'firebase/firestore';
+import { useTheme } from '../../hooks/useTheme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const Home: React.FC = () => {
 	const router = useRouter();
+	const { theme } = useTheme();
 	const [books, setBooks] = useState<any[]>([]);
 	const [loadingBooks, setLoadingBooks] = useState(true);
 	const [email, setEmail] = useState('');
@@ -87,22 +89,22 @@ const Home: React.FC = () => {
 	}, [books.length]);
 
 	return (
-		<View style={styles.container}>
+		<View style={[styles.container, { backgroundColor: theme.colors.background }]}>
 			<StatusBar barStyle="light-content" />
 			
 			{/* Header */}
 			<View style={styles.header}>
 				<View>
-					<Text style={styles.greeting}>Bonjour,</Text>
-					<Text style={styles.username}>{displayName || email?.split('@')[0] || 'Lecteur'}</Text>
+					<Text style={[styles.greeting, { color: theme.colors.textSecondary }]}>Bonjour,</Text>
+					<Text style={[styles.username, { color: theme.colors.text }]}>{displayName || email?.split('@')[0] || 'Lecteur'}</Text>
 				</View>
 				<View style={styles.headerRight}>
-					<TouchableOpacity onPress={() => router.push('/wallet')} style={styles.walletButton}>
-						<Ionicons name="wallet" size={20} color="#FFA94D" />
-						<Text style={styles.walletText}>{walletBalance.toFixed(0)}€</Text>
+					<TouchableOpacity onPress={() => router.push('/wallet')} style={[styles.walletButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+						<Ionicons name="wallet" size={20} color={theme.colors.primary} />
+						<Text style={[styles.walletText, { color: theme.colors.text }]}>{walletBalance.toFixed(0)}€</Text>
 					</TouchableOpacity>
 					<TouchableOpacity onPress={() => router.push('/profile')}>
-						<Image source={{ uri: photoURL || avatarUrl }} style={styles.avatar} />
+						<Image source={{ uri: photoURL || avatarUrl }} style={[styles.avatar, { borderColor: theme.colors.border }]} />
 					</TouchableOpacity>
 				</View>
 			</View>
@@ -141,26 +143,26 @@ const Home: React.FC = () => {
 												style={styles.heroCover}
 											/>
 											<View style={styles.heroInfo}>
-												<View style={styles.heroBadge}>
+												<View style={[styles.heroBadge, { backgroundColor: 'rgba(255, 107, 53, 0.15)', borderColor: 'rgba(255, 107, 53, 0.3)' }]}>
 													<Ionicons name="flame" size={10} color="#FF6B35" />
 													<Text style={styles.heroBadgeText}>EN VEDETTE</Text>
 												</View>
-												<Text style={styles.heroTitle} numberOfLines={2}>{livre.title}</Text>
-												<Text style={styles.heroAuthor}>{livre.author || livre.auteur || 'Auteur inconnu'}</Text>
+												<Text style={[styles.heroTitle, { color: theme.colors.text }]} numberOfLines={2}>{livre.title}</Text>
+												<Text style={[styles.heroAuthor, { color: theme.colors.textSecondary }]}>{livre.author || livre.auteur || 'Auteur inconnu'}</Text>
 												<View style={styles.heroMeta}>
 													<View style={styles.heroMetaItem}>
-														<Ionicons name="eye" size={12} color="#aaa" />
-														<Text style={styles.heroMetaText}>{livre.reads || 0}</Text>
+														<Ionicons name="eye" size={12} color={theme.colors.textSecondary} />
+														<Text style={[styles.heroMetaText, { color: theme.colors.textSecondary }]}>{livre.reads || 0}</Text>
 													</View>
 													{livre.tags && livre.tags[0] && (
-														<Text style={styles.heroGenre}>• {livre.tags[0]}</Text>
+														<Text style={[styles.heroGenre, { color: theme.colors.textSecondary }]}>• {livre.tags[0]}</Text>
 													)}
 												</View>
 												<TouchableOpacity style={styles.heroButton}>
-													<Text style={styles.heroButtonText}>
+													<Text style={[styles.heroButtonText, { color: theme.colors.primary }]}>
 														{livre.price && livre.price > 0 ? `${livre.price.toFixed(2)}€` : 'Gratuit'}
 													</Text>
-													<Ionicons name="arrow-forward-circle" size={18} color="#FFA94D" />
+													<Ionicons name="arrow-forward-circle" size={18} color={theme.colors.primary} />
 												</TouchableOpacity>
 											</View>
 										</View>
@@ -174,9 +176,9 @@ const Home: React.FC = () => {
 				{/* Section Continuer la lecture */}
 				<View style={styles.section}>
 					<View style={styles.sectionHeader}>
-						<Text style={styles.sectionTitle}>Populaires</Text>
+						<Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Populaires</Text>
 						<TouchableOpacity onPress={() => router.push('/explore')}>
-							<Text style={styles.seeAll}>Voir tout</Text>
+							<Text style={[styles.seeAll, { color: theme.colors.primary }]}>Voir tout</Text>
 						</TouchableOpacity>
 					</View>
 					<ScrollView 
@@ -191,21 +193,21 @@ const Home: React.FC = () => {
 								onPress={() => router.push(`/book/${livre.id}`)}
 								activeOpacity={0.9}
 							>
-								<Image
-									source={{ uri: livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=256' }}
-									style={styles.bookCover}
-								/>
-								<View style={styles.bookInfo}>
-									<Text style={styles.bookTitle} numberOfLines={2}>{livre.title}</Text>
-									<Text style={styles.bookAuthor} numberOfLines={1}>{livre.author || livre.auteur || 'Auteur'}</Text>
-									<View style={styles.bookFooter}>
-										<Text style={styles.bookPrice}>
+									<Image
+										source={{ uri: livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=256' }}
+										style={[styles.bookCover, { backgroundColor: theme.colors.surface }]}
+									/>
+									<View style={styles.bookInfo}>
+										<Text style={[styles.bookTitle, { color: theme.colors.text }]} numberOfLines={2}>{livre.title}</Text>
+										<Text style={[styles.bookAuthor, { color: theme.colors.textSecondary }]} numberOfLines={1}>{livre.author || livre.auteur || 'Auteur'}</Text>
+										<View style={styles.bookFooter}>
+											<Text style={[styles.bookPrice, { color: theme.colors.primary }]}>
 											{livre.price && livre.price > 0 ? `${livre.price.toFixed(2)}€` : 'Gratuit'}
 										</Text>
-										{livre.reads > 0 && (
-											<View style={styles.bookReads}>
-												<Ionicons name="eye-outline" size={12} color="#666" />
-												<Text style={styles.bookReadsText}>{livre.reads}</Text>
+												{livre.reads > 0 && (
+													<View style={styles.bookReads}>
+														<Ionicons name="eye-outline" size={12} color={theme.colors.textSecondary} />
+														<Text style={[styles.bookReadsText, { color: theme.colors.textSecondary }]}>{livre.reads}</Text>
 											</View>
 										)}
 									</View>
@@ -218,9 +220,9 @@ const Home: React.FC = () => {
 				{/* Section Nouveautés */}
 				<View style={styles.section}>
 					<View style={styles.sectionHeader}>
-						<Text style={styles.sectionTitle}>Nouveautés</Text>
+						<Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Nouveautés</Text>
 						<TouchableOpacity onPress={() => router.push('/explore')}>
-							<Text style={styles.seeAll}>Voir tout</Text>
+							<Text style={[styles.seeAll, { color: theme.colors.primary }]}>Voir tout</Text>
 						</TouchableOpacity>
 					</View>
 					<ScrollView 
@@ -237,19 +239,19 @@ const Home: React.FC = () => {
 							>
 								<Image
 									source={{ uri: livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=256' }}
-									style={styles.bookCover}
+									style={[styles.bookCover, { backgroundColor: theme.colors.surface }]}
 								/>
 								<View style={styles.bookInfo}>
-									<Text style={styles.bookTitle} numberOfLines={2}>{livre.title}</Text>
-									<Text style={styles.bookAuthor} numberOfLines={1}>{livre.author || livre.auteur || 'Auteur'}</Text>
+									<Text style={[styles.bookTitle, { color: theme.colors.text }]} numberOfLines={2}>{livre.title}</Text>
+									<Text style={[styles.bookAuthor, { color: theme.colors.textSecondary }]} numberOfLines={1}>{livre.author || livre.auteur || 'Auteur'}</Text>
 									<View style={styles.bookFooter}>
-										<Text style={styles.bookPrice}>
+										<Text style={[styles.bookPrice, { color: theme.colors.primary }]}>
 											{livre.price && livre.price > 0 ? `${livre.price.toFixed(2)}€` : 'Gratuit'}
 										</Text>
 										{livre.reads > 0 && (
 											<View style={styles.bookReads}>
-												<Ionicons name="eye-outline" size={12} color="#666" />
-												<Text style={styles.bookReadsText}>{livre.reads}</Text>
+												<Ionicons name="eye-outline" size={12} color={theme.colors.textSecondary} />
+												<Text style={[styles.bookReadsText, { color: theme.colors.textSecondary }]}>{livre.reads}</Text>
 											</View>
 										)}
 									</View>
@@ -261,7 +263,7 @@ const Home: React.FC = () => {
 
 				{/* Genres */}
 				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>Explorer par genre</Text>
+					<Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Explorer par genre</Text>
 					<View style={styles.genresGrid}>
 						{[
 							{ name: 'Romance', icon: 'heart', color: '#FF6B9D' },
@@ -269,15 +271,15 @@ const Home: React.FC = () => {
 							{ name: 'Thriller', icon: 'flash', color: '#E74C3C' },
 							{ name: 'Science-Fiction', icon: 'rocket', color: '#3498DB' },
 						].map((genre) => (
-							<TouchableOpacity
-								key={genre.name}
-								style={styles.genreCard}
-								onPress={() => router.push('/explore')}
-								activeOpacity={0.8}
-							>
-								<Ionicons name={genre.icon as any} size={24} color={genre.color} />
-								<Text style={styles.genreName}>{genre.name}</Text>
-							</TouchableOpacity>
+								<TouchableOpacity
+									key={genre.name}
+									style={[styles.genreCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+									onPress={() => router.push('/explore')}
+									activeOpacity={0.8}
+								>
+									<Ionicons name={genre.icon as any} size={24} color={genre.color} />
+									<Text style={[styles.genreName, { color: theme.colors.text }]}>{genre.name}</Text>
+								</TouchableOpacity>
 						))}
 					</View>
 				</View>
@@ -291,7 +293,6 @@ const Home: React.FC = () => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#000',
 	},
 	header: {
 		flexDirection: 'row',
@@ -303,13 +304,11 @@ const styles = StyleSheet.create({
 	},
 	greeting: {
 		fontSize: 14,
-		color: '#888',
 		marginBottom: 2,
 	},
 	username: {
 		fontSize: 22,
 		fontWeight: '700',
-		color: '#fff',
 	},
 	headerRight: {
 		flexDirection: 'row',
@@ -320,24 +319,20 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 6,
-		backgroundColor: '#111',
 		paddingVertical: 8,
 		paddingHorizontal: 12,
 		borderRadius: 16,
 		borderWidth: 1,
-		borderColor: '#222',
 	},
 	walletText: {
 		fontSize: 14,
 		fontWeight: '600',
-		color: '#fff',
 	},
 	avatar: {
 		width: 40,
 		height: 40,
 		borderRadius: 20,
 		borderWidth: 2,
-		borderColor: '#222',
 	},
 	content: {
 		flex: 1,
@@ -356,7 +351,6 @@ const styles = StyleSheet.create({
 		height: 200,
 		borderRadius: 16,
 		overflow: 'hidden',
-		backgroundColor: '#111',
 		marginRight: 16,
 	},
 	heroImage: {
@@ -378,7 +372,6 @@ const styles = StyleSheet.create({
 		width: 100,
 		height: 150,
 		borderRadius: 8,
-		backgroundColor: '#222',
 	},
 	heroInfo: {
 		flex: 1,
@@ -389,13 +382,11 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 4,
-		backgroundColor: 'rgba(255, 107, 53, 0.15)',
 		paddingVertical: 3,
 		paddingHorizontal: 8,
 		borderRadius: 10,
 		alignSelf: 'flex-start',
 		borderWidth: 1,
-		borderColor: 'rgba(255, 107, 53, 0.3)',
 	},
 	heroBadgeText: {
 		fontSize: 9,
@@ -406,11 +397,9 @@ const styles = StyleSheet.create({
 	heroTitle: {
 		fontSize: 16,
 		fontWeight: '700',
-		color: '#fff',
 	},
 	heroAuthor: {
 		fontSize: 12,
-		color: '#ccc',
 	},
 	heroMeta: {
 		flexDirection: 'row',
@@ -425,11 +414,9 @@ const styles = StyleSheet.create({
 	},
 	heroMetaText: {
 		fontSize: 11,
-		color: '#aaa',
 	},
 	heroGenre: {
 		fontSize: 11,
-		color: '#aaa',
 	},
 	heroButton: {
 		flexDirection: 'row',
@@ -440,7 +427,6 @@ const styles = StyleSheet.create({
 	heroButtonText: {
 		fontSize: 13,
 		fontWeight: '600',
-		color: '#FFA94D',
 	},
 
 	// Sections
@@ -457,11 +443,9 @@ const styles = StyleSheet.create({
 	sectionTitle: {
 		fontSize: 18,
 		fontWeight: '700',
-		color: '#fff',
 	},
 	seeAll: {
 		fontSize: 13,
-		color: '#FFA94D',
 		fontWeight: '600',
 	},
 
@@ -477,7 +461,6 @@ const styles = StyleSheet.create({
 		width: 140,
 		height: 210,
 		borderRadius: 10,
-		backgroundColor: '#111',
 		marginBottom: 8,
 	},
 	bookInfo: {
@@ -486,11 +469,9 @@ const styles = StyleSheet.create({
 	bookTitle: {
 		fontSize: 13,
 		fontWeight: '600',
-		color: '#fff',
 	},
 	bookAuthor: {
 		fontSize: 11,
-		color: '#888',
 		marginBottom: 4,
 	},
 	bookFooter: {
@@ -501,7 +482,6 @@ const styles = StyleSheet.create({
 	bookPrice: {
 		fontSize: 12,
 		fontWeight: '600',
-		color: '#FFA94D',
 	},
 	bookReads: {
 		flexDirection: 'row',
@@ -510,34 +490,6 @@ const styles = StyleSheet.create({
 	},
 	bookReadsText: {
 		fontSize: 10,
-		color: '#666',
-	},
-
-	// Grid
-	grid: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		gap: 12,
-	},
-	gridItem: {
-		width: (SCREEN_WIDTH - 52) / 3,
-	},
-	gridCover: {
-		width: '100%',
-		height: 120,
-		borderRadius: 8,
-		backgroundColor: '#111',
-		marginBottom: 6,
-	},
-	gridTitle: {
-		fontSize: 11,
-		fontWeight: '600',
-		color: '#fff',
-		marginBottom: 2,
-	},
-	gridAuthor: {
-		fontSize: 10,
-		color: '#888',
 	},
 
 	// Genres
@@ -548,18 +500,15 @@ const styles = StyleSheet.create({
 	},
 	genreCard: {
 		width: (SCREEN_WIDTH - 52) / 2,
-		backgroundColor: '#111',
 		borderRadius: 12,
 		padding: 18,
 		alignItems: 'center',
 		gap: 10,
 		borderWidth: 1,
-		borderColor: '#222',
 	},
 	genreName: {
 		fontSize: 14,
 		fontWeight: '600',
-		color: '#fff',
 	},
 });
 
