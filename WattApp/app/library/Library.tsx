@@ -27,6 +27,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { NativePDFService, PDFBookData } from '../services/NativePDFService';
 import PDFPageExtractor from '../components/PDFPageExtractor';
+import { useTheme } from '../../hooks/useTheme';
 
 // Types
 type BookType = {
@@ -77,6 +78,8 @@ type FolderType = {
 const initialFolders: FolderType[] = [];
 
 const Library: React.FC = () => {
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
   const router = useRouter();
   const { width, height } = useWindowDimensions();
   const isTablet = Math.max(width, height) >= 768;
@@ -1386,18 +1389,18 @@ Variables d'état:
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f0f0f',
+    backgroundColor: theme.colors.background,
   },
   headerSection: {
     paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 0) + 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
-    backgroundColor: '#0f0f0f',
+    backgroundColor: theme.colors.background,
     borderBottomWidth: 1,
-    borderBottomColor: '#222',
+    borderBottomColor: theme.colors.border,
   },
   headerTop: {
     flexDirection: 'row',
@@ -1406,24 +1409,24 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
-    color: '#fff',
+    color: theme.colors.text,
     fontSize: 32,
     fontWeight: 'bold',
     marginBottom: 4,
   },
   subtitle: {
-    color: '#888',
+    color: theme.colors.textSecondary,
     fontSize: 14,
   },
   downloadManagerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: theme.colors.surface,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#2a2a2a',
+    borderColor: theme.colors.border,
   },
   downloadCountText: {
     color: '#4CAF50',
@@ -1434,20 +1437,20 @@ const styles = StyleSheet.create({
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#2a2a2a',
+    borderColor: theme.colors.border,
   },
   searchIconLeft: {
     marginRight: 10,
   },
   searchInput: {
     flex: 1,
-    color: '#fff',
+    color: theme.colors.text,
     fontSize: 15,
   },
   clearBtn: {
@@ -1462,7 +1465,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFA94D',
+    backgroundColor: theme.colors.primary,
     paddingVertical: 12,
     borderRadius: 12,
     gap: 8,
@@ -1496,17 +1499,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#222',
+    borderBottomColor: theme.colors.border,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#fff',
+    color: theme.colors.text,
     flex: 1,
   },
   sectionCount: {
-    backgroundColor: '#2a2a2a',
-    color: '#888',
+    backgroundColor: theme.colors.surface,
+    color: theme.colors.textSecondary,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -1522,14 +1525,14 @@ const styles = StyleSheet.create({
   },
   horizontalCard: {
     width: 130,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     overflow: 'hidden',
   },
   horizontalCover: {
     width: '100%',
     height: 180,
-    backgroundColor: '#0f0f0f',
+    backgroundColor: theme.colors.background,
   },
   pdfIndicator: {
     width: '100%',
@@ -1628,24 +1631,24 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   horizontalBookTitle: {
-    color: '#fff',
+    color: theme.colors.text,
     fontSize: 13,
     fontWeight: '600',
     marginBottom: 4,
     lineHeight: 18,
   },
   horizontalBookAuthor: {
-    color: '#888',
+    color: theme.colors.textSecondary,
     fontSize: 11,
   },
   creationCard: {
     width: 160,
     marginRight: 16,
-    backgroundColor: '#232323',
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: theme.colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -1656,35 +1659,35 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 160,
     borderRadius: 8,
-    backgroundColor: '#181818',
+    backgroundColor: theme.colors.background,
     marginBottom: 8,
   },
   creationCardContent: {
     alignItems: 'center',
   },
   creationBookTitle: {
-    color: '#FFA94D',
+    color: theme.colors.primary,
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: 4,
   },
   creationBookAuthor: {
-    color: '#ccc',
+    color: theme.colors.text,
     fontSize: 12,
     textAlign: 'center',
     marginBottom: 6,
   },
   draftCard: {
     width: 150,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     overflow: 'hidden',
   },
   draftCover: {
     width: '100%',
     height: 160,
-    backgroundColor: '#0f0f0f',
+    backgroundColor: theme.colors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1695,30 +1698,30 @@ const styles = StyleSheet.create({
   },
   draftIcon: {
     fontSize: 48,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   draftCardContent: {
     padding: 12,
   },
   draftTitle: {
-    color: '#fff',
+    color: theme.colors.text,
     fontSize: 13,
     fontWeight: '600',
     marginBottom: 6,
     lineHeight: 18,
   },
   draftTemplate: {
-    color: '#666',
+    color: theme.colors.textSecondary,
     fontSize: 11,
     marginBottom: 4,
   },
   draftDate: {
-    color: '#666',
+    color: theme.colors.textSecondary,
     fontSize: 10,
     marginBottom: 2,
   },
   draftUpdatedDate: {
-    color: '#888',
+    color: theme.colors.textSecondary,
     fontSize: 10,
     fontWeight: '500',
   },
@@ -1731,13 +1734,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   emptySectionText: {
-    color: '#999',
+    color: theme.colors.textSecondary,
     fontSize: 16,
     fontWeight: '500',
     marginBottom: 4,
   },
   emptySectionSubtext: {
-    color: '#666',
+    color: theme.colors.textSecondary,
     fontSize: 14,
   },
 
@@ -1748,7 +1751,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   viewsText: {
-    color: '#888',
+    color: theme.colors.textSecondary,
     fontSize: 11,
   },
   tagsRow: { 
@@ -1768,7 +1771,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 169, 77, 0.3)',
   },
   tagText: { 
-    color: '#FFA94D', 
+    color: theme.colors.primary, 
     fontSize: 10, 
     fontWeight: '500',
   },
@@ -1785,14 +1788,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   empty: { 
-    color: '#fff', 
+    color: theme.colors.text, 
     textAlign: 'center', 
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 8,
   },
   emptySubtext: {
-    color: '#888',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     fontSize: 14,
   },
@@ -1803,7 +1806,7 @@ const styles = StyleSheet.create({
   },
   contextMenu: {
     position: 'absolute',
-    backgroundColor: '#23232a',
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     padding: 8,
     minWidth: 220,
@@ -1812,23 +1815,23 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: theme.colors.border,
   },
   contextMenuHeader: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    borderBottomColor: theme.colors.border,
     marginBottom: 4,
   },
   contextMenuTitle: {
-    color: '#FFA94D',
+    color: theme.colors.primary,
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 2,
   },
   contextMenuSubtitle: {
-    color: '#888',
+    color: theme.colors.textSecondary,
     fontSize: 12,
   },
   contextMenuItem: {

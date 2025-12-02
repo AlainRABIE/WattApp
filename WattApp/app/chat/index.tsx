@@ -40,7 +40,7 @@ export default function ChatsList() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Messages</Text>
+      <Text style={styles.title}>Messagessss</Text>
       {loading ? <ActivityIndicator color="#FFA94D" /> : null}
       <FlatList
         data={chats}

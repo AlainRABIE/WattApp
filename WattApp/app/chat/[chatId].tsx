@@ -10,32 +10,6 @@ import { v4 as uuidv4 } from 'uuid';
 function generateRoomId() {
   return uuidv4();
 }
-  // Envoi d'une invitation à dessiner
-  const sendDrawInvite = async () => {
-    const roomId = generateRoomId();
-    // Lien d'invitation (adapter le schéma si besoin)
-    const inviteUrl = Linking.createURL(`/draw?roomId=${roomId}`);
-    const auth = getAuth(app);
-    const current = auth.currentUser;
-    if (!current) return;
-    try {
-      await addDoc(collection(db, 'chats', chatId, 'messages'), {
-        sender: current.uid,
-        text: `🎨 Invitation à dessiner ensemble : ${inviteUrl}`,
-        createdAt: serverTimestamp(),
-        type: 'draw-invite',
-        roomId,
-      });
-      // update last message in chat doc
-      const chatRef = doc(db, 'chats', chatId);
-      await updateDoc(chatRef, {
-        lastMessageText: '[Invitation à dessiner]',
-        lastMessageAt: serverTimestamp(),
-      });
-    } catch (err) {
-      console.warn('Erreur envoi invitation dessin', err);
-    }
-  };
 import {
   View,
   Text,
@@ -68,8 +42,11 @@ import {
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useTheme } from '../../hooks/useTheme';
 
 export default function ChatThread() {
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
   const window = Dimensions.get('window');
   const params = useLocalSearchParams();
   const router = useRouter();
@@ -84,6 +61,33 @@ export default function ChatThread() {
   const [myEmail, setMyEmail] = useState<string | null>(null);
   const [otherUserInfo, setOtherUserInfo] = useState<any>(null);
   const flatRef = useRef<any>(null);
+
+  // Envoi d'une invitation à dessiner
+  const sendDrawInvite = async () => {
+    const roomId = generateRoomId();
+    // Lien d'invitation (adapter le schéma si besoin)
+    const inviteUrl = Linking.createURL(`/draw?roomId=${roomId}`);
+    const auth = getAuth(app);
+    const current = auth.currentUser;
+    if (!current) return;
+    try {
+      await addDoc(collection(db, 'chats', chatId, 'messages'), {
+        sender: current.uid,
+        text: `🎨 Invitation à dessiner ensemble : ${inviteUrl}`,
+        createdAt: serverTimestamp(),
+        type: 'draw-invite',
+        roomId,
+      });
+      // update last message in chat doc
+      const chatRef = doc(db, 'chats', chatId);
+      await updateDoc(chatRef, {
+        lastMessageText: '[Invitation à dessiner]',
+        lastMessageAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.warn('Erreur envoi invitation dessin', err);
+    }
+  };
 
   // Récupère les participants du chat
   useEffect(() => {
@@ -270,7 +274,7 @@ export default function ChatThread() {
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={{ flex: 1, backgroundColor: '#181818' }}>
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
         {/* Header */}
         {renderHeader()}
 
@@ -398,7 +402,7 @@ export default function ChatThread() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
   headerUltraModernWrap: {
     position: 'absolute',
     top: 0,
@@ -430,7 +434,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     width: 48,
     height: 48,
-    backgroundColor: '#222',
+    backgroundColor: theme.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -438,10 +442,10 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#222',
+    backgroundColor: theme.colors.surface,
   },
   headerUltraName: {
-    color: '#fff',
+    color: theme.colors.text,
     fontWeight: 'bold',
     fontSize: 18,
     flex: 1,
@@ -468,7 +472,7 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 16,
     marginHorizontal: 4,
-    backgroundColor: '#222',
+    backgroundColor: theme.colors.surface,
   },
   messageBubble: {
     maxWidth: '70%',
@@ -478,15 +482,15 @@ const styles = StyleSheet.create({
     marginHorizontal: 2,
   },
   messageBubbleMe: {
-    backgroundColor: '#FFA94D',
+    backgroundColor: theme.colors.primary,
     alignSelf: 'flex-end',
   },
   messageBubbleOther: {
-    backgroundColor: '#333',
+    backgroundColor: theme.colors.surface,
     alignSelf: 'flex-start',
   },
   messageText: {
-    color: '#fff',
+    color: theme.colors.text,
     fontSize: 16,
   },
   composerWrap: {
@@ -496,22 +500,22 @@ const styles = StyleSheet.create({
     bottom: 0,
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: '#181818',
+    backgroundColor: theme.colors.background,
     padding: 10,
     borderTopWidth: 1,
-    borderTopColor: '#222',
+    borderTopColor: theme.colors.border,
     zIndex: 20,
   },
   composerWrapFocused: {
-    backgroundColor: '#222',
+    backgroundColor: theme.colors.surface,
   },
   composerInput: {
     flex: 1,
     minHeight: 40,
     maxHeight: 120,
-    color: '#fff',
+    color: theme.colors.text,
     fontSize: 16,
-    backgroundColor: '#222',
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -523,7 +527,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFA94D',
+    backgroundColor: theme.colors.primary,
     elevation: 2,
     shadowColor: '#000',
     shadowOpacity: 0.2,

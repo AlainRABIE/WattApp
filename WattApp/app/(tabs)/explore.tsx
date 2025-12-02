@@ -4,6 +4,7 @@ import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { collection, getDocs, query, limit as queryLimit } from 'firebase/firestore';
 import app, { db } from '../../constants/firebaseConfig';
 import { useRouter } from 'expo-router';
+import { useTheme } from '../../hooks/useTheme';
 
 const CATEGORIES = [
   'Roman d\'amour', 'Fanfiction', 'Fiction générale', 'Roman pour adolescents', 'Aléatoire',
@@ -12,6 +13,7 @@ const CATEGORIES = [
 const { width } = Dimensions.get('window');
 
 export default function ExploreScreen() {
+  const { theme } = useTheme();
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(false);
   const [books, setBooks] = useState<any[]>([]);
@@ -71,7 +73,7 @@ export default function ExploreScreen() {
     </TouchableOpacity>
   );
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
   noResultContainer: {
     flex: 1,
     alignItems: 'center',
@@ -79,27 +81,27 @@ const styles = StyleSheet.create({
     marginTop: 32,
   },
   noResult: {
-    color: '#aaa',
+    color: theme.colors.textSecondary,
     fontSize: 18,
     textAlign: 'center',
     marginBottom: 8,
   },
   safeArea: {
     flex: 1,
-    backgroundColor: '#181818',
+    backgroundColor: theme.colors.background,
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#181818',
+    backgroundColor: theme.colors.background,
     paddingHorizontal: 12,
     paddingTop: 18,
     paddingBottom: 8,
   },
   searchBar: {
     flex: 1,
-    backgroundColor: '#23232a',
-    color: '#fff',
+    backgroundColor: theme.colors.surface,
+    color: theme.colors.text,
     borderRadius: 16,
     fontSize: 18,
     paddingHorizontal: 16,
@@ -107,17 +109,17 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   filterBtn: {
-    backgroundColor: '#23232a',
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     padding: 8,
     marginLeft: 2,
   },
   tabsRow: {
-    backgroundColor: '#181818',
+    backgroundColor: theme.colors.background,
     paddingVertical: 0,
     marginBottom: 0,
     borderBottomWidth: 1,
-    borderBottomColor: '#23232a',
+    borderBottomColor: theme.colors.border,
     marginTop: 0,
   },
   tabBtn: {
@@ -131,19 +133,19 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   tabBtnActive: {
-    backgroundColor: '#23232a',
+    backgroundColor: theme.colors.surface,
   },
   tabBtnText: {
-    color: '#aaa',
+    color: theme.colors.textSecondary,
     fontSize: 15,
     fontWeight: '500',
   },
   tabBtnTextActive: {
-    color: '#FFA94D',
+    color: theme.colors.primary,
     fontWeight: 'bold',
   },
   bookCard: {
-    backgroundColor: '#181818',
+    backgroundColor: theme.colors.background,
     borderRadius: 16,
     marginBottom: 18,
     flex: 1,
@@ -160,14 +162,14 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#23232a',
+    backgroundColor: theme.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 6,
     marginTop: 2,
   },
   bookRankText: {
-    color: '#FFA94D',
+    color: theme.colors.primary,
     fontWeight: 'bold',
     fontSize: 15,
   },
@@ -175,7 +177,7 @@ const styles = StyleSheet.create({
     width: 54,
     height: 74,
     borderRadius: 8,
-    backgroundColor: '#333',
+    backgroundColor: theme.colors.surface,
     marginRight: 8,
   },
   bookInfo: {
@@ -183,7 +185,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   bookTitle: {
-    color: '#fff',
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 2,
@@ -191,7 +193,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   bookAuthor: {
-    color: '#aaa',
+    color: theme.colors.textSecondary,
     fontSize: 14,
     marginBottom: 2,
     maxWidth: 110,
@@ -203,7 +205,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   bookStat: {
-    color: '#aaa',
+    color: theme.colors.textSecondary,
     fontSize: 13,
     marginRight: 12,
     flexDirection: 'row',
@@ -215,7 +217,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   bookTag: {
-    backgroundColor: '#23232a',
+    backgroundColor: theme.colors.surface,
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -223,13 +225,15 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   bookTagText: {
-    color: '#FFA94D',
+    color: theme.colors.primary,
     fontSize: 12,
     fontWeight: '500',
     maxWidth: 60,
     overflow: 'hidden',
   },
 });
+
+  const styles = getStyles(theme);
 
   return (
     <SafeAreaView style={styles.safeArea}>

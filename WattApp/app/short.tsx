@@ -8,10 +8,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import WishlistBasketAnimation from './components/WishlistBasketAnimation';
 import TrashAnimation from './components/TrashAnimation';
+import { useTheme } from '../hooks/useTheme';
 
 const { width } = Dimensions.get('window');
 
 export default function ShortScreen() {
+  const { theme } = useTheme();
   // Animation pour le drag
   const pan = useRef(new Animated.ValueXY()).current;
 
@@ -82,13 +84,14 @@ export default function ShortScreen() {
   };
 
   if (loading) return (
-    <View style={styles.center}><ActivityIndicator size="large" color="#FFA94D" /></View>
+    <View style={getStyles(theme).center}><ActivityIndicator size="large" color={theme.colors.primary} /></View>
   );
   if (!books.length) return (
-    <View style={styles.center}><Text>Aucun synopsis à afficher.</Text></View>
+    <View style={getStyles(theme).center}><Text style={{ color: theme.colors.text }}>Aucun synopsis à afficher.</Text></View>
   );
 
   const book = books[current];
+  const styles = getStyles(theme);
 
   return (
     <>
@@ -123,13 +126,13 @@ export default function ShortScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#181818', justifyContent: 'center', alignItems: 'center' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  card: { width: width * 0.9, backgroundColor: '#232323', borderRadius: 18, padding: 20, alignItems: 'center', elevation: 4 },
+const getStyles = (theme: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background },
+  card: { width: width * 0.9, backgroundColor: theme.colors.surface, borderRadius: 18, padding: 20, alignItems: 'center', elevation: 4 },
   pageBg: {
     flex: 1,
-    backgroundColor: '#181818',
+    backgroundColor: theme.colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
@@ -138,7 +141,7 @@ const styles = StyleSheet.create({
   paperRect: {
     width: width * 0.5, 
     minHeight: 680, 
-    backgroundColor: '#22232a', 
+    backgroundColor: theme.colors.surface, 
     borderRadius: 24,
     paddingVertical: 48,
     paddingHorizontal: 32,
@@ -153,14 +156,14 @@ const styles = StyleSheet.create({
   },
   pageContainer: {
     flex: 1,
-    backgroundColor: '#181818',
+    backgroundColor: theme.colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
     paddingTop: 60,
   },
   pageTitle: {
-    color: '#fff',
+    color: theme.colors.text,
     fontSize: 26,
     fontWeight: '400',
     textAlign: 'center',
@@ -175,7 +178,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   pageSynopsis: {
-    color: '#fff',
+    color: theme.colors.text,
     fontSize: 20,
     textAlign: 'center',
     lineHeight: 32,

@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
 	},
 	heroCard: {
 		width: SCREEN_WIDTH - 40,
-		height: 200,
+		height: 180,
 		borderRadius: 16,
 		overflow: 'hidden',
 		marginRight: 16,
@@ -369,8 +369,8 @@ const styles = StyleSheet.create({
 		gap: 12,
 	},
 	heroCover: {
-		width: 100,
-		height: 150,
+		width: 80,
+		height: 120,
 		borderRadius: 8,
 	},
 	heroInfo: {
@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
 
 	// Sections
 	section: {
-		marginTop: 28,
+		marginTop: 24,
 		paddingHorizontal: 20,
 	},
 	sectionHeader: {
@@ -451,28 +451,28 @@ const styles = StyleSheet.create({
 
 	// Horizontal scroll
 	horizontalScroll: {
-		gap: 14,
+		gap: 12,
 		paddingRight: 20,
 	},
 	bookCard: {
-		width: 140,
+		width: 110,
 	},
 	bookCover: {
-		width: 140,
-		height: 210,
-		borderRadius: 10,
-		marginBottom: 8,
+		width: 110,
+		height: 165,
+		borderRadius: 8,
+		marginBottom: 6,
 	},
 	bookInfo: {
 		gap: 3,
 	},
 	bookTitle: {
-		fontSize: 13,
+		fontSize: 12,
 		fontWeight: '600',
 	},
 	bookAuthor: {
-		fontSize: 11,
-		marginBottom: 4,
+		fontSize: 10,
+		marginBottom: 3,
 	},
 	bookFooter: {
 		flexDirection: 'row',

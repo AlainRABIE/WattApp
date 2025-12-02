@@ -2,12 +2,12 @@ import { collectionGroup, getDocs, where, query as fsQuery } from 'firebase/fire
 export const unstable_settings = { layout: null };
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, KeyboardAvoidingView, Platform, Image } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, setDoc, doc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
+import { useTheme } from '../../hooks/useTheme';
 
 const CATEGORY_LABELS: Record<string, string> = {
   "Roman d'amour": "Roman d'amour",
@@ -25,7 +25,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 export default function CommunityChat() {
-  const [myGroups, setMyGroups] = useState<any[]>([]);
+  const { theme } = useTheme();
   const [showMembersSidebar, setShowMembersSidebar] = useState(false);
   const [members, setMembers] = useState<any[]>([]);
   const [input, setInput] = useState('');
@@ -45,25 +45,6 @@ export default function CommunityChat() {
     }
     return true;
   });
-
-  useEffect(() => {
-    const fetchMyGroups = async () => {
-      const auth = getAuth(app);
-      const user = auth.currentUser;
-      if (!user) return;
-      const q = collectionGroup(db, 'members');
-      const snap = await getDocs(fsQuery(q, where('uid', '==', user.uid)));
-      const groups = snap.docs.map(doc => {
-        const parent = doc.ref.parent.parent;
-        return {
-          ...doc.data(),
-          groupId: parent?.id,
-        };
-      });
-      setMyGroups(groups);
-    };
-    fetchMyGroups();
-  }, []);
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -103,23 +84,20 @@ export default function CommunityChat() {
     setInput('');
   };
 
+  const styles = getStyles(theme);
+
   return (
     <>
-      <LinearGradient
-        colors={["#fff7ef", "#ffe0c2"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.bg}
-      >
+      <View style={styles.bg}>
         {/* Nom du groupe toujours visible en haut */}
         <View style={styles.groupHeaderBar}>
           {isMember ? (
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtnRound}>
-              <Ionicons name="arrow-back" size={22} color="#FFA94D" />
+              <Ionicons name="arrow-back" size={22} color={theme.colors.primary} />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtnPreview}>
-              <Ionicons name="arrow-back" size={22} color="#FFD600" />
+              <Ionicons name="arrow-back" size={22} color={theme.colors.primary} />
             </TouchableOpacity>
           )}
           <View style={styles.bubbleHeaderWrap}>
@@ -132,24 +110,6 @@ export default function CommunityChat() {
           )}
         </View>
 
-        {/* Section Mes groupes */}
-        {myGroups.length > 0 && (
-          <View style={styles.myGroupsSection}>
-            <Text style={styles.myGroupsTitle}>Mes groupes</Text>
-            <FlatList
-              data={myGroups}
-              keyExtractor={(item, idx) => `${item.groupId}-${item.uid || ''}-${idx}`}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 8 }}
-              renderItem={({ item }) => (
-                <View style={styles.myGroupBubble}>
-                  <Text style={styles.myGroupText}>{item.groupId}</Text>
-                </View>
-              )}
-            />
-          </View>
-        )}
         {members.length > 0 && (
           <View style={styles.membersBar}>
             <FlatList
@@ -183,15 +143,10 @@ export default function CommunityChat() {
                 <View style={styles.messageRowPremium}>
                   <Image source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }} style={styles.avatarPremium} />
                   <View style={styles.bubbleWrapPremium}>
-                    <Text style={styles.userPremium}>{item.user}</Text>
-                    <LinearGradient
-                      colors={isEven ? ["#FFA94D", "#FFCC80"] : ["#fff", "#ffe0c2"]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.bubblePremium}
-                    >
-                      <Text style={[styles.textPremium, { color: isEven ? '#23232a' : '#FFA94D' }]}>{item.text}</Text>
-                    </LinearGradient>
+                  <Text style={styles.userPremium}>{item.user}</Text>
+                  <View style={[styles.bubblePremium, { backgroundColor: isEven ? '#FFA94D' : '#232323' }]}>
+                    <Text style={[styles.textPremium, { color: isEven ? '#fff' : '#fff' }]}>{item.text}</Text>
+                  </View>
                     {item.createdAt?.seconds ? (
                       <Text style={styles.timePremium}>{new Date(item.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
                     ) : null}
@@ -294,7 +249,7 @@ export default function CommunityChat() {
             </TouchableOpacity>
           </View>
         )}
-      </LinearGradient>
+      </View>
       {/* Sidebar membres */}
       {showMembersSidebar && (
         <View style={styles.sidebarOverlay}>
@@ -327,9 +282,12 @@ export default function CommunityChat() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
   // Ajout des styles manquants utilisés dans le composant
-  bg: { flex: 1 },
+  bg: { 
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
   groupHeaderBar: {
     position: 'absolute',
     top: 0,
@@ -338,53 +296,40 @@ const styles = StyleSheet.create({
     zIndex: 200,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 38,
-    paddingBottom: 10,
-    paddingHorizontal: 18,
-    borderBottomLeftRadius: 22,
-    borderBottomRightRadius: 22,
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.13,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 10,
+    paddingTop: 50,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+    backgroundColor: theme.colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   groupHeaderTitle: {
-    color: '#FFA94D',
-    fontSize: 22,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-    textShadowColor: '#fff7',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    color: theme.colors.text,
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   backBtnRound: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#fff7ef',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.background,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.10,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   backBtnPreview: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(24,24,24,0.72)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.background,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.10,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   bubbleHeaderWrap: {
     flex: 1,
@@ -394,110 +339,72 @@ const styles = StyleSheet.create({
     marginLeft: -38,
   },
   membersBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#fff7ef',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.background,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 14,
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.10,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  myGroupsSection: {
-    marginTop: 70,
-    marginBottom: 8,
-    paddingHorizontal: 8,
-  },
-  myGroupsTitle: {
-    color: '#FFA94D',
-    fontWeight: 'bold',
-    fontSize: 17,
-    marginBottom: 6,
-    marginLeft: 8,
-  },
-  myGroupBubble: {
-    backgroundColor: '#FFA94D',
-    borderRadius: 999,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    marginRight: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  myGroupText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 15,
+    marginLeft: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   membersBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-    marginTop: 70,
+    marginBottom: 12,
+    marginTop: 100,
     minHeight: 54,
-    paddingBottom: 2,
+    paddingHorizontal: 20,
   },
   memberAvatarWrap: {
-    marginRight: 8,
+    marginRight: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   memberAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 2,
-    borderColor: '#FFA94D',
-    backgroundColor: '#fff',
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.surface,
   },
   membersCount: {
-    color: '#FFA94D',
-    fontWeight: 'bold',
-    fontSize: 15,
+    color: theme.colors.textSecondary,
+    fontWeight: '600',
+    fontSize: 14,
     marginLeft: 6,
-    marginRight: 2,
   },
   previewOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(24,24,24,0.72)',
+    backgroundColor: 'rgba(0,0,0,0.85)',
     zIndex: 99,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    paddingBottom: 24,
+    paddingBottom: 32,
   },
   joinBtn: {
-    backgroundColor: '#FFA94D',
-    borderRadius: 18,
-    paddingVertical: 12,
-    paddingHorizontal: 36,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 24,
+    paddingVertical: 16,
+    paddingHorizontal: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.13,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
+    marginTop: 16,
   },
   joinBtnText: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontWeight: '700',
     fontSize: 16,
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   memberCountText: {
-    color: '#fff',
-    fontSize: 17,
+    color: theme.colors.text,
+    fontSize: 16,
     fontWeight: '600',
-    marginBottom: 18,
+    marginBottom: 12,
     textAlign: 'center',
-    textShadowColor: '#0008',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
   sidebarOverlay: {
     position: 'absolute',
@@ -513,31 +420,29 @@ const styles = StyleSheet.create({
   sidebarContainer: {
     width: 300,
     height: '100%',
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 18,
-    borderBottomLeftRadius: 18,
+    backgroundColor: theme.colors.surface,
+    borderTopLeftRadius: 0,
+    borderBottomLeftRadius: 0,
     shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: -2, height: 0 },
-    elevation: 8,
-    paddingHorizontal: 0,
-    paddingTop: 0,
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    shadowOffset: { width: -4, height: 0 },
+    elevation: 10,
   },
   sidebarHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingTop: 24,
-    paddingBottom: 12,
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#FFA94D22',
+    borderBottomColor: theme.colors.border,
   },
   sidebarTitle: {
-    fontSize: 19,
-    fontWeight: 'bold',
-    color: '#FFA94D',
+    fontSize: 18,
+    fontWeight: '700',
+    color: theme.colors.text,
   },
   sidebarCloseBtn: {
     padding: 4,
@@ -545,54 +450,53 @@ const styles = StyleSheet.create({
   sidebarMemberRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#FFA94D11',
+    borderBottomColor: theme.colors.border,
   },
   sidebarMemberAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     marginRight: 12,
-    backgroundColor: '#FFA94D33',
+    backgroundColor: theme.colors.background,
   },
   sidebarMemberName: {
     fontSize: 15,
-    color: '#23232a',
-    fontWeight: '600',
+    color: theme.colors.text,
+    fontWeight: '500',
   },
   bubbleWrapPremium: {
     flex: 1,
-    marginLeft: 8,
+    marginLeft: 12,
     backgroundColor: 'transparent',
   },
   userPremium: {
-    fontWeight: 'bold',
-    color: '#FFA94D',
-    marginBottom: 2,
-    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.primary,
+    marginBottom: 4,
+    fontSize: 13,
   },
   bubblePremium: {
-    borderRadius: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    marginBottom: 2,
+    borderRadius: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginBottom: 4,
     minWidth: 60,
     alignSelf: 'flex-start',
   },
   textPremium: {
     fontSize: 15,
-    fontWeight: '500',
-    lineHeight: 20,
+    fontWeight: '400',
+    lineHeight: 21,
   },
   timePremium: {
-    color: '#FFA94D',
+    color: theme.colors.textSecondary,
     fontSize: 11,
     marginTop: 2,
     alignSelf: 'flex-end',
     marginRight: 2,
-    opacity: 0.7,
   },
   inputBarWrapPremium: {
     position: 'absolute',
@@ -604,55 +508,41 @@ const styles = StyleSheet.create({
   inputBarPremium: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 28,
-    margin: 18,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.13,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 24,
+    margin: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   inputPremium: {
     flex: 1,
-    color: '#FFA94D',
-    fontSize: 16,
+    color: theme.colors.text,
+    fontSize: 15,
     paddingVertical: 8,
     paddingHorizontal: 10,
   },
   sendBtnPremium: {
     marginLeft: 8,
     padding: 10,
-    backgroundColor: '#FFA94D',
-    borderRadius: 20,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.13,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
   },
     messageRowPremium: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 26,
+    marginBottom: 20,
   },
   avatarPremium: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    marginRight: 14,
-    backgroundColor: '#fff',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 12,
+    backgroundColor: theme.colors.surface,
     borderWidth: 2,
-    borderColor: '#FFA94D',
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-    marginBottom: 2,
+    borderColor: theme.colors.primary,
   },
 });
