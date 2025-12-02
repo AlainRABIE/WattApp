@@ -59,6 +59,7 @@ import Svg, { Path, Rect, Text as SvgText } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import MangaDrawingModal from '../../components/MangaDrawingModal';
 import MangaCoverCreator from '../../components/MangaCoverCreator';
+import AIWritingAssistant from '../../components/AIWritingAssistant';
 import { mangaProjectService, MangaProject, MangaPage, MangaPanel, DrawingPath } from '../../services/MangaProjectService';
 import { getAuth } from 'firebase/auth';
 import app from '../../../constants/firebaseConfig';
@@ -247,6 +248,8 @@ const MangaEditorSimple: React.FC = () => {
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
   const [taskPriority, setTaskPriority] = useState<'basse' | 'moyenne' | 'haute'>('moyenne');
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [currentDialogueText, setCurrentDialogueText] = useState('');
   
   // Fonction pour obtenir l'utilisateur actuel
   const getCurrentUser = () => {
@@ -851,6 +854,13 @@ const MangaEditorSimple: React.FC = () => {
         <View style={styles.headerActions}>
           <TouchableOpacity 
             style={styles.headerButton}
+            onPress={() => setShowAIAssistant(true)}
+          >
+            <Ionicons name="sparkles" size={20} color="#FFD700" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.headerButton}
             onPress={() => setShowCoverCreator(true)}
           >
             <Ionicons name="image-outline" size={20} color="#FFA94D" />
@@ -1230,6 +1240,17 @@ const MangaEditorSimple: React.FC = () => {
           </View>
         </View>
       </Modal>
+      
+      {/* Assistant IA */}
+      <AIWritingAssistant
+        visible={showAIAssistant}
+        onClose={() => setShowAIAssistant(false)}
+        currentText={currentDialogueText}
+        onApplySuggestion={(suggestion) => {
+          setCurrentDialogueText(suggestion);
+          setShowAIAssistant(false);
+        }}
+      />
     </View>
   );
 };

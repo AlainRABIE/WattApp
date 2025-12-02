@@ -10,8 +10,10 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AIWritingAssistant from './AIWritingAssistant';
 
 interface AdvancedWritingEditorProps {
   bookId: string;
@@ -65,6 +67,8 @@ const AdvancedWritingEditor: React.FC<AdvancedWritingEditorProps> = ({
   const [focusMode, setFocusMode] = useState(false);
   const [writingMode, setWritingMode] = useState<'normal' | 'zen' | 'typewriter'>('normal');
   const [fontSize, setFontSize] = useState(16);
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [selectedText, setSelectedText] = useState('');
 
   // Références
   const textInputRef = useRef<TextInput>(null);
@@ -132,6 +136,20 @@ const AdvancedWritingEditor: React.FC<AdvancedWritingEditorProps> = ({
     // Callback externe
     onContentChange?.(newContent);
   }, [calculateStats, performAutoSave, onContentChange]);
+
+  // Gestion de l'application des suggestions IA
+  const handleApplySuggestion = useCallback((suggestion: string) => {
+    if (selectedText) {
+      // Remplacer le texte sélectionné
+      const newContent = content.replace(selectedText, suggestion);
+      handleContentChange(newContent);
+    } else {
+      // Ajouter à la fin
+      const newContent = content + '\n\n' + suggestion;
+      handleContentChange(newContent);
+    }
+    setSelectedText('');
+  }, [content, selectedText, handleContentChange]);
 
   // Gestion des modes d'écriture
   const toggleWritingMode = useCallback(() => {
@@ -203,6 +221,14 @@ const AdvancedWritingEditor: React.FC<AdvancedWritingEditorProps> = ({
       ]}
     >
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <TouchableOpacity 
+          style={styles.toolbarButton}
+          onPress={() => setShowAIAssistant(true)}
+        >
+          <Ionicons name="sparkles" size={18} color="#9b59b6" />
+          <Text style={[styles.toolbarButtonText, { color: '#9b59b6' }]}>IA</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity 
           style={styles.toolbarButton}
           onPress={toggleWritingMode}
@@ -320,6 +346,16 @@ const AdvancedWritingEditor: React.FC<AdvancedWritingEditorProps> = ({
       </View>
 
       {showStats && renderStats()}
+
+      {/* Assistant IA */}
+      <AIWritingAssistant
+        visible={showAIAssistant}
+        onClose={() => setShowAIAssistant(false)}
+        selectedText={selectedText}
+        fullText={content}
+        onApplySuggestion={handleApplySuggestion}
+        genre="fiction"
+      />
     </KeyboardAvoidingView>
   );
 };

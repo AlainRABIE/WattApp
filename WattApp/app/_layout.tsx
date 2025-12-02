@@ -1,6 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, usePathname } from 'expo-router';
-import { Animated, useEffect } from 'react';
+import {  useEffect } from 'react';
 import type { StackCardInterpolationProps } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
@@ -13,6 +13,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import BottomNav from './components/BottomNav';
 import { STRIPE_CONFIG } from '../constants/stripeConfig';
 import { NotificationService } from '../services/NotificationService';
+import { LLamaAIService } from '../services/LLamaAIService';
+import { LLAMA_AI_CONFIG } from '../constants/llamaConfig';
 import React from 'react';
 
 export const unstable_settings = {
@@ -64,7 +66,36 @@ export default function RootLayout() {
       }
     };
 
+    const initializeAI = async () => {
+      try {
+        const provider = LLAMA_AI_CONFIG.PROVIDER || 'HUGGINGFACE';
+        let apiKey = '';
+        
+        switch (provider) {
+          case 'HUGGINGFACE':
+            apiKey = LLAMA_AI_CONFIG.HUGGINGFACE_API_KEY || '';
+            break;
+          case 'OPENROUTER':
+            apiKey = LLAMA_AI_CONFIG.OPENROUTER_API_KEY || '';
+            break;
+          case 'OLLAMA':
+            apiKey = '';
+            break;
+        }
+
+        if (apiKey && apiKey !== 'YOUR_OPENROUTER_KEY_HERE') {
+          LLamaAIService.initialize(apiKey, provider as any);
+          console.log('✅ Assistant IA initialisé avec succès:', provider);
+        } else {
+          console.warn('⚠️ Clé API IA non configurée');
+        }
+      } catch (error) {
+        console.error('❌ Erreur initialisation IA:', error);
+      }
+    };
+
     initializeNotifications();
+    initializeAI();
   }, []);
 
   return (

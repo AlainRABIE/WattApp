@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import AIWritingAssistant from '../../components/AIWritingAssistant';
 
 const { width, height } = Dimensions.get('window');
 
@@ -93,6 +94,10 @@ const ModernTextEditor: React.FC = () => {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [selectedText, setSelectedText] = useState('');
   const [selectedColor, setSelectedColor] = useState('#FF6B6B');
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [selectionStart, setSelectionStart] = useState(0);
+  const [selectionEnd, setSelectionEnd] = useState(0);
+  const [showAIButton, setShowAIButton] = useState(false);
   
   // États des statistiques
   const [stats, setStats] = useState<WritingStats>({
@@ -686,6 +691,10 @@ const ModernTextEditor: React.FC = () => {
         </View>
         
         <View style={styles.headerRight}>
+          <TouchableOpacity onPress={() => setShowAIAssistant(true)} style={styles.headerButton}>
+            <Ionicons name="sparkles" size={24} color="#FFD700" />
+          </TouchableOpacity>
+          
           <TouchableOpacity onPress={toggleStats} style={styles.headerButton}>
             <Ionicons 
               name="analytics-outline" 
@@ -737,7 +746,20 @@ const ModernTextEditor: React.FC = () => {
             value={content}
             onChangeText={handleContentChange}
             onSelectionChange={(event) => {
-              setCursorPosition(event.nativeEvent.selection.start);
+              const { start, end } = event.nativeEvent.selection;
+              setCursorPosition(start);
+              setSelectionStart(start);
+              setSelectionEnd(end);
+              
+              // Afficher le bouton IA si du texte est sélectionné
+              if (start !== end) {
+                const selected = content.substring(start, end);
+                setSelectedText(selected);
+                setShowAIButton(true);
+              } else {
+                setSelectedText('');
+                setShowAIButton(false);
+              }
             }}
             placeholder={
               settings.focusMode 
@@ -826,6 +848,27 @@ const ModernTextEditor: React.FC = () => {
         </Modal>
       )}
 
+      {/* Bouton IA flottant lors de la sélection */}
+      {showAIButton && selectedText && (
+        <Animated.View 
+          style={[
+            styles.floatingAIButton,
+            { backgroundColor: '#FFD700' },
+          ]}
+        >
+          <TouchableOpacity 
+            onPress={() => {
+              setShowAIAssistant(true);
+              setShowAIButton(false);
+            }} 
+            style={styles.floatingAIButtonTouch}
+          >
+            <Ionicons name="sparkles" size={24} color="#000" />
+            <Text style={styles.floatingAIButtonText}>IA</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
       {/* Bouton flottant pour sortir du mode focus */}
       {settings.focusMode && (
         <Animated.View 
@@ -845,6 +888,29 @@ const ModernTextEditor: React.FC = () => {
           </TouchableOpacity>
         </Animated.View>
       )}
+      
+      {/* Assistant IA */}
+      <AIWritingAssistant
+        visible={showAIAssistant}
+        onClose={() => {
+          setShowAIAssistant(false);
+          setShowAIButton(false);
+          setSelectedText('');
+        }}
+        onApplySuggestion={(suggestion) => {
+          if (selectedText && selectionStart !== selectionEnd) {
+            // Remplacer le texte sélectionné
+            const newContent = content.substring(0, selectionStart) + suggestion + content.substring(selectionEnd);
+            setContent(newContent);
+          } else {
+            // Ajouter à la fin
+            setContent(content + '\n\n' + suggestion);
+          }
+          setShowAIAssistant(false);
+          setShowAIButton(false);
+          setSelectedText('');
+        }}
+      />
 
       {/* Paramètres */}
       {renderSettings()}
@@ -1121,6 +1187,33 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  
+  // Floating AI Button
+  floatingAIButton: {
+    position: 'absolute',
+    top: 150,
+    right: 20,
+    borderRadius: 28,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    zIndex: 1000,
+  },
+  floatingAIButtonTouch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  floatingAIButtonText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   
   // Color Picker Styles

@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "dotenv": "^17.2.3",
     "expo": "^54.0.21",
     "expo-linear-gradient": "~15.0.7",
     "expo-print": "^15.0.7",
