@@ -219,19 +219,11 @@ export default function MessengerList() {
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
         
-        {/* Header avec gradient */}
-        <LinearGradient
-          colors={[theme.colors.primary, theme.colors.secondary]}
-          start={[0, 0]}
-          end={[1, 1]}
-          style={styles.header}
-        >
+        {/* Header épuré */}
+        <View style={styles.header}>
           <View style={styles.headerContent}>
-            <View>
+            <View style={styles.headerLeft}>
               <Text style={styles.headerTitle}>Messages</Text>
-              <Text style={styles.headerSubtitle}>
-                {filteredChats.length} conversation{filteredChats.length > 1 ? 's' : ''}
-              </Text>
             </View>
             <TouchableOpacity
               style={styles.headerButton}
@@ -240,75 +232,42 @@ export default function MessengerList() {
                 loadFriendsForModal();
               }}
             >
-              <Ionicons name="create-outline" size={24} color="#000" />
+              <Ionicons name="add" size={24} color={theme.colors.primary} />
             </TouchableOpacity>
           </View>
-        </LinearGradient>
+        </View>
 
-        {/* Onglets de filtrage */}
+        {/* Onglets épurés */}
         <View style={styles.tabsContainer}>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tabsContent}
+          <TouchableOpacity
+            style={styles.tab}
+            onPress={() => setActiveTab('all')}
           >
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'all' && styles.tabActive]}
-              onPress={() => setActiveTab('all')}
-            >
-              <Ionicons 
-                name="chatbubbles" 
-                size={18} 
-                color={activeTab === 'all' ? theme.colors.primary : theme.colors.textSecondary} 
-              />
-              <Text style={[styles.tabText, activeTab === 'all' && styles.tabTextActive]}>
-                Tous
-              </Text>
-              <View style={[styles.tabBadge, activeTab === 'all' && styles.tabBadgeActive]}>
-                <Text style={[styles.tabBadgeText, activeTab === 'all' && styles.tabBadgeTextActive]}>
-                  {chats.length}
-                </Text>
-              </View>
-            </TouchableOpacity>
+            <Text style={[styles.tabText, activeTab === 'all' && styles.tabTextActive]}>
+              Tous
+            </Text>
+            {activeTab === 'all' && <View style={styles.tabIndicator} />}
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'dms' && styles.tabActive]}
-              onPress={() => setActiveTab('dms')}
-            >
-              <Ionicons 
-                name="person" 
-                size={18} 
-                color={activeTab === 'dms' ? theme.colors.primary : theme.colors.textSecondary} 
-              />
-              <Text style={[styles.tabText, activeTab === 'dms' && styles.tabTextActive]}>
-                DMs
-              </Text>
-              <View style={[styles.tabBadge, activeTab === 'dms' && styles.tabBadgeActive]}>
-                <Text style={[styles.tabBadgeText, activeTab === 'dms' && styles.tabBadgeTextActive]}>
-                  {chats.filter(c => c.type === 'dm').length}
-                </Text>
-              </View>
-            </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.tab}
+            onPress={() => setActiveTab('dms')}
+          >
+            <Text style={[styles.tabText, activeTab === 'dms' && styles.tabTextActive]}>
+              Directs
+            </Text>
+            {activeTab === 'dms' && <View style={styles.tabIndicator} />}
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'groups' && styles.tabActive]}
-              onPress={() => setActiveTab('groups')}
-            >
-              <Ionicons 
-                name="people" 
-                size={18} 
-                color={activeTab === 'groups' ? theme.colors.primary : theme.colors.textSecondary} 
-              />
-              <Text style={[styles.tabText, activeTab === 'groups' && styles.tabTextActive]}>
-                Groupes
-              </Text>
-              <View style={[styles.tabBadge, activeTab === 'groups' && styles.tabBadgeActive]}>
-                <Text style={[styles.tabBadgeText, activeTab === 'groups' && styles.tabBadgeTextActive]}>
-                  {chats.filter(c => c.type === 'group').length}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </ScrollView>
+          <TouchableOpacity
+            style={styles.tab}
+            onPress={() => setActiveTab('groups')}
+          >
+            <Text style={[styles.tabText, activeTab === 'groups' && styles.tabTextActive]}>
+              Groupes
+            </Text>
+            {activeTab === 'groups' && <View style={styles.tabIndicator} />}
+          </TouchableOpacity>
         </View>
 
         {/* Liste des conversations */}
@@ -355,43 +314,37 @@ export default function MessengerList() {
               >
                 <TouchableOpacity
                   style={styles.chatCard}
-                  activeOpacity={0.7}
+                  activeOpacity={0.6}
                   onPress={() => router.push({ pathname: `/chat/[chatId]`, params: { chatId: item.id } })}
                 >
                   <View style={styles.avatarContainer}>
                     <Image source={{ uri: item.avatar }} style={styles.avatar} />
                     <View style={styles.onlineIndicator} />
-                    <View style={styles.dmBadge}>
-                      <Ionicons name="person" size={10} color="#fff" />
-                    </View>
                   </View>
                   <View style={styles.chatContent}>
                     <View style={styles.chatHeaderRow}>
                       <Text style={styles.chatName} numberOfLines={1}>{item.name}</Text>
                       <Text style={styles.chatTime}>{formatTime(item.lastMsgAt)}</Text>
                     </View>
-                    <View style={styles.chatFooterRow}>
-                      <Text style={styles.chatLastMsg} numberOfLines={1}>{item.lastMsg}</Text>
-                      {item.unread > 0 && (
-                        <View style={styles.badgeUnread}>
-                          <Text style={styles.badgeUnreadText}>{item.unread}</Text>
-                        </View>
-                      )}
-                    </View>
+                    <Text style={styles.chatLastMsg} numberOfLines={2}>{item.lastMsg}</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+                  {item.unread > 0 && (
+                    <View style={styles.badgeUnread}>
+                      <Text style={styles.badgeUnreadText}>{item.unread}</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
               </Swipeable>
             ) : (
               <TouchableOpacity
                 style={styles.chatCard}
-                activeOpacity={0.7}
+                activeOpacity={0.6}
                 onPress={() => router.push({ pathname: `/community/[category]`, params: { category: item.id } })}
               >
                 <View style={styles.avatarContainer}>
                   <Image source={{ uri: item.avatar }} style={styles.avatar} />
                   <View style={styles.groupBadge}>
-                    <Ionicons name="people" size={12} color="#fff" />
+                    <Ionicons name="people" size={10} color="#fff" />
                   </View>
                 </View>
                 <View style={styles.chatContent}>
@@ -399,16 +352,13 @@ export default function MessengerList() {
                     <Text style={styles.chatName} numberOfLines={1}>{item.name}</Text>
                     <Text style={styles.chatTime}>{formatTime(item.lastMsgAt)}</Text>
                   </View>
-                  <View style={styles.chatFooterRow}>
-                    <Text style={styles.chatLastMsg} numberOfLines={1}>{item.lastMsg}</Text>
-                    {item.unread > 0 && (
-                      <View style={styles.badgeUnread}>
-                        <Text style={styles.badgeUnreadText}>{item.unread}</Text>
-                      </View>
-                    )}
-                  </View>
+                  <Text style={styles.chatLastMsg} numberOfLines={2}>{item.lastMsg}</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+                {item.unread > 0 && (
+                  <View style={styles.badgeUnread}>
+                    <Text style={styles.badgeUnreadText}>{item.unread}</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             )
           }
@@ -418,19 +368,13 @@ export default function MessengerList() {
         {/* Bouton flottant pour nouveau message */}
         <TouchableOpacity
           style={styles.fab}
+          activeOpacity={0.8}
           onPress={() => {
             setShowFriendsModal(true);
             loadFriendsForModal();
           }}
         >
-          <LinearGradient
-            colors={[theme.colors.primary, theme.colors.secondary]}
-            start={[0, 0]}
-            end={[1, 1]}
-            style={styles.fabGradient}
-          >
-            <Ionicons name="add" size={28} color="#000" />
-          </LinearGradient>
+          <Ionicons name="create-outline" size={24} color="#fff" />
         </TouchableOpacity>
 
         {/* Modal de sélection d'ami - Redesigné */}
@@ -564,142 +508,109 @@ const getStyles = (theme: any) => StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   
-  // Header
+  // Header épuré
   header: {
     paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 0) + 20,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingHorizontal: 24,
+    backgroundColor: theme.colors.background,
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  headerTitle: {
-    color: '#000',
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 4,
+  headerLeft: {
+    flex: 1,
   },
-  headerSubtitle: {
-    color: '#000',
-    fontSize: 14,
-    opacity: 0.8,
+  headerTitle: {
+    color: theme.colors.text,
+    fontSize: 34,
+    fontWeight: '700',
+    letterSpacing: -0.5,
   },
   headerButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.15)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // Onglets
+  // Onglets minimalistes
   tabsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    paddingBottom: 12,
+    gap: 32,
     backgroundColor: theme.colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  tabsContent: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    gap: 8,
   },
   tab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginRight: 8,
-    gap: 8,
-  },
-  tabActive: {
-    backgroundColor: theme.colors.background,
-    borderWidth: 2,
-    borderColor: theme.colors.primary,
+    paddingVertical: 8,
+    position: 'relative',
   },
   tabText: {
     color: theme.colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '500',
   },
   tabTextActive: {
-    color: theme.colors.primary,
-    fontWeight: 'bold',
+    color: theme.colors.text,
+    fontWeight: '600',
   },
-  tabBadge: {
-    backgroundColor: theme.colors.background,
-    borderRadius: 10,
-    minWidth: 22,
-    height: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
-  },
-  tabBadgeActive: {
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 2,
     backgroundColor: theme.colors.primary,
-  },
-  tabBadgeText: {
-    color: theme.colors.textSecondary,
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  tabBadgeTextActive: {
-    color: '#000',
+    borderRadius: 1,
   },
 
   // Liste
   listContent: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 8,
     paddingBottom: 100,
   },
 
-  // Carte de chat
+  // Carte de chat épurée
   chatCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.surface,
     paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderRadius: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    paddingHorizontal: 24,
+    backgroundColor: theme.colors.background,
+    borderBottomWidth: 0.5,
+    borderBottomColor: theme.colors.border,
   },
   
-  // Avatar
+  // Avatar minimaliste
   avatarContainer: {
     position: 'relative',
-    marginRight: 14,
+    marginRight: 16,
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: theme.colors.background,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: theme.colors.surface,
   },
   onlineIndicator: {
     position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#4CAF50',
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#00C853',
     borderWidth: 2,
-    borderColor: theme.colors.surface,
+    borderColor: theme.colors.background,
   },
-  dmBadge: {
+  groupBadge: {
     position: 'absolute',
-    top: 0,
-    left: 0,
+    bottom: -2,
+    right: -2,
     width: 18,
     height: 18,
     borderRadius: 9,
@@ -707,20 +618,7 @@ const getStyles = (theme: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: theme.colors.surface,
-  },
-  groupBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: theme.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: theme.colors.surface,
+    borderColor: theme.colors.background,
   },
 
   // Contenu du chat
@@ -732,67 +630,61 @@ const getStyles = (theme: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   chatName: {
     color: theme.colors.text,
     fontWeight: '600',
     fontSize: 16,
     flex: 1,
-    marginRight: 8,
+    marginRight: 12,
   },
   chatTime: {
     color: theme.colors.textSecondary,
-    fontSize: 12,
-  },
-  chatFooterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    fontSize: 13,
   },
   chatLastMsg: {
     color: theme.colors.textSecondary,
     fontSize: 14,
-    flex: 1,
-    marginRight: 8,
+    lineHeight: 20,
   },
   badgeUnread: {
     backgroundColor: theme.colors.primary,
-    borderRadius: 12,
-    minWidth: 22,
-    height: 22,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 7,
+    paddingHorizontal: 6,
+    marginLeft: 12,
   },
   badgeUnreadText: {
-    color: '#000',
-    fontWeight: 'bold',
+    color: '#fff',
+    fontWeight: '700',
     fontSize: 11,
   },
 
-  // État vide
+  // État vide minimaliste
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    paddingVertical: 80,
     paddingHorizontal: 40,
   },
   emptyIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: theme.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   emptyTitle: {
     color: theme.colors.text,
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
     marginBottom: 8,
-    textAlign: 'center',
   },
   emptySubtitle: {
     color: theme.colors.textSecondary,
@@ -805,69 +697,61 @@ const getStyles = (theme: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 24,
-    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    gap: 6,
   },
   emptyButtonText: {
-    color: '#000',
-    fontWeight: 'bold',
-    fontSize: 15,
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 
-  // Bouton flottant
+  // Bouton flottant minimaliste
   fab: {
     position: 'absolute',
-    right: 20,
+    right: 24,
     bottom: 90,
-    shadowColor: theme.colors.primary,
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
-  },
-  fabGradient: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: theme.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
 
   // Action de suppression
   deleteAction: {
-    backgroundColor: '#E53935',
+    backgroundColor: '#FF3B30',
     justifyContent: 'center',
     alignItems: 'center',
-    width: 90,
-    borderRadius: 16,
-    marginBottom: 12,
+    width: 80,
     paddingHorizontal: 16,
   },
   deleteText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     marginTop: 4,
   },
 
-  // Modal
+  // Modal épuré
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   modalContainer: {
-    backgroundColor: theme.colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '85%',
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: -4 },
-    elevation: 10,
+    backgroundColor: theme.colors.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -876,13 +760,13 @@ const getStyles = (theme: any) => StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 24,
     paddingBottom: 16,
-    borderBottomWidth: 1,
+    borderBottomWidth: 0.5,
     borderBottomColor: theme.colors.border,
   },
   modalTitle: {
     color: theme.colors.text,
-    fontWeight: 'bold',
-    fontSize: 24,
+    fontWeight: '700',
+    fontSize: 22,
     marginBottom: 4,
   },
   modalSubtitle: {
@@ -890,10 +774,10 @@ const getStyles = (theme: any) => StyleSheet.create({
     fontSize: 14,
   },
   modalCloseButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.background,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -924,8 +808,8 @@ const getStyles = (theme: any) => StyleSheet.create({
   },
   modalEmptyText: {
     color: theme.colors.text,
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
     marginTop: 16,
     marginBottom: 8,
   },
@@ -935,38 +819,37 @@ const getStyles = (theme: any) => StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Liste d'amis
+  // Liste d'amis épurée
   friendsList: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingVertical: 8,
   },
   friendCard: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
     backgroundColor: theme.colors.background,
-    borderRadius: 14,
-    marginBottom: 10,
+    borderBottomWidth: 0.5,
+    borderBottomColor: theme.colors.border,
   },
   friendAvatarContainer: {
     position: 'relative',
     marginRight: 14,
   },
   friendAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: theme.colors.surface,
   },
   friendOnline: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#4CAF50',
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#00C853',
     borderWidth: 2,
     borderColor: theme.colors.background,
   },
@@ -975,7 +858,7 @@ const getStyles = (theme: any) => StyleSheet.create({
   },
   friendName: {
     color: theme.colors.text,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     marginBottom: 2,
   },
