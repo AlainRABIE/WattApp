@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Linking, Modal, TextInput, Share } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { getAuth, updateProfile } from 'firebase/auth';
 import app, { db } from '../constants/firebaseConfig';
-import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { useTheme } from '../hooks/useTheme';
@@ -27,6 +28,22 @@ const Profile: React.FC = () => {
   const [uploading, setUploading] = useState<boolean>(false);
   const [playlists, setPlaylists] = useState<any[]>([]);
   const { theme } = useTheme();
+
+  // États pour le modal d'ajout de playlist
+  const [showAddPlaylistModal, setShowAddPlaylistModal] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [newPlaylistURL, setNewPlaylistURL] = useState('');
+  const [selectedPlatform, setSelectedPlatform] = useState<'spotify' | 'apple' | 'youtube' | 'deezer' | 'other'>('spotify');
+  const [newPlaylistPrivate, setNewPlaylistPrivate] = useState(false);
+  const [addingPlaylist, setAddingPlaylist] = useState(false);
+
+  const PLATFORMS = [
+    { id: 'spotify', name: 'Spotify', icon: 'logo-spotify', color: '#1DB954' },
+    { id: 'apple', name: 'Apple Music', icon: 'logo-apple', color: '#FA243C' },
+    { id: 'youtube', name: 'YouTube', icon: 'logo-youtube', color: '#FF0000' },
+    { id: 'deezer', name: 'Deezer', icon: 'disc', color: '#A238FF' },
+    { id: 'other', name: 'Autre', icon: 'musical-notes', color: '#FFA94D' },
+  ];
 
   useEffect(() => {
     const load = async () => await loadProfile();
@@ -189,6 +206,77 @@ const Profile: React.FC = () => {
       Alert.alert('Succès', `Playlist maintenant ${statusText} !`);
     } catch (error) {
       Alert.alert('Erreur', 'Impossible de modifier la visibilité.');
+    }
+  };
+
+  const addPlaylist = async () => {
+    if (!newPlaylistName.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer un nom de playlist.');
+      return;
+    }
+    if (!newPlaylistURL.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer un lien de playlist.');
+      return;
+    }
+
+    try {
+      setAddingPlaylist(true);
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+      if (!user) throw new Error('Utilisateur non authentifié');
+
+      const platform = PLATFORMS.find(p => p.id === selectedPlatform);
+      
+      await addDoc(collection(db, 'playlists'), {
+        uid: user.uid,
+        name: newPlaylistName.trim(),
+        url: newPlaylistURL.trim(),
+        platform: selectedPlatform,
+        icon: platform?.icon || 'musical-notes',
+        isPrivate: newPlaylistPrivate,
+        createdAt: serverTimestamp(),
+      });
+
+      // Recharger les playlists
+      const qPlaylists = query(collection(db, 'playlists'), where('uid', '==', user.uid));
+      const snapPlaylists = await getDocs(qPlaylists);
+      setPlaylists(snapPlaylists.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      // Réinitialiser le formulaire
+      setNewPlaylistName('');
+      setNewPlaylistURL('');
+      setSelectedPlatform('spotify');
+      setNewPlaylistPrivate(false);
+      setShowAddPlaylistModal(false);
+
+      Alert.alert('Succès', 'Playlist ajoutée !');
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible d\'ajouter la playlist.');
+      console.error(error);
+    } finally {
+      setAddingPlaylist(false);
+    }
+  };
+
+  const sharePlaylist = async (playlist: any) => {
+    try {
+      const message = `🎵 ${playlist.name}\n\nÉcoute ma playlist sur ${playlist.platform.toUpperCase()} :\n${playlist.url}`;
+      
+      await Share.share({
+        message: message,
+        title: playlist.name,
+      });
+    } catch (error) {
+      console.error('Erreur partage:', error);
+    }
+  };
+
+  const copyPlaylistLink = async (playlist: any) => {
+    try {
+      await Clipboard.setStringAsync(playlist.url);
+      Alert.alert('Copié !', 'Le lien a été copié dans le presse-papier.');
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible de copier le lien.');
     }
   };
 
@@ -386,7 +474,7 @@ const Profile: React.FC = () => {
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Playlists</Text>
             <TouchableOpacity 
               style={[styles.addBtn, { backgroundColor: theme.colors.primary }]} 
-              onPress={() => Alert.alert('Ajout playlist', 'Ajout de playlist non implémenté ici.')}
+              onPress={() => setShowAddPlaylistModal(true)}
             >
               <Ionicons name="add" size={18} color={theme.colors.background} />
             </TouchableOpacity>
@@ -403,7 +491,6 @@ const Profile: React.FC = () => {
                   key={playlist.id}
                   style={[styles.playlistCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
                   onPress={() => openPlaylist(playlist)}
-                  onLongPress={() => deletePlaylist(playlist.id)}
                 >
                   <View style={styles.playlistTop}>
                     <TouchableOpacity
@@ -416,14 +503,39 @@ const Profile: React.FC = () => {
                         color={theme.colors.primary} 
                       />
                     </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.playlistShare, { backgroundColor: theme.colors.background }]}
+                      onPress={() => sharePlaylist(playlist)}
+                    >
+                      <Ionicons name="share-outline" size={12} color={theme.colors.primary} />
+                    </TouchableOpacity>
                   </View>
                   <View style={styles.playlistContent}>
-                    {renderPlatformIcon(playlist.platform, playlist.icon)}
+                    <Ionicons 
+                      name={playlist.icon as any || 'musical-notes'} 
+                      size={40} 
+                      color={getPlatformColor(playlist.platform)} 
+                    />
                     <View style={[styles.platformTag, { backgroundColor: getPlatformColor(playlist.platform) }]}>
                       <Text style={styles.platformLabel}>{playlist.platform.toUpperCase()}</Text>
                     </View>
                   </View>
                   <Text style={[styles.playlistTitle, { color: theme.colors.text }]} numberOfLines={2}>{playlist.name}</Text>
+                  
+                  <View style={styles.playlistActions}>
+                    <TouchableOpacity 
+                      style={styles.playlistActionBtn}
+                      onPress={() => copyPlaylistLink(playlist)}
+                    >
+                      <Ionicons name="copy-outline" size={14} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.playlistActionBtn}
+                      onPress={() => deletePlaylist(playlist.id)}
+                    >
+                      <Ionicons name="trash-outline" size={14} color={theme.colors.error} />
+                    </TouchableOpacity>
+                  </View>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -448,6 +560,150 @@ const Profile: React.FC = () => {
         </TouchableOpacity>
         <View style={{ height: 80 }} />
       </ScrollView>
+
+      {/* Modal d'ajout de playlist */}
+      <Modal
+        visible={showAddPlaylistModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAddPlaylistModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.background }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Ajouter une playlist</Text>
+              <TouchableOpacity onPress={() => setShowAddPlaylistModal(false)}>
+                <Ionicons name="close-circle" size={28} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.modalBody}>
+              {/* Sélection de plateforme */}
+              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Plateforme</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.platformSelector}>
+                {PLATFORMS.map((platform) => (
+                  <TouchableOpacity
+                    key={platform.id}
+                    style={[
+                      styles.platformOption,
+                      { 
+                        backgroundColor: selectedPlatform === platform.id ? platform.color : theme.colors.surface,
+                        borderColor: selectedPlatform === platform.id ? platform.color : theme.colors.border,
+                      }
+                    ]}
+                    onPress={() => setSelectedPlatform(platform.id as any)}
+                  >
+                    <Ionicons 
+                      name={platform.icon as any} 
+                      size={24} 
+                      color={selectedPlatform === platform.id ? '#fff' : theme.colors.text} 
+                    />
+                    <Text style={[
+                      styles.platformOptionText,
+                      { color: selectedPlatform === platform.id ? '#fff' : theme.colors.text }
+                    ]}>
+                      {platform.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Nom de la playlist */}
+              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Nom de la playlist</Text>
+              <TextInput
+                style={[styles.input, { 
+                  backgroundColor: theme.colors.surface, 
+                  color: theme.colors.text,
+                  borderColor: theme.colors.border 
+                }]}
+                placeholder="Ma playlist préférée"
+                placeholderTextColor={theme.colors.textSecondary}
+                value={newPlaylistName}
+                onChangeText={setNewPlaylistName}
+                maxLength={50}
+              />
+
+              {/* URL de la playlist */}
+              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Lien de la playlist</Text>
+              <TextInput
+                style={[styles.input, { 
+                  backgroundColor: theme.colors.surface, 
+                  color: theme.colors.text,
+                  borderColor: theme.colors.border 
+                }]}
+                placeholder="https://..."
+                placeholderTextColor={theme.colors.textSecondary}
+                value={newPlaylistURL}
+                onChangeText={setNewPlaylistURL}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+              />
+
+              {/* Visibilité */}
+              <TouchableOpacity 
+                style={[styles.privacyToggle, { 
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border 
+                }]}
+                onPress={() => setNewPlaylistPrivate(!newPlaylistPrivate)}
+              >
+                <View style={styles.privacyToggleLeft}>
+                  <Ionicons 
+                    name={newPlaylistPrivate ? "lock-closed" : "globe-outline"} 
+                    size={20} 
+                    color={theme.colors.primary} 
+                  />
+                  <View style={styles.privacyToggleText}>
+                    <Text style={[styles.privacyToggleTitle, { color: theme.colors.text }]}>
+                      {newPlaylistPrivate ? 'Playlist privée' : 'Playlist publique'}
+                    </Text>
+                    <Text style={[styles.privacyToggleSubtitle, { color: theme.colors.textSecondary }]}>
+                      {newPlaylistPrivate ? 'Visible uniquement par vous' : 'Visible sur votre profil'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={[
+                  styles.switch,
+                  { backgroundColor: newPlaylistPrivate ? theme.colors.primary : theme.colors.border }
+                ]}>
+                  <View style={[
+                    styles.switchThumb,
+                    { 
+                      backgroundColor: theme.colors.background,
+                      transform: [{ translateX: newPlaylistPrivate ? 18 : 2 }]
+                    }
+                  ]} />
+                </View>
+              </TouchableOpacity>
+
+              {/* Boutons */}
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.modalCancelBtn, { 
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.border 
+                  }]}
+                  onPress={() => setShowAddPlaylistModal(false)}
+                >
+                  <Text style={[styles.modalCancelText, { color: theme.colors.text }]}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalSubmitBtn, { backgroundColor: theme.colors.primary }]}
+                  onPress={addPlaylist}
+                  disabled={addingPlaylist}
+                >
+                  {addingPlaylist ? (
+                    <ActivityIndicator color={theme.colors.background} size="small" />
+                  ) : (
+                    <Text style={[styles.modalSubmitText, { color: theme.colors.background }]}>Ajouter</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -646,10 +902,18 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   playlistTop: {
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
   playlistLock: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playlistShare: {
     width: 24,
     height: 24,
     borderRadius: 12,
@@ -682,6 +946,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     lineHeight: 18,
+    marginBottom: 8,
+  },
+  playlistActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    paddingTop: 8,
+    borderTopWidth: 0.5,
+    borderTopColor: '#eee',
+  },
+  playlistActionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   logoutBtn: {
     flexDirection: 'row',
@@ -694,6 +974,128 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   logoutText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '85%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 0.5,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  modalBody: {
+    padding: 24,
+  },
+  inputLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  platformSelector: {
+    marginBottom: 8,
+  },
+  platformOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginRight: 12,
+    borderWidth: 1.5,
+    gap: 8,
+  },
+  platformOptionText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  input: {
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 15,
+    borderWidth: 1,
+  },
+  privacyToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 16,
+  },
+  privacyToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  privacyToggleText: {
+    flex: 1,
+  },
+  privacyToggleTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  privacyToggleSubtitle: {
+    fontSize: 12,
+  },
+  switch: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  switchThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 24,
+    marginBottom: 16,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  modalSubmitBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  modalSubmitText: {
     fontSize: 15,
     fontWeight: '600',
   },
