@@ -17,6 +17,7 @@ const SettingsScreen: React.FC = () => {
 	const [notifications, setNotifications] = useState(true);
 	const [autoDownload, setAutoDownload] = useState(false);
 	const [darkMode, setDarkMode] = useState(false);
+	const [isPremium, setIsPremium] = useState(false);
 	
 	// Stripe
 	const [stripeStatus, setStripeStatus] = useState<'not-connected' | 'connected' | 'loading'>('loading');
@@ -35,6 +36,7 @@ const SettingsScreen: React.FC = () => {
 				const userSnap = await getDoc(userRef);
 				if (userSnap.exists()) {
 					setIsPrivate(!!userSnap.data().isPrivate);
+					setIsPremium(!!userSnap.data().isPremium);
 					// Stripe status
 					if (userSnap.data().stripeAccountId) {
 						setStripeStatus('connected');
@@ -317,15 +319,42 @@ const SettingsScreen: React.FC = () => {
 								<Ionicons name="download" size={20} color="#4CAF50" />
 							</View>
 							<View style={styles.settingTextContainer}>
-								<Text style={styles.settingLabel}>Téléchargement automatique</Text>
-								<Text style={styles.settingDescription}>Télécharger les livres en Wi-Fi</Text>
+								<View style={styles.labelWithBadge}>
+									<Text style={styles.settingLabel}>Téléchargement automatique</Text>
+									{!isPremium && (
+										<View style={styles.premiumBadge}>
+											<Ionicons name="star" size={10} color="#FFD700" />
+											<Text style={styles.premiumBadgeText}>Premium</Text>
+										</View>
+									)}
+								</View>
+								<Text style={styles.settingDescription}>
+									{isPremium 
+										? 'Télécharger les livres en Wi-Fi' 
+										: 'Fonctionnalité Premium uniquement'
+									}
+								</Text>
 							</View>
 						</View>
 						<Switch
-							value={autoDownload}
-							onValueChange={setAutoDownload}
+							value={autoDownload && isPremium}
+							onValueChange={(value) => {
+								if (!isPremium) {
+									Alert.alert(
+										'Fonctionnalité Premium',
+										'Le téléchargement automatique est réservé aux membres Premium. Passez à Premium pour télécharger un nombre illimité de livres sans contrainte.',
+										[
+											{ text: 'Annuler', style: 'cancel' },
+											{ text: 'Devenir Premium', onPress: () => router.push('/wallet') }
+										]
+									);
+								} else {
+									setAutoDownload(value);
+								}
+							}}
+							disabled={!isPremium}
 							trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-							thumbColor={autoDownload ? '#fff' : '#f4f3f4'}
+							thumbColor={(autoDownload && isPremium) ? '#fff' : '#f4f3f4'}
 						/>
 					</View>
 
@@ -534,11 +563,16 @@ const getStyles = (theme: any) => StyleSheet.create({
 	settingTextContainer: {
 		flex: 1,
 	},
+	labelWithBadge: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		marginBottom: 2,
+	},
 	settingLabel: {
 		fontSize: 16,
 		fontWeight: '500',
 		color: theme.colors.text,
-		marginBottom: 2,
 	},
 	settingDescription: {
 		fontSize: 13,
@@ -553,6 +587,23 @@ const getStyles = (theme: any) => StyleSheet.create({
 		height: 0.5,
 		backgroundColor: theme.colors.border,
 		marginLeft: 74,
+	},
+
+	// Badge Premium
+	premiumBadge: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#FFD700' + '20',
+		paddingHorizontal: 6,
+		paddingVertical: 2,
+		borderRadius: 8,
+		gap: 3,
+	},
+	premiumBadgeText: {
+		fontSize: 10,
+		fontWeight: '700',
+		color: '#FFD700',
+		textTransform: 'uppercase',
 	},
 
 	// Thèmes
