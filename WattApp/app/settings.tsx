@@ -475,7 +475,7 @@ const SettingsScreen: React.FC = () => {
 				
 				<View style={styles.settingGroup}>
 					{/* Centre d'aide */}
-					<TouchableOpacity style={styles.settingItem}>
+					<TouchableOpacity style={styles.settingItem} onPress={() => router.push('/help-center')}>
 						<View style={styles.settingLeft}>
 							<View style={[styles.iconContainer, { backgroundColor: '#2196F3' + '20' }]}>
 								<Ionicons name="help-circle" size={20} color="#2196F3" />
