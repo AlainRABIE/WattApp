@@ -6,6 +6,7 @@ import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useTheme } from '../../hooks/useTheme';
+import { BookOfTheMonth } from '../components/BookOfTheMonth';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -172,6 +173,17 @@ const Home: React.FC = () => {
 						</ScrollView>
 					</View>
 				)}
+
+				{/* Livre du mois */}
+				<View style={[styles.section, { marginTop: 8 }]}>
+					<View style={styles.sectionHeader}>
+						<Text style={[styles.sectionTitle, { color: theme.colors.text }]}>🏆 Classement</Text>
+						<TouchableOpacity onPress={() => router.push('/ranking/monthly' as any)}>
+							<Text style={[styles.seeAll, { color: theme.colors.primary }]}>Voir tout</Text>
+						</TouchableOpacity>
+					</View>
+					<BookOfTheMonth />
+				</View>
 
 				{/* Section Continuer la lecture */}
 				<View style={styles.section}>

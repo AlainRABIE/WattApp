@@ -23,6 +23,7 @@ import StarRating from '../components/StarRating';
 import * as ImagePicker from 'expo-image-picker';
 import { ShareModal } from '../components/ShareModal';
 import { useTheme } from '../../hooks/useTheme';
+import { MonthlyRankingService } from '../../services/MonthlyRankingService';
 
 const BookDetail: React.FC = () => {
   const { theme } = useTheme();
@@ -46,6 +47,7 @@ const BookDetail: React.FC = () => {
   
   const [tags, setTags] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [isBookOfTheMonth, setIsBookOfTheMonth] = useState<boolean>(false);
 
   // Charger le livre - OPTIMISÉ
   useEffect(() => {
@@ -86,6 +88,9 @@ const BookDetail: React.FC = () => {
         setIsAuthor(bookData.authorUid === user.uid);
         setTags(Array.isArray(bookData.tags) ? bookData.tags : []);
         setHasPurchased(purchaseCheck);
+        
+        // Vérifier si c'est le livre du mois (fire and forget)
+        MonthlyRankingService.isBookOfTheMonth(bookId).then(setIsBookOfTheMonth).catch(() => {});
         
         // User rating
         if (userRatingSnap.exists()) {
@@ -226,7 +231,12 @@ const BookDetail: React.FC = () => {
         </TouchableOpacity>
         
         <View style={dynamicStyles.headerRight}>
-          {isAuthor && (
+          {isBookOfTheMonth && (
+            <View style={[dynamicStyles.badge, { backgroundColor: '#FFD700' + '20', borderColor: '#FFD700', borderWidth: 1 }]}>
+              <Text style={[dynamicStyles.badgeText, { color: '#FFD700' }]}>👑 Livre du mois</Text>
+            </View>
+          )}
+          {isAuthor && !isBookOfTheMonth && (
             <View style={[dynamicStyles.badge, { backgroundColor: theme.colors.primary + '15' }]}>
               <Text style={[dynamicStyles.badgeText, { color: theme.colors.primary }]}>Mon livre</Text>
             </View>

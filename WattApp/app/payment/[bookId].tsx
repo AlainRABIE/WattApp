@@ -8,15 +8,25 @@ import { doc, getDoc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/fi
 import { StripeProvider, usePaymentSheet } from '@stripe/stripe-react-native';
 import { STRIPE_CONFIG } from '../../constants/stripeConfig';
 import PaymentService from '../../services/PaymentService';
-// Fonction utilitaire pour appeler l'API backend Stripe PaymentIntent
-async function createStripePaymentIntent(bookId, amount) {
-  const response = await fetch('https://watt-app.vercel.app/api/create-payment-intent', {
+// Fonction utilitaire pour appeler l'API backend Stripe PaymentIntent (Firebase Function)
+async function createStripePaymentIntent(bookId: string, amount: number) {
+  // Remplace cette URL par ton URL Firebase Function réelle
+  // Format: https://<region>-<project-id>.cloudfunctions.net/createPaymentIntent
+  // Ex: https://europe-west1-wattapp-123abc.cloudfunctions.net/createPaymentIntent
+  const FIREBASE_FUNCTION_URL = 'https://YOUR_REGION-YOUR_PROJECT_ID.cloudfunctions.net/createPaymentIntent';
+  
+  const response = await fetch(FIREBASE_FUNCTION_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ bookId, amount })
   });
-  if (!response.ok) throw new Error('Erreur lors de la création du paiement Stripe');
-  return await response.json(); // { clientSecret, paymentIntentId }
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Erreur lors de la création du paiement Stripe');
+  }
+  
+  return await response.json(); // { clientSecret }
 }
 
 // Fonction utilitaire pour créer une session Stripe Checkout (PayPal)

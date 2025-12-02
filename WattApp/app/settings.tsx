@@ -8,6 +8,7 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../hooks/useTheme';
 import { useRouter } from 'expo-router';
+import { MonthlyRankingService } from '../services/MonthlyRankingService';
 
 
 const SettingsScreen: React.FC = () => {
@@ -520,6 +521,75 @@ const SettingsScreen: React.FC = () => {
 								<Ionicons name="document-text" size={20} color="#795548" />
 							</View>
 							<Text style={styles.settingLabel}>Conditions d'utilisation</Text>
+						</View>
+						<Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+					</TouchableOpacity>
+				</View>
+			</View>
+
+			{/* Section Outils développeur */}
+			<View style={styles.section}>
+				<Text style={styles.sectionTitle}>🛠️ Outils développeur</Text>
+				
+				<View style={styles.settingGroup}>
+					{/* Générer classement mensuel */}
+					<TouchableOpacity 
+						style={styles.settingItem}
+						onPress={async () => {
+							Alert.alert(
+								'Générer le classement',
+								'Calculer le classement mensuel des livres les plus lus maintenant ?',
+								[
+									{ text: 'Annuler', style: 'cancel' },
+									{
+										text: 'Générer',
+										onPress: async () => {
+											setLoading(true);
+											try {
+												const ranking = await MonthlyRankingService.calculateMonthlyRanking();
+												Alert.alert(
+													'✅ Classement généré !',
+													`Livre du mois: "${ranking.topBook?.title}" par ${ranking.topBook?.author}\n\n${ranking.topBook?.reads.toLocaleString()} lectures • ${ranking.topBook?.avgRating.toFixed(1)}⭐`
+												);
+											} catch (error) {
+												Alert.alert('❌ Erreur', 'Impossible de générer le classement');
+												console.error(error);
+											} finally {
+												setLoading(false);
+											}
+										}
+									}
+								]
+							);
+						}}
+					>
+						<View style={styles.settingLeft}>
+							<View style={[styles.iconContainer, { backgroundColor: '#FFD700' + '20' }]}>
+								<Ionicons name="trophy" size={20} color="#FFD700" />
+							</View>
+							<View style={styles.settingTextContainer}>
+								<Text style={styles.settingLabel}>Générer le classement mensuel</Text>
+								<Text style={styles.settingDescription}>Calculer le Top 10 des livres du mois</Text>
+							</View>
+						</View>
+						<Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+					</TouchableOpacity>
+
+					<View style={styles.separator} />
+
+					{/* Voir le classement */}
+					<TouchableOpacity 
+						style={styles.settingItem}
+						onPress={() => router.push('/ranking/monthly' as any)}
+					>
+						<View style={styles.settingLeft}>
+							<View style={[styles.iconContainer, { backgroundColor: '#4CAF50' + '20' }]}>
+								<Ionicons name="list" size={20} color="#4CAF50" />
+							</View>
+							<View style={styles.settingTextContainer}>
+								<Text style={styles.settingLabel}>Voir le classement</Text>
+								<Text style={styles.settingDescription}>Consulter le Top 10 actuel</Text>
+							</View>
 						</View>
 						<Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
 					</TouchableOpacity>
