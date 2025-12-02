@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
-import { View, Text, Modal, TextInput, Button, ActivityIndicator } from 'react-native';
-import SelectableText from 'react-native-selectable-text';
+import { View, Text, Modal, TextInput, Button, ActivityIndicator, StyleSheet } from 'react-native';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../../constants/firebaseConfig';
 import { getAuth } from 'firebase/auth';
@@ -49,20 +48,13 @@ export default function HighlightableText({ projectId, page, text }) {
   const [definition, setDefinition] = useState('');
   const [loadingDefinition, setLoadingDefinition] = useState(false);
 
-  const handleSelection = ({ content, menuItem }) => {
-    setSelectedText(content);
+  const handleTextSelection = () => {
+    // Cette fonction sera appelée lors de la sélection de texte
+    // Note: La sélection native de React Native ne fournit pas le texte sélectionné directement
+    // Pour une implémentation complète, vous devriez utiliser onSelectionChange ou une autre approche
     setModalVisible(true);
-    setShowTranslation(false);
-    setTranslation('');
-    setShowDefinition(false);
-    setDefinition('');
-    if (menuItem === 'Traduire') {
-      handleTranslate(content);
-    }
-    if (menuItem === 'Définir') {
-      handleDefinition(content);
-    }
   };
+
   const handleDefinition = async (word) => {
     setLoadingDefinition(true);
     const def = await getDefinition(word, 'en'); // adapte la langue si besoin
@@ -97,12 +89,9 @@ export default function HighlightableText({ projectId, page, text }) {
 
   return (
     <View>
-      <SelectableText
-        value={text}
-        onSelection={handleSelection}
-        menuItems={['Surligner', 'Traduire', 'Définir']}
-        highlightColor="#FFFF00"
-      />
+      <Text selectable={true} style={styles.selectableText}>
+        {text}
+      </Text>
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={{ flex: 1, justifyContent: 'center', backgroundColor: '#00000099' }}>
           <View style={{ backgroundColor: '#fff', margin: 20, borderRadius: 8, padding: 16 }}>
@@ -132,3 +121,11 @@ export default function HighlightableText({ projectId, page, text }) {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  selectableText: {
+    fontSize: 16,
+    lineHeight: 24,
+    padding: 10,
+  },
+});

@@ -1,7 +1,6 @@
 import { Tabs, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { View, TouchableOpacity, Image, StyleSheet, useWindowDimensions, Text } from 'react-native';
-import Logo from '../../assets/images/LOGO.png';
 import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -61,7 +60,6 @@ export default function TabLayout() {
     <View style={styles.wrapper}>
       {/* Logo en haut au centre */}
       <View style={{ alignItems: 'center', marginTop: 32, marginBottom: 8 }}>
-        <Image source={Logo} style={{ width: 180, height: 60, resizeMode: 'contain' }} />
       </View>
       {/* Hide the Tabs default tab bar, we'll use a custom BottomNav */}
       <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }} />

@@ -31,7 +31,7 @@ const LoginScreen: React.FC = () => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <Image source={require('../../assets/images/favicon.png')} style={styles.logo} />
+      <Image source={require('../../assets/images/LOGO.png')} style={styles.logo} />
       <Text style={styles.title}>Connexion</Text>
       <TextInput
         style={styles.input}
