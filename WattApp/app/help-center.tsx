@@ -73,6 +73,18 @@ const HelpCenterScreen: React.FC = () => {
 			answer: 'Tous vos livres téléchargés sont disponibles dans votre Bibliothèque. Accédez-y depuis le menu principal, puis sélectionnez l\'onglet "Téléchargés".'
 		},
 		{
+			id: '6b',
+			category: 'books',
+			question: 'Comment exporter un livre en PDF ?',
+			answer: 'Sur la page d\'un livre, appuyez sur l\'icône de téléchargement à côté du bouton de lecture. Le livre sera généré en PDF et vous pourrez le partager ou le sauvegarder. Les utilisateurs gratuits peuvent exporter 2 livres par mois, les membres Premium ont des exports illimités.'
+		},
+		{
+			id: '6c',
+			category: 'premium',
+			question: 'Combien de livres puis-je exporter en PDF ?',
+			answer: 'Les utilisateurs gratuits peuvent exporter 2 livres en PDF par mois. Ce quota se réinitialise automatiquement chaque mois. Les membres Premium peuvent exporter un nombre illimité de livres. Consultez votre quota dans Paramètres > Exports PDF.'
+		},
+		{
 			id: '7',
 			category: 'writing',
 			question: 'Comment publier mon histoire ?',

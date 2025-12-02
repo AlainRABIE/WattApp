@@ -25,6 +25,7 @@ import { ShareModal } from '../components/ShareModal';
 import { useTheme } from '../../hooks/useTheme';
 import { MonthlyRankingService } from '../../services/MonthlyRankingService';
 import { NotificationService } from '../../services/NotificationService';
+import PDFExportService from '../../services/PDFExportService';
 
 const BookDetail: React.FC = () => {
   const { theme } = useTheme();
@@ -49,6 +50,44 @@ const BookDetail: React.FC = () => {
   const [tags, setTags] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isBookOfTheMonth, setIsBookOfTheMonth] = useState<boolean>(false);
+  const [exportingPDF, setExportingPDF] = useState<boolean>(false);
+
+  // Fonction pour exporter le livre en PDF
+  const handleExportPDF = async () => {
+    if (!book) return;
+    
+    try {
+      setExportingPDF(true);
+      
+      // Récupérer tout le contenu du livre
+      let fullContent = '';
+      
+      if (chapters.length > 0) {
+        // Si le livre a des chapitres, on les récupère tous
+        for (const chapter of chapters) {
+          fullContent += `\n\n=== ${chapter.title} ===\n\n${chapter.content || ''}`;
+        }
+      } else {
+        // Sinon on utilise le contenu direct du livre
+        fullContent = book.content || book.synopsis || 'Contenu non disponible';
+      }
+      
+      await PDFExportService.exportBookToPDF({
+        bookId: book.id,
+        bookTitle: book.title || 'Sans titre',
+        bookContent: fullContent,
+        author: book.authorName || 'Auteur inconnu',
+        coverImage: book.coverImage,
+        includeImages: true,
+      });
+      
+    } catch (error) {
+      console.error('Erreur export PDF:', error);
+      Alert.alert('Erreur', 'Impossible d\'exporter le livre en PDF');
+    } finally {
+      setExportingPDF(false);
+    }
+  };
 
   // Charger le livre - OPTIMISÉ
   useEffect(() => {
@@ -334,16 +373,42 @@ const BookDetail: React.FC = () => {
               >
                 <Ionicons name="list-outline" size={20} color={theme.colors.text} />
               </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[dynamicStyles.secondaryButton, { borderColor: theme.colors.border }]}
+                onPress={handleExportPDF}
+                disabled={exportingPDF}
+              >
+                {exportingPDF ? (
+                  <ActivityIndicator size="small" color={theme.colors.text} />
+                ) : (
+                  <Ionicons name="download-outline" size={20} color={theme.colors.text} />
+                )}
+              </TouchableOpacity>
             </>
           ) : (book?.price && book.price > 0) ? (
             hasPurchased ? (
-              <TouchableOpacity
-                style={[dynamicStyles.primaryButton, { backgroundColor: theme.colors.primary }]}
-                onPress={() => router.push(`/book/${bookId}/read`)}
-              >
-                <Ionicons name="book-outline" size={20} color="#fff" />
-                <Text style={dynamicStyles.primaryButtonText}>Lire maintenant</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  style={[dynamicStyles.primaryButton, { backgroundColor: theme.colors.primary }]}
+                  onPress={() => router.push(`/book/${bookId}/read`)}
+                >
+                  <Ionicons name="book-outline" size={20} color="#fff" />
+                  <Text style={dynamicStyles.primaryButtonText}>Lire maintenant</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[dynamicStyles.secondaryButton, { borderColor: theme.colors.border }]}
+                  onPress={handleExportPDF}
+                  disabled={exportingPDF}
+                >
+                  {exportingPDF ? (
+                    <ActivityIndicator size="small" color={theme.colors.text} />
+                  ) : (
+                    <Ionicons name="download-outline" size={20} color={theme.colors.text} />
+                  )}
+                </TouchableOpacity>
+              </>
             ) : (
               <>
                 <TouchableOpacity
@@ -365,13 +430,27 @@ const BookDetail: React.FC = () => {
               </>
             )
           ) : (
-            <TouchableOpacity
-              style={[dynamicStyles.primaryButton, { backgroundColor: theme.colors.primary }]}
-              onPress={() => router.push(`/book/${bookId}/read`)}
-            >
-              <Ionicons name="book-outline" size={20} color="#fff" />
-              <Text style={dynamicStyles.primaryButtonText}>Lire gratuitement</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={[dynamicStyles.primaryButton, { backgroundColor: theme.colors.primary }]}
+                onPress={() => router.push(`/book/${bookId}/read`)}
+              >
+                <Ionicons name="book-outline" size={20} color="#fff" />
+                <Text style={dynamicStyles.primaryButtonText}>Lire gratuitement</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[dynamicStyles.secondaryButton, { borderColor: theme.colors.border }]}
+                onPress={handleExportPDF}
+                disabled={exportingPDF}
+              >
+                {exportingPDF ? (
+                  <ActivityIndicator size="small" color={theme.colors.text} />
+                ) : (
+                  <Ionicons name="download-outline" size={20} color={theme.colors.text} />
+                )}
+              </TouchableOpacity>
+            </>
           )}
         </View>
 

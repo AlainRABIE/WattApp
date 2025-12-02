@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../hooks/useTheme';
 import { useRouter } from 'expo-router';
 import { MonthlyRankingService } from '../services/MonthlyRankingService';
+import PDFExportService from '../services/PDFExportService';
 
 
 const SettingsScreen: React.FC = () => {
@@ -22,6 +23,9 @@ const SettingsScreen: React.FC = () => {
 	const [isPremium, setIsPremium] = useState(false);
 	const [cacheSize, setCacheSize] = useState<string>('Calcul...');
 	const [isCalculatingCache, setIsCalculatingCache] = useState(false);
+	
+	// Quota PDF exports
+	const [pdfQuota, setPdfQuota] = useState<{ used: number; limit: number; isPremium: boolean } | null>(null);
 	
 	// Stripe
 	const [stripeStatus, setStripeStatus] = useState<'not-connected' | 'connected' | 'loading'>('loading');
@@ -41,6 +45,10 @@ const SettingsScreen: React.FC = () => {
 				if (userSnap.exists()) {
 					setIsPrivate(!!userSnap.data().isPrivate);
 					setIsPremium(!!userSnap.data().isPremium);
+					
+					// Charger quota PDF
+					PDFExportService.checkExportQuota(user.uid).then(setPdfQuota).catch(() => {});
+					
 					// Stripe status
 					if (userSnap.data().stripeAccountId) {
 						setStripeStatus('connected');
@@ -470,6 +478,65 @@ const SettingsScreen: React.FC = () => {
 				</View>
 			</View>
 
+			{/* Section Exports PDF */}
+			<View style={styles.section}>
+				<Text style={styles.sectionTitle}>Exports PDF</Text>
+				
+				<View style={styles.settingGroup}>
+					{/* Quota PDF */}
+					<TouchableOpacity 
+						style={styles.settingItem} 
+						onPress={() => {
+							const auth = getAuth();
+							const user = auth.currentUser;
+							if (user) PDFExportService.showQuotaInfo(user.uid);
+						}}
+					>
+						<View style={styles.settingLeft}>
+							<View style={[styles.iconContainer, { backgroundColor: '#E91E63' + '20' }]}>
+								<Ionicons name="document-text" size={20} color="#E91E63" />
+							</View>
+							<View style={styles.settingTextContainer}>
+								<Text style={styles.settingLabel}>Quota d'exports</Text>
+								<Text style={styles.settingDescription}>
+									{pdfQuota ? (
+										pdfQuota.isPremium 
+											? `Illimité (${pdfQuota.used} ce mois)`
+											: `${pdfQuota.used}/${pdfQuota.limit} utilisés ce mois`
+									) : (
+										'Chargement...'
+									)}
+								</Text>
+							</View>
+						</View>
+						<Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+					</TouchableOpacity>
+					
+					{!isPremium && (
+						<>
+							<View style={styles.separator} />
+							<View style={styles.premiumPromoContainer}>
+								<View style={styles.premiumPromoIcon}>
+									<Ionicons name="star" size={24} color="#FFD700" />
+								</View>
+								<View style={styles.premiumPromoText}>
+									<Text style={styles.premiumPromoTitle}>Exports illimités avec Premium</Text>
+									<Text style={styles.premiumPromoDescription}>
+										Exportez autant de livres que vous voulez en PDF
+									</Text>
+								</View>
+								<TouchableOpacity 
+									style={styles.premiumPromoButton}
+									onPress={() => router.push('/wallet')}
+								>
+									<Text style={styles.premiumPromoButtonText}>Découvrir</Text>
+								</TouchableOpacity>
+							</View>
+						</>
+					)}
+				</View>
+			</View>
+
 			{/* Section Aide & Support */}
 			<View style={styles.section}>
 				<Text style={styles.sectionTitle}>Aide & Support</Text>
@@ -834,6 +901,48 @@ const getStyles = (theme: any) => StyleSheet.create({
 		fontSize: 16,
 		fontWeight: '600',
 		color: '#FF3B30',
+	},
+	
+	// Promo Premium
+	premiumPromoContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingVertical: 14,
+		paddingHorizontal: 24,
+		backgroundColor: theme.colors.surface,
+		gap: 12,
+	},
+	premiumPromoIcon: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		backgroundColor: '#FFD700' + '20',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	premiumPromoText: {
+		flex: 1,
+	},
+	premiumPromoTitle: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: theme.colors.text,
+		marginBottom: 2,
+	},
+	premiumPromoDescription: {
+		fontSize: 12,
+		color: theme.colors.textSecondary,
+	},
+	premiumPromoButton: {
+		backgroundColor: theme.colors.primary,
+		paddingVertical: 6,
+		paddingHorizontal: 14,
+		borderRadius: 12,
+	},
+	premiumPromoButtonText: {
+		fontSize: 13,
+		fontWeight: '600',
+		color: '#fff',
 	},
 });
 
