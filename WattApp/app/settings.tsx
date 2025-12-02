@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Switch, StyleSheet, Alert, TouchableOpacity, ActivityIndicator, Linking, ScrollView, Platform, StatusBar } from 'react-native';
 import { getAuth } from 'firebase/auth';
 import { db } from '../constants/firebaseConfig';
+import * as FileSystem from 'expo-file-system';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../hooks/useTheme';
@@ -18,6 +19,8 @@ const SettingsScreen: React.FC = () => {
 	const [autoDownload, setAutoDownload] = useState(false);
 	const [darkMode, setDarkMode] = useState(false);
 	const [isPremium, setIsPremium] = useState(false);
+	const [cacheSize, setCacheSize] = useState<string>('Calcul...');
+	const [isCalculatingCache, setIsCalculatingCache] = useState(false);
 	
 	// Stripe
 	const [stripeStatus, setStripeStatus] = useState<'not-connected' | 'connected' | 'loading'>('loading');
@@ -130,6 +133,90 @@ const SettingsScreen: React.FC = () => {
 			Alert.alert('Erreur', 'Impossible de mettre à jour la confidentialité.');
 		}
 	};
+
+	// Calculer la taille du cache
+	const calculateCacheSize = async () => {
+		try {
+			setIsCalculatingCache(true);
+			const cacheDir = FileSystem.cacheDirectory;
+			if (!cacheDir) {
+				setCacheSize('0 Mo');
+				return;
+			}
+			
+			const dirInfo = await FileSystem.getInfoAsync(cacheDir);
+			if (!dirInfo.exists) {
+				setCacheSize('0 Mo');
+				return;
+			}
+
+			// Lire tous les fichiers du cache
+			const files = await FileSystem.readDirectoryAsync(cacheDir);
+			let totalSize = 0;
+
+			for (const file of files) {
+				const fileInfo = await FileSystem.getInfoAsync(cacheDir + file);
+				if (fileInfo.exists && 'size' in fileInfo) {
+					totalSize += fileInfo.size || 0;
+				}
+			}
+
+			// Convertir en Mo
+			const sizeInMB = (totalSize / (1024 * 1024)).toFixed(2);
+			setCacheSize(`${sizeInMB} Mo`);
+		} catch (error) {
+			console.error('Erreur calcul cache:', error);
+			setCacheSize('Erreur');
+		} finally {
+			setIsCalculatingCache(false);
+		}
+	};
+
+	// Vider le cache
+	const clearCache = async () => {
+		Alert.alert(
+			'Vider le cache',
+			`Cette action va libérer ${cacheSize} d'espace de stockage. Voulez-vous continuer ?`,
+			[
+				{ text: 'Annuler', style: 'cancel' },
+				{ 
+					text: 'Vider', 
+					style: 'destructive',
+					onPress: async () => {
+						try {
+							setIsCalculatingCache(true);
+							const cacheDir = FileSystem.cacheDirectory;
+							if (!cacheDir) return;
+
+							const files = await FileSystem.readDirectoryAsync(cacheDir);
+							
+							// Supprimer tous les fichiers
+							for (const file of files) {
+								try {
+									await FileSystem.deleteAsync(cacheDir + file, { idempotent: true });
+								} catch (e) {
+									console.error('Erreur suppression fichier:', file, e);
+								}
+							}
+
+							setCacheSize('0 Mo');
+							Alert.alert('Succès', 'Le cache a été vidé avec succès.');
+						} catch (error) {
+							console.error('Erreur vidage cache:', error);
+							Alert.alert('Erreur', 'Impossible de vider le cache.');
+						} finally {
+							setIsCalculatingCache(false);
+						}
+					}
+				}
+			]
+		);
+	};
+
+	// Calculer la taille du cache au montage
+	useEffect(() => {
+		calculateCacheSize();
+	}, []);
 
 	const styles = getStyles(theme);
 
@@ -361,17 +448,23 @@ const SettingsScreen: React.FC = () => {
 					<View style={styles.separator} />
 
 					{/* Cache */}
-					<TouchableOpacity style={styles.settingItem}>
+					<TouchableOpacity style={styles.settingItem} onPress={clearCache} disabled={isCalculatingCache}>
 						<View style={styles.settingLeft}>
 							<View style={[styles.iconContainer, { backgroundColor: '#F44336' + '20' }]}>
 								<Ionicons name="trash" size={20} color="#F44336" />
 							</View>
 							<View style={styles.settingTextContainer}>
 								<Text style={styles.settingLabel}>Vider le cache</Text>
-								<Text style={styles.settingDescription}>Libérer de l'espace de stockage</Text>
+								<Text style={styles.settingDescription}>
+									{isCalculatingCache ? 'Calcul en cours...' : `Espace utilisé: ${cacheSize}`}
+								</Text>
 							</View>
 						</View>
-						<Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+						{isCalculatingCache ? (
+							<ActivityIndicator color={theme.colors.primary} size="small" />
+						) : (
+							<Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+						)}
 					</TouchableOpacity>
 				</View>
 			</View>
