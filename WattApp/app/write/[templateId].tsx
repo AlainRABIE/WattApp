@@ -318,6 +318,16 @@ const TemplateEditor: React.FC = () => {
                       await TagService.incrementMultipleTagsUsage(tags);
                     }
                     
+                    // Notifier les followers de la publication du livre
+                    const { FollowService } = await import('../../services/FollowService');
+                    await FollowService.notifyFollowersBookPublished(
+                      user.uid,
+                      user.displayName || user.email || 'Auteur',
+                      bookRef.id,
+                      title,
+                      template?.backgroundImage || undefined
+                    );
+                    
                     Alert.alert('Publié', 'Votre document a été publié !');
                   } catch (e) {
                     let msg = '';

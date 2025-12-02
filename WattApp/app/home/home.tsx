@@ -7,6 +7,8 @@ import app, { db } from '../../constants/firebaseConfig';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useTheme } from '../../hooks/useTheme';
 import { BookOfTheMonth } from '../components/BookOfTheMonth';
+import { NotificationModal } from '../components/NotificationModal';
+import { NotificationService } from '../../services/NotificationService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -21,6 +23,8 @@ const Home: React.FC = () => {
 	const [walletBalance, setWalletBalance] = useState<number>(0);
 	const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
 	const heroScrollRef = useRef<ScrollView>(null);
+	const [notificationModalVisible, setNotificationModalVisible] = useState(false);
+	const [unreadCount, setUnreadCount] = useState(0);
 	const nameForAvatar = (displayName || email || 'User') as string;
 	const avatarLen = nameForAvatar.trim().includes(' ') ? 2 : 1;
 	const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(nameForAvatar)}&length=${avatarLen}&background=FFA94D&color=181818&size=128`;
@@ -71,6 +75,20 @@ const Home: React.FC = () => {
 		loadBooks();
 	}, []);
 
+	// Écouter les notifications non lues
+	useEffect(() => {
+		const auth = getAuth(app);
+		const user = auth.currentUser;
+		if (!user) return;
+
+		const unsubscribe = NotificationService.subscribeToNotifications(user.uid, (notifications) => {
+			const count = notifications.filter(n => !n.read).length;
+			setUnreadCount(count);
+		});
+
+		return () => unsubscribe();
+	}, []);
+
 	// Auto-scroll pour le carrousel hero
 	useEffect(() => {
 		if (books.length <= 1) return;
@@ -99,15 +117,32 @@ const Home: React.FC = () => {
 					<Text style={[styles.greeting, { color: theme.colors.textSecondary }]}>Bonjour,</Text>
 					<Text style={[styles.username, { color: theme.colors.text }]}>{displayName || email?.split('@')[0] || 'Lecteur'}</Text>
 				</View>
-				<View style={styles.headerRight}>
-					<TouchableOpacity onPress={() => router.push('/wallet')} style={[styles.walletButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-						<Ionicons name="wallet" size={20} color={theme.colors.primary} />
-						<Text style={[styles.walletText, { color: theme.colors.text }]}>{walletBalance.toFixed(0)}€</Text>
-					</TouchableOpacity>
-					<TouchableOpacity onPress={() => router.push('/profile')}>
-						<Image source={{ uri: photoURL || avatarUrl }} style={[styles.avatar, { borderColor: theme.colors.border }]} />
-					</TouchableOpacity>
-				</View>
+			<View style={styles.headerRight}>
+				<TouchableOpacity onPress={() => router.push('/wallet')} style={[styles.walletButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+					<Ionicons name="wallet" size={20} color={theme.colors.primary} />
+					<Text style={[styles.walletText, { color: theme.colors.text }]}>{walletBalance.toFixed(0)}€</Text>
+				</TouchableOpacity>
+				<TouchableOpacity 
+					onPress={() => setNotificationModalVisible(true)}
+					style={styles.notificationButton}
+				>
+					<Ionicons 
+						name={unreadCount > 0 ? 'notifications' : 'notifications-outline'} 
+						size={24} 
+						color={theme.colors.primary} 
+					/>
+					{unreadCount > 0 && (
+						<View style={[styles.notificationBadge, { backgroundColor: '#FF3B30' }]}>
+							<Text style={styles.notificationBadgeText}>
+								{unreadCount > 99 ? '99+' : unreadCount}
+							</Text>
+						</View>
+					)}
+				</TouchableOpacity>
+				<TouchableOpacity onPress={() => router.push('/profile')}>
+					<Image source={{ uri: photoURL || avatarUrl }} style={[styles.avatar, { borderColor: theme.colors.border }]} />
+				</TouchableOpacity>
+			</View>
 			</View>
 
 			<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -298,6 +333,12 @@ const Home: React.FC = () => {
 
 				<View style={{ height: 120 }} />
 			</ScrollView>
+
+			{/* Modal de notifications */}
+			<NotificationModal 
+				visible={notificationModalVisible}
+				onClose={() => setNotificationModalVisible(false)}
+			/>
 		</View>
 	);
 };
@@ -326,6 +367,29 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 14,
+	},
+	notificationButton: {
+		width: 40,
+		height: 40,
+		alignItems: 'center',
+		justifyContent: 'center',
+		position: 'relative',
+	},
+	notificationBadge: {
+		position: 'absolute',
+		top: 0,
+		right: 0,
+		minWidth: 18,
+		height: 18,
+		borderRadius: 9,
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingHorizontal: 4,
+	},
+	notificationBadgeText: {
+		color: '#fff',
+		fontSize: 10,
+		fontWeight: '700',
 	},
 	walletButton: {
 		flexDirection: 'row',

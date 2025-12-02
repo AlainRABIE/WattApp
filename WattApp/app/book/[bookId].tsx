@@ -24,6 +24,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { ShareModal } from '../components/ShareModal';
 import { useTheme } from '../../hooks/useTheme';
 import { MonthlyRankingService } from '../../services/MonthlyRankingService';
+import { NotificationService } from '../../services/NotificationService';
 
 const BookDetail: React.FC = () => {
   const { theme } = useTheme();
@@ -199,6 +200,29 @@ const BookDetail: React.FC = () => {
         user: user.displayName || user.email || 'Utilisateur',
         createdAt: Date.now(),
       }, { merge: true });
+      
+      // Notifier l'auteur du livre (si ce n'est pas lui-même)
+      if (book && book.authorUid && book.authorUid !== user.uid) {
+        // Notification pour la note
+        await NotificationService.notifyNewRating(
+          book.authorUid,
+          bookId,
+          book.title,
+          userRating,
+          user.displayName || user.email || 'Un lecteur'
+        );
+        
+        // Notification pour le commentaire si présent
+        if (userComment && userComment.length > 0) {
+          await NotificationService.notifyNewComment(
+            book.authorUid,
+            bookId,
+            book.title,
+            user.displayName || user.email || 'Un lecteur',
+            userComment
+          );
+        }
+      }
       
       Alert.alert('Merci !', 'Votre avis a été enregistré.');
     } catch (error) {

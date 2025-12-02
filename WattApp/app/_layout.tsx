@@ -1,15 +1,19 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, usePathname } from 'expo-router';
-import { Animated } from 'react-native';
+import { Animated, useEffect } from 'react';
 import type { StackCardInterpolationProps } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StripeProvider } from '@stripe/stripe-react-native';
+import { getAuth } from 'firebase/auth';
+import app from '../constants/firebaseConfig';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import BottomNav from './components/BottomNav';
 import { STRIPE_CONFIG } from '../constants/stripeConfig';
+import { NotificationService } from '../services/NotificationService';
+import React from 'react';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -48,6 +52,20 @@ export default function RootLayout() {
     pathname.startsWith('/chat/') || // Cacher pour toutes les pages de chat direct (DM)
     pathname.startsWith('/payment/') // Cacher pour les pages de paiement
   );
+
+  // Initialiser les notifications au démarrage
+  useEffect(() => {
+    const initializeNotifications = async () => {
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+      
+      if (user) {
+        await NotificationService.initialize(user.uid);
+      }
+    };
+
+    initializeNotifications();
+  }, []);
 
   return (
     <StripeProvider publishableKey={STRIPE_CONFIG.PUBLISHABLE_KEY}>

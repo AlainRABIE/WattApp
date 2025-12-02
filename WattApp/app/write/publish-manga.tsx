@@ -445,6 +445,16 @@ const MangaPublisher: React.FC = () => {
                   authorUid: user.uid,
                 });
 
+                // Notifier les followers de la publication du manga
+                const { FollowService } = await import('../../services/FollowService');
+                await FollowService.notifyFollowersBookPublished(
+                  user.uid,
+                  publication.author || user.displayName || user.email || 'Auteur',
+                  projectId as string,
+                  publication.title,
+                  publication.coverImage || undefined
+                );
+
                 Alert.alert(
                   'Manga publié !', 
                   'Votre manga est maintenant disponible dans la marketplace',

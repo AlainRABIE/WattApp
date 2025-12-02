@@ -12,6 +12,7 @@ import {
   updateDoc
 } from 'firebase/firestore';
 import { db } from '../constants/firebaseConfig';
+import { NotificationService } from './NotificationService';
 
 export class FollowService {
   
@@ -33,6 +34,13 @@ export class FollowService {
       
       // Mettre à jour les statistiques
       await this.updateFollowStats(followerId, followedUserId, 1);
+      
+      // Notifier l'utilisateur suivi
+      await NotificationService.notifyNewFollower(
+        followedUserId,
+        followerId,
+        followerName
+      );
       
       return true;
     } catch (error) {
@@ -218,6 +226,40 @@ export class FollowService {
       }
     } catch (error) {
       console.error('Erreur lors de l\'initialisation des statistiques:', error);
+    }
+  }
+  
+  /**
+   * Notifier tous les followers lors de la publication d'un livre
+   */
+  static async notifyFollowersBookPublished(
+    authorId: string,
+    authorName: string,
+    bookId: string,
+    bookTitle: string,
+    coverImage?: string
+  ): Promise<void> {
+    try {
+      // Récupérer tous les followers de l'auteur
+      const followers = await this.getFollowers(authorId);
+      
+      // Notifier chaque follower
+      const notificationPromises = followers.map((follower: any) =>
+        NotificationService.notifyBookPublished(
+          follower.followerId,
+          authorId,
+          authorName,
+          bookId,
+          bookTitle,
+          coverImage
+        )
+      );
+      
+      await Promise.all(notificationPromises);
+      
+      console.log(`📚 ${followers.length} followers notifiés pour le livre "${bookTitle}"`);
+    } catch (error) {
+      console.error('Erreur lors de la notification des followers:', error);
     }
   }
 }

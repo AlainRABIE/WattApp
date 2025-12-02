@@ -4,6 +4,7 @@
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../constants/firebaseConfig';
 import { doc, updateDoc, arrayUnion, serverTimestamp, addDoc, collection, increment, getDoc, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { NotificationService } from './NotificationService';
 
 export class PaymentService {
   
@@ -107,6 +108,21 @@ export class PaymentService {
         status: 'completed',
         createdAt: serverTimestamp(),
       });
+
+      // Notifier l'auteur du livre
+      const bookSnap = await getDoc(bookRef);
+      if (bookSnap.exists()) {
+        const bookData = bookSnap.data();
+        if (bookData.authorUid && bookData.authorUid !== user.uid) {
+          await NotificationService.notifyNewPurchase(
+            bookData.authorUid,
+            bookId,
+            bookData.title || 'Un livre',
+            user.displayName || user.email || 'Un lecteur',
+            amount
+          );
+        }
+      }
 
       console.log('Paiement traité avec succès:', {
         bookId,
