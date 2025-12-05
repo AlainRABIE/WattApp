@@ -6,6 +6,7 @@ import { BlurView } from 'expo-blur';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
 import { collection, query, where, getDocs } from 'firebase/firestore';
+import { useTheme } from '../../hooks/useTheme';
 
 const TABS = [
   { id: 'home', label: 'Home', icon: 'home-outline', route: '/home/home' },
@@ -24,6 +25,7 @@ export default function BottomNav() {
   const segments = useSegments();
   const pathname = usePathname() || '';
   const active = segments[segments.length - 1] || '';
+  const { theme } = useTheme();
 
   const handlePress = (route: string) => {
     // Si déjà sur la page, ne rien faire (pour tous les boutons)
@@ -125,7 +127,7 @@ export default function BottomNav() {
                 <Animated.View style={[{ transform: [{ scale: scalesRef.current[tab.id] || new Animated.Value(1) }] }]}> 
                   <View style={styles.iconWrap}>
                     {isActive ? (
-                      <BlurView intensity={60} tint="light" style={styles.activeBubble}>
+                      <BlurView intensity={60} tint="light" style={[styles.activeBubble, { backgroundColor: theme.colors.primary }]}>
                         <View style={styles.bubbleContent}>
                           <Ionicons name={
                             tab.id === 'mygroups' ? 'chatbubbles-outline' :
@@ -134,7 +136,7 @@ export default function BottomNav() {
                             tab.id === 'library' ? 'book-outline' :
                             tab.id === 'short' ? 'flash-outline' :
                             (tab.icon as any)
-                          } size={26} color={'#181818'} />
+                          } size={26} color={theme.colors.background} />
                         </View>
                       </BlurView>
                     ) : (
@@ -145,7 +147,7 @@ export default function BottomNav() {
                         tab.id === 'library' ? 'book-outline' :
                         tab.id === 'short' ? 'flash-outline' :
                         (tab.icon as any)
-                      } size={26} color={'#F5E9DA'} />
+                      } size={26} color={theme.colors.textSecondary} />
                     )}
                   </View>
                 </Animated.View>
@@ -206,7 +208,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   activeBubble: {
-    backgroundColor: '#FFA94D',
     width: 54,
     height: 54,
     borderRadius: 999,
