@@ -7,7 +7,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { getAuth, updateProfile } from 'firebase/auth';
 import app, { db } from '../constants/firebaseConfig';
-import { collection, query, where, getDocs, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { useTheme } from '../hooks/useTheme';
@@ -94,12 +94,57 @@ const Profile: React.FC = () => {
         if (typeof d.isPrivate !== 'undefined') setIsPrivate(!!d.isPrivate);
       }
 
-      // Lectures récentes
+      // Lectures récentes - depuis readingProgress
       try {
-        const qReads = query(collection(db, 'reads'), where('uid', '==', user.uid));
-        const snapReads = await getDocs(qReads);
-        setRecentReads(snapReads.docs.map(d => ({ id: d.id, ...d.data() })));
-      } catch (e) {}
+        const readingProgressCol = collection(db, 'users', user.uid, 'readingProgress');
+        const snapReads = await getDocs(readingProgressCol);
+        
+        // Récupérer les données des livres pour chaque lecture
+        const readsWithDetails = await Promise.all(
+          snapReads.docs.map(async (d) => {
+            const data = d.data();
+            try {
+              // Récupérer les détails du livre depuis Firestore
+              const bookRef = doc(db, 'books', d.id);
+              const bookSnap = await getDoc(bookRef);
+              if (bookSnap.exists()) {
+                const bookData = bookSnap.data();
+                return {
+                  id: d.id,
+                  titre: data.bookTitle || bookData.title,
+                  couverture: bookData.coverImage,
+                  lastReadAt: data.lastReadAt,
+                  currentPage: data.currentPage,
+                  totalPages: data.totalPages,
+                  ...data
+                };
+              }
+            } catch (err) {
+              console.warn('Erreur lors de la récupération du livre:', err);
+            }
+            return {
+              id: d.id,
+              titre: data.bookTitle || 'Livre',
+              lastReadAt: data.lastReadAt,
+              ...data
+            };
+          })
+        );
+        
+        // Trier par date de dernière lecture (plus récent en premier)
+        const sortedReads = readsWithDetails
+          .filter(r => r.id) // Filtrer les entrées nulles
+          .sort((a, b) => {
+            const dateA = a.lastReadAt ? new Date(a.lastReadAt).getTime() : 0;
+            const dateB = b.lastReadAt ? new Date(b.lastReadAt).getTime() : 0;
+            return dateB - dateA;
+          })
+          .slice(0, 10); // Limiter aux 10 plus récents
+        
+        setRecentReads(sortedReads);
+      } catch (e) {
+        console.warn('Erreur chargement lectures récentes:', e);
+      }
 
       // Playlists
       try {
@@ -478,10 +523,37 @@ const Profile: React.FC = () => {
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {recentReads.map(r => (
-                <View key={String(r.id)} style={styles.bookCard}>
-                  <Image source={{ uri: r.couverture || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80' }} style={[styles.bookCover, { borderColor: theme.colors.border }]} />
-                  <Text style={[styles.bookTitle, { color: theme.colors.text }]} numberOfLines={2}>{r.titre || 'Titre'}</Text>
-                </View>
+                <TouchableOpacity 
+                  key={String(r.id)} 
+                  style={styles.bookCard}
+                  onPress={() => router.push(`../book/${r.id}`)}
+                >
+                  <Image 
+                    source={{ uri: r.couverture || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80' }} 
+                    style={[styles.bookCover, { borderColor: theme.colors.border }]} 
+                  />
+                  {r.currentPage && r.totalPages && (
+                    <View style={[styles.progressBar, { backgroundColor: theme.colors.surface }]}>
+                      <View 
+                        style={[
+                          styles.progressFill, 
+                          { 
+                            backgroundColor: theme.colors.primary,
+                            width: `${Math.min(100, (r.currentPage / r.totalPages) * 100)}%` 
+                          }
+                        ]} 
+                      />
+                    </View>
+                  )}
+                  <Text style={[styles.bookTitle, { color: theme.colors.text }]} numberOfLines={2}>
+                    {r.titre || 'Titre'}
+                  </Text>
+                  {r.currentPage && r.totalPages && (
+                    <Text style={[styles.readingProgress, { color: theme.colors.textSecondary }]}>
+                      {Math.round((r.currentPage / r.totalPages) * 100)}%
+                    </Text>
+                  )}
+                </TouchableOpacity>
               ))}
             </ScrollView>
           )}
@@ -912,6 +984,21 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 8,
     lineHeight: 18,
+  },
+  progressBar: {
+    height: 3,
+    borderRadius: 2,
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  readingProgress: {
+    fontSize: 11,
+    marginTop: 4,
+    fontWeight: '600',
   },
   playlistCard: {
     width: 140,
