@@ -135,6 +135,25 @@ const Profile: React.FC = () => {
     }
   };
 
+  const getPlatformIcon = (platform: string, iconName?: string): string => {
+    // Mapping des plateformes vers leurs icônes valides Ionicons
+    const platformIcons: Record<string, string> = {
+      'spotify': 'logo-spotify',
+      'apple': 'logo-apple',
+      'youtube': 'logo-youtube',
+      'deezer': 'disc',
+      'other': 'musical-notes'
+    };
+
+    // Si l'icône fournie est invalide (emoji ou caractère spécial), utiliser l'icône de la plateforme
+    if (iconName && !/^[a-z-]+$/.test(iconName)) {
+      // Les noms d'icônes Ionicons contiennent uniquement des lettres minuscules et des tirets
+      return platformIcons[platform] || 'musical-notes';
+    }
+
+    return iconName || platformIcons[platform] || 'musical-notes';
+  };
+
   const renderPlatformIcon = (platform: string, iconName: string) => {
     if (platform === 'apple' || platform === 'spotify' || platform === 'youtube' || platform === 'deezer') {
       return (
@@ -512,7 +531,7 @@ const Profile: React.FC = () => {
                   </View>
                   <View style={styles.playlistContent}>
                     <Ionicons 
-                      name={playlist.icon as any || 'musical-notes'} 
+                      name={getPlatformIcon(playlist.platform, playlist.icon) as any} 
                       size={40} 
                       color={getPlatformColor(playlist.platform)} 
                     />
@@ -976,6 +995,22 @@ const styles = StyleSheet.create({
   logoutText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  workCard: {
+    width: 110,
+    marginRight: 16,
+  },
+  workCover: {
+    width: 110,
+    height: 160,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  workTitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 8,
+    lineHeight: 18,
   },
 
   // Modal styles
