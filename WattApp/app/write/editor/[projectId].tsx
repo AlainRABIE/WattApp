@@ -293,7 +293,7 @@ const ModernTextEditor: React.FC = () => {
     {
       id: 'underline',
       name: 'Souligné',
-      icon: 'underline-outline',
+      icon: 'create-outline',
       action: () => richEditorRef.current?.setUnderline(),
     },
     {

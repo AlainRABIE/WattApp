@@ -94,10 +94,23 @@ const RichTextEditorComponent = forwardRef<RichTextEditorRef, RichTextEditorProp
         (richText.current as any)?.setHeading(level);
       },
       setTextAlign: (align: 'left' | 'center' | 'right' | 'justify') => {
-        if (align === 'left') (richText.current as any)?.setAlignLeft();
-        else if (align === 'center') (richText.current as any)?.setAlignCenter();
-        else if (align === 'right') (richText.current as any)?.setAlignRight();
-        else if (align === 'justify') (richText.current as any)?.setAlignFull();
+        // Utiliser sendAction pour exécuter les commandes d'alignement
+        const editor = richText.current as any;
+        if (!editor) return;
+        
+        try {
+          if (align === 'left') {
+            editor.sendAction?.('justifyLeft', 'result');
+          } else if (align === 'center') {
+            editor.sendAction?.('justifyCenter', 'result');
+          } else if (align === 'right') {
+            editor.sendAction?.('justifyRight', 'result');
+          } else if (align === 'justify') {
+            editor.sendAction?.('justifyFull', 'result');
+          }
+        } catch (error) {
+          console.log('Alignement non supporté:', error);
+        }
       },
       focusContentEditor: () => {
         richText.current?.focusContentEditor();
