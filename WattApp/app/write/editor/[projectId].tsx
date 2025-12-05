@@ -61,7 +61,7 @@ interface FormatAction {
 
 const ModernTextEditor: React.FC = () => {
   const router = useRouter();
-  const { projectId, mode } = useLocalSearchParams();
+  const { projectId, mode, projectTitle, projectGenre, isNewProject } = useLocalSearchParams();
   
   // Références
   const textInputRef = useRef<TextInput>(null);
@@ -71,7 +71,9 @@ const ModernTextEditor: React.FC = () => {
   
   // États principaux
   const [content, setContent] = useState('');
-  const [title, setTitle] = useState('Nouveau Chapitre');
+  const [title, setTitle] = useState(
+    typeof projectTitle === 'string' ? projectTitle : 'Nouveau Chapitre'
+  );
   const [settings, setSettings] = useState<EditorSettings>({
     fontSize: 16,
     lineHeight: 1.6,
@@ -120,6 +122,31 @@ const ModernTextEditor: React.FC = () => {
   const toolbarAnimation = useRef(new Animated.Value(1)).current;
   const statsAnimation = useRef(new Animated.Value(0)).current;
   const fadeAnimation = useRef(new Animated.Value(1)).current;
+
+  // Charger les données du projet au montage
+  useEffect(() => {
+    const loadProjectData = async () => {
+      if (!projectId) return;
+      
+      try {
+        // TODO: Charger le projet depuis Firebase
+        // const projectData = await getProjectById(projectId);
+        // if (projectData) {
+        //   setTitle(projectData.title);
+        //   setContent(projectData.content || '');
+        // }
+        
+        // Pour l'instant, on utilise les paramètres passés
+        if (isNewProject === 'true') {
+          console.log('Nouveau projet:', projectTitle);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement du projet:', error);
+      }
+    };
+
+    loadProjectData();
+  }, [projectId, projectTitle, isNewProject]);
 
   // Thèmes
   const themes = {
@@ -954,6 +981,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 12,
     flex: 1,
+    textAlign: 'center',
   },
   loadingIndicator: {
     transform: [{ rotate: '360deg' }],

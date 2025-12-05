@@ -83,7 +83,7 @@ const WritingDashboard: React.FC = () => {
   const creationTypes = [
     {
       id: 'book' as const,
-      title: 'Écrire un Livre',
+      title: 'Écrire un Livres',
       description: 'Romans, nouvelles, poésie et essais',
       icon: 'book-outline',
       gradient: ['#667eea', '#764ba2'],
@@ -270,51 +270,17 @@ const WritingDashboard: React.FC = () => {
   const loadProjects = async () => {
     setLoading(true);
     try {
-      // Simuler le chargement des projets depuis Firebase
-      const mockProjects: Project[] = [
-        {
-          id: '1',
-          title: 'Les Chroniques d\'Aetheria',
-          description: 'Une épopée fantasy dans un monde magique peuplé de créatures mystiques',
-          genre: 'Fantasy',
-          progress: 65,
-          lastEdited: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-          wordCount: 45000,
-          chaptersCount: 12,
-          status: 'writing',
-          tags: ['fantasy', 'magie', 'aventure'],
-          cover: 'https://picsum.photos/300/400?random=1'
-        },
-        {
-          id: '2',
-          title: 'Néon & Circuits',
-          description: 'Thriller cyberpunk dans une mégalopole futuriste',
-          genre: 'Science-fiction',
-          progress: 30,
-          lastEdited: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-          wordCount: 22000,
-          chaptersCount: 8,
-          status: 'writing',
-          tags: ['cyberpunk', 'technologie', 'dystopie'],
-          cover: 'https://picsum.photos/300/400?random=2'
-        },
-        {
-          id: '3',
-          title: 'Lettres à Luna',
-          description: 'Romance épistolaire entre deux âmes perdues',
-          genre: 'Romance',
-          progress: 85,
-          lastEdited: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-          wordCount: 67000,
-          chaptersCount: 20,
-          status: 'editing',
-          tags: ['romance', 'lettres', 'émotions'],
-          cover: 'https://picsum.photos/300/400?random=3'
-        }
-      ];
+      // TODO: Charger les projets depuis Firebase
+      // const userProjects = await getFirestoreProjects();
+      // Pour l'instant, on initialise avec un tableau vide
+      const userProjects: Project[] = [];
 
-      setProjects(mockProjects);
-      setRecentProjects(mockProjects.slice(0, 2));
+      setProjects(userProjects);
+      // Trier par date de dernière modification et prendre les 2 plus récents
+      const sorted = [...userProjects].sort((a, b) => 
+        b.lastEdited.getTime() - a.lastEdited.getTime()
+      );
+      setRecentProjects(sorted.slice(0, 2));
     } catch (error) {
       console.error('Erreur lors du chargement des projets:', error);
     } finally {
@@ -601,15 +567,15 @@ const WritingDashboard: React.FC = () => {
                   
                   <View style={styles.mangaStatsRow}>
                     <View style={styles.mangaStat}>
-                      <Text style={styles.mangaStatNumber}>12</Text>
+                      <Text style={styles.mangaStatNumber}>0</Text>
                       <Text style={styles.mangaStatLabel}>Pages</Text>
                     </View>
                     <View style={styles.mangaStat}>
-                      <Text style={styles.mangaStatNumber}>3</Text>
+                      <Text style={styles.mangaStatNumber}>0</Text>
                       <Text style={styles.mangaStatLabel}>Chapitres</Text>
                     </View>
                     <View style={styles.mangaStat}>
-                      <Text style={styles.mangaStatNumber}>45</Text>
+                      <Text style={styles.mangaStatNumber}>0</Text>
                       <Text style={styles.mangaStatLabel}>Followers</Text>
                     </View>
                   </View>
@@ -702,7 +668,7 @@ const WritingDashboard: React.FC = () => {
         {selectedWritingType && (
           <>
             {/* Projets récents */}
-            {recentProjects.length > 0 && (
+            {recentProjects.length > 0 ? (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <Text style={styles.sectionTitle}>Continuer l'écriture</Text>
@@ -719,6 +685,48 @@ const WritingDashboard: React.FC = () => {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.projectsList}
                 />
+              </View>
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                <LinearGradient
+                  colors={['#667eea', '#764ba2']}
+                  style={styles.emptyStateGradient}
+                >
+                  <Ionicons 
+                    name={selectedWritingType === 'manga' ? 'brush-outline' : 'create-outline'} 
+                    size={80} 
+                    color="rgba(255,255,255,0.9)" 
+                  />
+                  <Text style={styles.emptyStateTitle}>
+                    {selectedWritingType === 'manga' 
+                      ? '🎨 Votre première page vous attend'
+                      : '✨ Chaque grand roman commence par un premier mot'
+                    }
+                  </Text>
+                  <Text style={styles.emptyStateQuote}>
+                    {selectedWritingType === 'manga'
+                      ? '"L\'art du manga est l\'art de raconter des histoires avec des images."'
+                      : '"Il n\'y a rien de plus angoissant qu\'une page blanche... et rien de plus excitant."'
+                    }
+                  </Text>
+                  <Text style={styles.emptyStateAuthor}>
+                    {selectedWritingType === 'manga' ? '— Osamu Tezuka' : '— Ernest Hemingway'}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.emptyStateButton}
+                    onPress={() => setShowQuickActions(true)}
+                  >
+                    <LinearGradient
+                      colors={['#FFA94D', '#FF8A65']}
+                      style={styles.emptyStateButtonGradient}
+                    >
+                      <Ionicons name="add-circle-outline" size={24} color="#fff" />
+                      <Text style={styles.emptyStateButtonText}>
+                        {selectedWritingType === 'manga' ? 'Créer mon premier manga' : 'Commencer à écrire'}
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </LinearGradient>
               </View>
             )}
           </>
@@ -766,10 +774,11 @@ const WritingDashboard: React.FC = () => {
             </View>
 
             {/* Liste des projets */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>
-                {selectedWritingType === 'manga' ? 'Mes Mangas' : 'Mes Projets'}
-              </Text>
+            {filteredProjects.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>
+                  {selectedWritingType === 'manga' ? 'Mes Mangas' : 'Mes Projets'}
+                </Text>
           
           {filteredProjects.map((project, index) => (
             <TouchableOpacity
@@ -809,7 +818,8 @@ const WritingDashboard: React.FC = () => {
               </View>
             </TouchableOpacity>
           ))}
-            </View>
+              </View>
+            )}
           </>
         )}
 
@@ -1569,6 +1579,63 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     lineHeight: 16,
+  },
+
+  // État vide (Empty State)
+  emptyStateContainer: {
+    marginHorizontal: 20,
+    marginVertical: 32,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  emptyStateGradient: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 400,
+  },
+  emptyStateTitle: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 24,
+    marginBottom: 20,
+    lineHeight: 32,
+  },
+  emptyStateQuote: {
+    color: 'rgba(255, 255, 255, 0.95)',
+    fontSize: 16,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 20,
+    lineHeight: 24,
+  },
+  emptyStateAuthor: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  emptyStateButton: {
+    borderRadius: 25,
+    overflow: 'hidden',
+    width: '100%',
+    maxWidth: 300,
+  },
+  emptyStateButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    gap: 12,
+  },
+  emptyStateButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 
