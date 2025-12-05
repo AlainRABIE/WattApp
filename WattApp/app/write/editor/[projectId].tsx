@@ -19,6 +19,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import AIWritingAssistant from '../../components/AIWritingAssistant';
+import RichTextEditor, { RichTextEditorRef } from '../components/RichTextEditor';
 
 const { width, height } = Dimensions.get('window');
 
@@ -65,6 +66,7 @@ const ModernTextEditor: React.FC = () => {
   
   // Références
   const textInputRef = useRef<TextInput>(null);
+  const richEditorRef = useRef<RichTextEditorRef>(null);
   const autoSaveTimeoutRef = useRef<any>(null);
   const cursorPositionRef = useRef(0);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -100,6 +102,11 @@ const ModernTextEditor: React.FC = () => {
   const [selectionStart, setSelectionStart] = useState(0);
   const [selectionEnd, setSelectionEnd] = useState(0);
   const [showAIButton, setShowAIButton] = useState(false);
+  
+  // États de formatage de texte
+  const [textColor, setTextColor] = useState('#ffffff');
+  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
+  const [isItalic, setIsItalic] = useState(false);
   
   // États des statistiques
   const [stats, setStats] = useState<WritingStats>({
@@ -274,49 +281,56 @@ const ModernTextEditor: React.FC = () => {
       id: 'bold',
       name: 'Gras',
       icon: 'text',
-      action: () => insertFormat('**', '**'),
+      action: () => richEditorRef.current?.setBold(),
     },
     {
       id: 'italic',
       name: 'Italique',
       icon: 'text-outline',
-      action: () => insertFormat('*', '*'),
+      action: () => richEditorRef.current?.setItalic(),
+      isActive: isItalic,
     },
     {
-      id: 'quote',
-      name: 'Citation',
-      icon: 'chatbox-outline',
-      action: () => insertFormat('> ', ''),
+      id: 'underline',
+      name: 'Souligné',
+      icon: 'underline-outline',
+      action: () => richEditorRef.current?.setUnderline(),
     },
     {
-      id: 'list',
-      name: 'Liste',
-      icon: 'list-outline',
-      action: () => insertFormat('- ', ''),
+      id: 'align-left',
+      name: 'Aligner à gauche',
+      icon: 'reorder-three-outline',
+      action: () => {
+        richEditorRef.current?.setTextAlign('left');
+        setTextAlign('left');
+      },
+      isActive: textAlign === 'left',
     },
     {
-      id: 'heading',
-      name: 'Titre',
-      icon: 'document-text-outline',
-      action: () => insertFormat('# ', ''),
+      id: 'align-center',
+      name: 'Centrer',
+      icon: 'reorder-two-outline',
+      action: () => {
+        richEditorRef.current?.setTextAlign('center');
+        setTextAlign('center');
+      },
+      isActive: textAlign === 'center',
+    },
+    {
+      id: 'align-right',
+      name: 'Aligner à droite',
+      icon: 'reorder-four-outline',
+      action: () => {
+        richEditorRef.current?.setTextAlign('right');
+        setTextAlign('right');
+      },
+      isActive: textAlign === 'right',
     },
     {
       id: 'color',
       name: 'Couleur',
       icon: 'color-palette-outline',
       action: () => setShowColorPicker(true),
-    },
-    {
-      id: 'highlight',
-      name: 'Surligner',
-      icon: 'brush-outline',
-      action: () => insertFormat('<mark style="background-color: #FFEAA7;">', '</mark>'),
-    },
-    {
-      id: 'underline',
-      name: 'Souligner',
-      icon: 'text',
-      action: () => insertFormat('<u>', '</u>'),
     },
   ];
 
@@ -339,15 +353,12 @@ const ModernTextEditor: React.FC = () => {
     }, 10);
   };
 
-  // Application de couleur au texte sélectionné
+  // Application de couleur au texte
   const applyColor = (color: string) => {
-    if (selectedText.trim() === '') {
-      // Si aucun texte n'est sélectionné, insérer un placeholder
-      insertFormat(`<span style="color: ${color};">`, '</span>');
-    } else {
-      // Appliquer la couleur au texte sélectionné
-      insertFormat(`<span style="color: ${color};">`, '</span>');
-    }
+    // Appliquer la couleur au texte
+    // Si du texte est sélectionné dans l'éditeur riche, il sera coloré
+    // Sinon, la couleur s'appliquera au prochain texte saisi
+    richEditorRef.current?.setForeColor(color);
     setSelectedColor(color);
     setShowColorPicker(false);
   };
@@ -423,15 +434,43 @@ const ModernTextEditor: React.FC = () => {
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View style={styles.toolbarContent}>
           {/* Actions de formatage */}
-          {formatActions.map((action) => (
-            <TouchableOpacity
-              key={action.id}
-              style={[styles.toolbarButton, { borderColor: currentTheme.border }]}
-              onPress={action.action}
-            >
-              <Ionicons name={action.icon as any} size={18} color={currentTheme.accent} />
-            </TouchableOpacity>
-          ))}
+          {formatActions.map((action) => {
+            const isColorButton = action.id === 'color';
+            return (
+              <TouchableOpacity
+                key={action.id}
+                style={[
+                  styles.toolbarButton, 
+                  { borderColor: currentTheme.border },
+                  action.isActive && { backgroundColor: currentTheme.accent },
+                  // Afficher la couleur sélectionnée en fond pour la palette
+                  isColorButton && { 
+                    backgroundColor: selectedColor,
+                    borderWidth: 2,
+                    borderColor: '#ffffff',
+                    shadowColor: selectedColor,
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.5,
+                    shadowRadius: 4,
+                    elevation: 4,
+                  },
+                ]}
+                onPress={action.action}
+              >
+                <Ionicons 
+                  name={action.icon as any} 
+                  size={18} 
+                  color={
+                    isColorButton
+                      ? '#ffffff' // Toujours blanc pour le contraste avec la couleur de fond
+                      : action.isActive 
+                        ? currentTheme.background 
+                        : currentTheme.accent
+                  } 
+                />
+              </TouchableOpacity>
+            );
+          })}
           
           <View style={[styles.toolbarSeparator, { backgroundColor: currentTheme.border }]} />
           
@@ -751,129 +790,29 @@ const ModernTextEditor: React.FC = () => {
 
       {/* Zone d'écriture */}
       <View style={styles.editorContainer}>
-        <ScrollView
-          ref={scrollViewRef}
-          style={[styles.scrollView, settings.focusMode && styles.focusedScrollView]}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          <TextInput
-            ref={textInputRef}
-            style={[
-              styles.textInput,
-              {
-                color: currentTheme.text,
-                fontSize: settings.fontSize,
-                lineHeight: settings.fontSize * settings.lineHeight,
-                fontFamily: settings.fontFamily,
-              },
-              settings.typewriterMode && [styles.typewriterMode, { backgroundColor: currentTheme.surface }],
-              settings.focusMode && styles.focusedTextInput,
-            ]}
-            value={content}
-            onChangeText={handleContentChange}
-            onSelectionChange={(event) => {
-              const { start, end } = event.nativeEvent.selection;
-              setCursorPosition(start);
-              setSelectionStart(start);
-              setSelectionEnd(end);
-              
-              // Afficher le bouton IA si du texte est sélectionné
-              if (start !== end) {
-                const selected = content.substring(start, end);
-                setSelectedText(selected);
-                setShowAIButton(true);
-              } else {
-                setSelectedText('');
-                setShowAIButton(false);
-              }
-            }}
-            placeholder={
-              settings.focusMode 
-                ? "Laissez vos pensées s'écouler..."
-                : "Commencez à écrire votre histoire..."
-            }
-            placeholderTextColor={currentTheme.textSecondary}
-            multiline
-            textAlignVertical="top"
-            autoCapitalize="sentences"
-            autoCorrect
-            spellCheck
-            scrollEnabled={false}
-            textContentType="none"
-            maxLength={settings.typewriterMode ? undefined : 100000}
-          />
-        </ScrollView>
+        <RichTextEditor
+          ref={richEditorRef}
+          initialContent={content}
+          placeholder={
+            settings.focusMode 
+              ? "Laissez vos pensées s'écouler..."
+              : "Commencez à écrire votre histoire..."
+          }
+          onChangeText={handleContentChange}
+          backgroundColor={currentTheme.background}
+          textColor={textColor}
+          placeholderColor={currentTheme.textSecondary}
+          fontSize={settings.fontSize}
+          fontFamily={settings.fontFamily}
+          lineHeight={settings.lineHeight}
+          editorStyle={settings.focusMode ? styles.focusedTextInput : undefined}
+        />
       </View>
 
       {/* Statistiques */}
       {showStats && renderStats()}
 
-      {/* Sélecteur de couleurs */}
-      {showColorPicker && (
-        <Modal visible={showColorPicker} animationType="fade" transparent statusBarTranslucent>
-          <BlurView intensity={50} style={styles.modalOverlay}>
-            <View style={[styles.colorPickerModal, { backgroundColor: currentTheme.background }]}>
-              <View style={[styles.colorPickerHeader, { borderBottomColor: currentTheme.border }]}>
-                <Text style={[styles.colorPickerTitle, { color: currentTheme.text }]}>
-                  Choisir une couleur
-                </Text>
-                <TouchableOpacity onPress={() => setShowColorPicker(false)}>
-                  <Ionicons name="close" size={24} color={currentTheme.accent} />
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.colorPickerContent}>
-                <Text style={[styles.colorPickerSubtitle, { color: currentTheme.textSecondary }]}>
-                  Couleurs prédéfinies
-                </Text>
-                
-                <View style={styles.colorGrid}>
-                  {colorPalette.map((color, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={[
-                        styles.colorOption,
-                        { backgroundColor: color },
-                        selectedColor === color && { 
-                          borderColor: currentTheme.accent, 
-                          borderWidth: 3,
-                          transform: [{ scale: 1.1 }] 
-                        }
-                      ]}
-                      onPress={() => applyColor(color)}
-                    >
-                      {selectedColor === color && (
-                        <Ionicons name="checkmark" size={20} color="#fff" />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                
-                <View style={styles.colorPickerActions}>
-                  <TouchableOpacity
-                    style={[styles.colorPickerButton, { backgroundColor: currentTheme.surface }]}
-                    onPress={() => setShowColorPicker(false)}
-                  >
-                    <Text style={[styles.colorPickerButtonText, { color: currentTheme.textSecondary }]}>
-                      Annuler
-                    </Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={[styles.colorPickerButton, { backgroundColor: currentTheme.accent }]}
-                    onPress={() => applyColor(selectedColor)}
-                  >
-                    <Text style={[styles.colorPickerButtonText, { color: currentTheme.background }]}>
-                      Appliquer
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </BlurView>
-        </Modal>
-      )}
+      {/* Sélecteur de couleurs - Voir la modal principale plus bas */}
 
       {/* Bouton IA flottant lors de la sélection */}
       {showAIButton && selectedText && (
@@ -941,6 +880,61 @@ const ModernTextEditor: React.FC = () => {
 
       {/* Paramètres */}
       {renderSettings()}
+
+      {/* Sélecteur de couleur */}
+      <Modal
+        visible={showColorPicker}
+        animationType="fade"
+        transparent
+        statusBarTranslucent
+      >
+        <BlurView intensity={50} style={styles.modalOverlay}>
+          <View style={[styles.colorPickerModal, { backgroundColor: currentTheme.surface }]}>
+            <View style={[styles.colorPickerHeader, { borderBottomColor: currentTheme.border }]}>
+              <Text style={[styles.colorPickerTitle, { color: currentTheme.text }]}>
+                Choisir une couleur
+              </Text>
+              <TouchableOpacity onPress={() => setShowColorPicker(false)}>
+                <Ionicons name="close" size={24} color={currentTheme.accent} />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.colorPickerContent}>
+              <Text style={[styles.colorPickerSubtitle, { color: currentTheme.textSecondary }]}>
+                Sélectionnez la couleur de votre texte
+              </Text>
+              
+              <View style={styles.colorGrid}>
+                {colorPalette.map((color) => (
+                  <TouchableOpacity
+                    key={color}
+                    style={[
+                      styles.colorOption,
+                      { backgroundColor: color },
+                      selectedColor === color && { 
+                        borderWidth: 3, 
+                        borderColor: currentTheme.accent 
+                      }
+                    ]}
+                    onPress={() => applyColor(color)}
+                  >
+                    {selectedColor === color && (
+                      <Ionicons name="checkmark" size={24} color="#fff" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TouchableOpacity
+                style={[styles.colorOption, { backgroundColor: '#ffffff', marginTop: 16 }]}
+                onPress={() => applyColor('#ffffff')}
+              >
+                <Text style={{ color: '#000', fontWeight: 'bold' }}>Blanc</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </BlurView>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
