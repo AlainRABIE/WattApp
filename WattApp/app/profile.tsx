@@ -529,13 +529,13 @@ const Profile: React.FC = () => {
                   onPress={() => router.push(`../book/${r.id}`)}
                 >
                   <Image 
-                    source={{ uri: r.couverture || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80' }} 
+                    source={{ uri: typeof r.couverture === 'string' ? r.couverture : 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80' }} 
                     style={[styles.bookCover, { borderColor: theme.colors.border }]} 
                   />
-                  {r.currentPage && r.totalPages && (
-                    <View style={[styles.progressBar, { backgroundColor: theme.colors.surface }]}>
+                  {(typeof r.currentPage === 'number' && typeof r.totalPages === 'number' && r.totalPages > 0) && (
+                    <View style={[styles.progressBar, { backgroundColor: theme.colors.surface }]}> 
                       <View 
-                        style={[
+                        style={[ 
                           styles.progressFill, 
                           { 
                             backgroundColor: theme.colors.primary,
@@ -546,10 +546,10 @@ const Profile: React.FC = () => {
                     </View>
                   )}
                   <Text style={[styles.bookTitle, { color: theme.colors.text }]} numberOfLines={2}>
-                    {r.titre || 'Titre'}
+                    {typeof r.titre === 'string' ? r.titre : String(r.titre) || 'Titre'}
                   </Text>
-                  {r.currentPage && r.totalPages && (
-                    <Text style={[styles.readingProgress, { color: theme.colors.textSecondary }]}>
+                  {(typeof r.currentPage === 'number' && typeof r.totalPages === 'number' && r.totalPages > 0) && (
+                    <Text style={[styles.readingProgress, { color: theme.colors.textSecondary }]}> 
                       {Math.round((r.currentPage / r.totalPages) * 100)}%
                     </Text>
                   )}

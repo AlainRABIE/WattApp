@@ -1,4 +1,4 @@
-import React, { useRef, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, forwardRef, useImperativeHandle, useEffect } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { RichEditor, RichToolbar, actions } from 'react-native-pell-rich-editor';
 
@@ -15,6 +15,8 @@ export interface RichTextEditorRef {
   setStrikethrough: () => void;
   setHeading: (level: number) => void;
   setTextAlign: (align: 'left' | 'center' | 'right' | 'justify') => void;
+  updateFontSize: (size: number) => void;
+  setFontSizeForSelection: (size: number) => void;
   focusContentEditor: () => void;
   blurContentEditor: () => void;
 }
@@ -112,6 +114,24 @@ const RichTextEditorComponent = forwardRef<RichTextEditorRef, RichTextEditorProp
           console.log('Alignement non supporté:', error);
         }
       },
+      updateFontSize: (size: number) => {
+        // Mettre à jour la taille de police globale via CSS
+        const editor = richText.current as any;
+        // Note: Ceci change le style CSS global, pas le contenu HTML
+      },
+      setFontSizeForSelection: async (size: number) => {
+        // Obtenir le HTML actuel, modifier et remettre
+        const editor = richText.current;
+        if (!editor) return;
+        
+        try {
+          // Utiliser insertHTML pour ajouter un span avec la taille
+          const htmlToInsert = `<span style="font-size: ${size}px;">TEXTE_TEMPORAIRE</span>`;
+          (editor as any).insertHTML?.(htmlToInsert);
+        } catch (e) {
+          console.log('Erreur insertion HTML:', e);
+        }
+      },
       focusContentEditor: () => {
         richText.current?.focusContentEditor();
       },
@@ -144,6 +164,42 @@ const RichTextEditorComponent = forwardRef<RichTextEditorRef, RichTextEditorProp
         richText.current?.setContentHTML(initialContent);
       }
     };
+
+    // Mettre à jour la taille de police quand elle change
+    useEffect(() => {
+      const editor = richText.current as any;
+      if (editor?.webview?.current) {
+        editor.webview.current.injectJavaScript(`
+          var content = document.getElementById('content');
+          if (content) {
+            content.style.fontSize = '${fontSize}px';
+          }
+          var pellContent = document.querySelector('.pell-content');
+          if (pellContent) {
+            pellContent.style.fontSize = '${fontSize}px';
+          }
+          true;
+        `);
+      }
+    }, [fontSize]);
+
+    // Mettre à jour la police quand elle change
+    useEffect(() => {
+      const editor = richText.current as any;
+      if (editor?.webview?.current) {
+        editor.webview.current.injectJavaScript(`
+          var content = document.getElementById('content');
+          if (content) {
+            content.style.fontFamily = '${fontFamily}, serif';
+          }
+          var pellContent = document.querySelector('.pell-content');
+          if (pellContent) {
+            pellContent.style.fontFamily = '${fontFamily}, serif';
+          }
+          true;
+        `);
+      }
+    }, [fontFamily]);
 
     return (
       <View style={styles.container}>

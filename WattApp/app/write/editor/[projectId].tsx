@@ -98,6 +98,7 @@ const ModernTextEditor: React.FC = () => {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [selectedText, setSelectedText] = useState('');
   const [selectedColor, setSelectedColor] = useState('#FF6B6B');
+  const [showFontPicker, setShowFontPicker] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [selectionStart, setSelectionStart] = useState(0);
   const [selectionEnd, setSelectionEnd] = useState(0);
@@ -211,6 +212,20 @@ const ModernTextEditor: React.FC = () => {
     '#F8C471', // Pêche
     '#D2B4DE', // Mauve
     '#A9DFBF', // Vert pastel
+  ];
+
+  // Liste des polices disponibles
+  const fontFamilies = [
+    { name: 'Georgia', label: 'Georgia (Classique)', style: 'serif' },
+    { name: 'Times New Roman', label: 'Times New Roman', style: 'serif' },
+    { name: 'Arial', label: 'Arial (Moderne)', style: 'sans-serif' },
+    { name: 'Helvetica', label: 'Helvetica', style: 'sans-serif' },
+    { name: 'Courier New', label: 'Courier (Machine à écrire)', style: 'monospace' },
+    { name: 'Verdana', label: 'Verdana (Lisible)', style: 'sans-serif' },
+    { name: 'Palatino', label: 'Palatino (Élégante)', style: 'serif' },
+    { name: 'Garamond', label: 'Garamond (Littéraire)', style: 'serif' },
+    { name: 'Comic Sans MS', label: 'Comic Sans (Ludique)', style: 'cursive' },
+    { name: 'Impact', label: 'Impact (Bold)', style: 'sans-serif' },
   ];
 
   // Calcul des statistiques
@@ -331,6 +346,12 @@ const ModernTextEditor: React.FC = () => {
       name: 'Couleur',
       icon: 'color-palette-outline',
       action: () => setShowColorPicker(true),
+    },
+    {
+      id: 'font',
+      name: 'Police',
+      icon: 'text',
+      action: () => setShowFontPicker(true),
     },
   ];
 
@@ -477,17 +498,29 @@ const ModernTextEditor: React.FC = () => {
           {/* Contrôles de police */}
           <TouchableOpacity
             style={[styles.toolbarButton, { borderColor: currentTheme.border }]}
-            onPress={() => updateSettings('fontSize', Math.min(24, settings.fontSize + 1))}
+            onPress={() => {
+              const newSize = Math.max(12, settings.fontSize - 1);
+              updateSettings('fontSize', newSize);
+            }}
           >
-            <Ionicons name="add" size={18} color={currentTheme.accent} />
+            <Ionicons name="remove" size={18} color={currentTheme.accent} />
             <Text style={[styles.toolbarButtonText, { color: currentTheme.accent }]}>A</Text>
           </TouchableOpacity>
           
+          <View style={[styles.fontSizeDisplay, { borderColor: currentTheme.border }]}>
+            <Text style={[styles.fontSizeText, { color: currentTheme.text }]}>
+              {settings.fontSize}
+            </Text>
+          </View>
+          
           <TouchableOpacity
             style={[styles.toolbarButton, { borderColor: currentTheme.border }]}
-            onPress={() => updateSettings('fontSize', Math.max(12, settings.fontSize - 1))}
+            onPress={() => {
+              const newSize = Math.min(24, settings.fontSize + 1);
+              updateSettings('fontSize', newSize);
+            }}
           >
-            <Ionicons name="remove" size={18} color={currentTheme.accent} />
+            <Ionicons name="add" size={18} color={currentTheme.accent} />
             <Text style={[styles.toolbarButtonText, { color: currentTheme.accent }]}>A</Text>
           </TouchableOpacity>
           
@@ -652,26 +685,6 @@ const ModernTextEditor: React.FC = () => {
                     <TouchableOpacity
                       style={[styles.fontButton, { backgroundColor: currentTheme.surface }]}
                       onPress={() => updateSettings('fontSize', Math.min(24, settings.fontSize + 1))}
-                    >
-                      <Ionicons name="add" size={16} color={currentTheme.accent} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-                
-                <View style={styles.fontControl}>
-                  <Text style={[styles.settingLabel, { color: currentTheme.textSecondary }]}>
-                    Interligne: {settings.lineHeight}
-                  </Text>
-                  <View style={styles.fontButtons}>
-                    <TouchableOpacity
-                      style={[styles.fontButton, { backgroundColor: currentTheme.surface }]}
-                      onPress={() => updateSettings('lineHeight', Math.max(1.2, settings.lineHeight - 0.1))}
-                    >
-                      <Ionicons name="remove" size={16} color={currentTheme.accent} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.fontButton, { backgroundColor: currentTheme.surface }]}
-                      onPress={() => updateSettings('lineHeight', Math.min(2.0, settings.lineHeight + 0.1))}
                     >
                       <Ionicons name="add" size={16} color={currentTheme.accent} />
                     </TouchableOpacity>
@@ -935,6 +948,76 @@ const ModernTextEditor: React.FC = () => {
           </View>
         </BlurView>
       </Modal>
+
+      {/* Sélecteur de police */}
+      <Modal
+        visible={showFontPicker}
+        animationType="fade"
+        transparent
+        statusBarTranslucent
+      >
+        <BlurView intensity={50} style={styles.modalOverlay}>
+          <View style={[styles.colorPickerModal, { backgroundColor: currentTheme.surface }]}>
+            <View style={[styles.colorPickerHeader, { borderBottomColor: currentTheme.border }]}>
+              <Text style={[styles.colorPickerTitle, { color: currentTheme.text }]}>
+                Choisir une police
+              </Text>
+              <TouchableOpacity onPress={() => setShowFontPicker(false)}>
+                <Ionicons name="close" size={24} color={currentTheme.accent} />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.colorPickerContent}>
+              <Text style={[styles.colorPickerSubtitle, { color: currentTheme.textSecondary }]}>
+                Sélectionnez la police d'écriture
+              </Text>
+              
+              <View style={styles.fontList}>
+                {fontFamilies.map((font) => (
+                  <TouchableOpacity
+                    key={font.name}
+                    style={[
+                      styles.fontOption,
+                      { backgroundColor: currentTheme.background },
+                      settings.fontFamily === font.name && { 
+                        borderWidth: 2, 
+                        borderColor: currentTheme.accent,
+                        backgroundColor: 'rgba(255, 169, 77, 0.1)'
+                      }
+                    ]}
+                    onPress={() => {
+                      updateSettings('fontFamily', font.name);
+                      setShowFontPicker(false);
+                    }}
+                  >
+                    <Text style={[
+                      styles.fontOptionText, 
+                      { 
+                        color: currentTheme.text,
+                        fontFamily: Platform.OS === 'ios' ? font.name : undefined
+                      }
+                    ]}>
+                      {font.label}
+                    </Text>
+                    <Text style={[
+                      styles.fontPreview,
+                      { 
+                        color: currentTheme.textSecondary,
+                        fontFamily: Platform.OS === 'ios' ? font.name : undefined
+                      }
+                    ]}>
+                      Abc 123
+                    </Text>
+                    {settings.fontFamily === font.name && (
+                      <Ionicons name="checkmark-circle" size={24} color={currentTheme.accent} />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        </BlurView>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -1007,6 +1090,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginLeft: 4,
+  },
+  fontSizeDisplay: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginRight: 8,
+    minWidth: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fontSizeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   toolbarSeparator: {
     width: 1,
@@ -1304,6 +1401,31 @@ const styles = StyleSheet.create({
   colorPickerButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  
+  // Font Picker Styles
+  fontList: {
+    gap: 12,
+    marginTop: 8,
+  },
+  fontOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+    marginBottom: 8,
+  },
+  fontOptionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+  },
+  fontPreview: {
+    fontSize: 18,
+    marginRight: 12,
   },
 });
 
