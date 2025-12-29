@@ -1,11 +1,14 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
+import StorageService from '../../services/StorageService';
 
 export interface PDFBookData {
   id: string;
   title: string;
-  filePath: string; // URI du PDF original
+  filePath: string; // URI du PDF original (local)
+  firebaseUrl?: string; // URL Firebase Storage du PDF
   coverImagePath?: string; // URI de l'image de couverture locale
+  coverImageUrl?: string; // URL Firebase Storage de la couverture
   pagesImagePaths?: string[]; // URIs des images de chaque page
   totalPages?: number; // Nombre total de pages
   downloadedAt: number;
@@ -78,6 +81,56 @@ export class NativePDFService {
       };
     } catch (error) {
       console.error('Erreur lors du téléchargement PDF:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Upload un PDF vers Firebase Storage et retourne l'URL
+   */
+  static async uploadPDFToFirebase(
+    localPdfUri: string,
+    bookId: string,
+    userId: string,
+    onProgress?: (progress: any) => void
+  ): Promise<string> {
+    try {
+      console.log('☁️ Upload PDF vers Firebase Storage...');
+      const firebaseUrl = await StorageService.uploadBookPDF(
+        localPdfUri,
+        bookId,
+        userId,
+        onProgress
+      );
+      console.log('✅ PDF uploadé:', firebaseUrl);
+      return firebaseUrl;
+    } catch (error) {
+      console.error('Erreur uploadPDFToFirebase:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Upload une couverture vers Firebase Storage
+   */
+  static async uploadCoverToFirebase(
+    coverUri: string,
+    bookId: string,
+    userId: string,
+    onProgress?: (progress: any) => void
+  ): Promise<string> {
+    try {
+      console.log('☁️ Upload couverture vers Firebase Storage...');
+      const firebaseUrl = await StorageService.uploadBookCover(
+        coverUri,
+        bookId,
+        userId,
+        onProgress
+      );
+      console.log('✅ Couverture uploadée:', firebaseUrl);
+      return firebaseUrl;
+    } catch (error) {
+      console.error('Erreur uploadCoverToFirebase:', error);
       throw error;
     }
   }

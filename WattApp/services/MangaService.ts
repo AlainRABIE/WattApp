@@ -16,6 +16,7 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 import { db } from '../constants/firebaseConfig';
+import StorageService from './StorageService';
 
 export interface MangaProject {
   id: string;
@@ -192,19 +193,12 @@ class MangaService {
 
   async deleteMangaProject(projectId: string): Promise<void> {
     try {
-      // Delete associated files from storage
+      // Get the project to access userId
       const project = await this.getMangaProject(projectId);
+      
       if (project) {
-        if (project.coverImageUrl) {
-          await this.deleteFile(project.coverImageUrl);
-        }
-        
-        // Delete page images
-        for (const page of project.pages) {
-          if (page.imageUrl) {
-            await this.deleteFile(page.imageUrl);
-          }
-        }
+        // Delete all associated files from storage
+        await this.deleteMangaFiles(projectId, project.userId);
       }
       
       // Delete the document
@@ -324,44 +318,35 @@ class MangaService {
     }
   }
 
-  // File storage operations - DISABLED (no Firebase Storage)
-  async uploadFile(file: Blob, path: string): Promise<string> {
-    /*
-    try {
-      const storageRef = ref(storage, path);
-      const snapshot = await uploadBytes(storageRef, file);
-      return await getDownloadURL(snapshot.ref);
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      throw error;
-    }
-    */
-    throw new Error('File upload disabled - no Firebase Storage');
-  }
-
+  // File storage operations with Firebase Storage
   async deleteFile(url: string): Promise<void> {
-    /*
-    try {
-      const storageRef = ref(storage, url);
-      await deleteObject(storageRef);
-    } catch (error) {
-      console.error('Error deleting file:', error);
-      // Don't throw error for file deletion failures
-    }
-    */
-    console.warn('File deletion disabled - no Firebase Storage');
+    return StorageService.deleteFile(url);
   }
 
   // Cover image upload
-  async uploadCoverImage(projectId: string, imageBlob: Blob): Promise<string> {
-    const path = `manga/${projectId}/cover.jpg`;
-    return await this.uploadFile(imageBlob, path);
+  async uploadCoverImage(
+    uri: string, 
+    mangaId: string, 
+    userId: string,
+    onProgress?: (progress: any) => void
+  ): Promise<string> {
+    return StorageService.uploadMangaCover(uri, mangaId, userId, onProgress);
   }
 
   // Page image upload
-  async uploadPageImage(projectId: string, pageNumber: number, imageBlob: Blob): Promise<string> {
-    const path = `manga/${projectId}/pages/page_${pageNumber}.jpg`;
-    return await this.uploadFile(imageBlob, path);
+  async uploadPageImage(
+    uri: string, 
+    mangaId: string, 
+    userId: string, 
+    pageNumber: number,
+    onProgress?: (progress: any) => void
+  ): Promise<string> {
+    return StorageService.uploadMangaPage(uri, mangaId, userId, pageNumber, onProgress);
+  }
+
+  // Delete all files for a manga
+  async deleteMangaFiles(mangaId: string, userId: string): Promise<void> {
+    return StorageService.deleteMangaFiles(mangaId, userId);
   }
 
   // Analytics

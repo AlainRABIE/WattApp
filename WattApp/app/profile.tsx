@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Linking, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { ThemeSelector } from './components/ThemeSelector';
 import { useTheme } from '../hooks/useTheme';
+import OpenSourceBooksService from '../services/OpenSourceBooksService';
 
 const Profile: React.FC = () => {
   const router = useRouter();
@@ -29,6 +30,9 @@ const Profile: React.FC = () => {
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [showThemeSelector, setShowThemeSelector] = useState(false);
   const { theme } = useTheme();
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0, bookTitle: '' });
 
   useEffect(() => {
     const load = async () => await loadProfile();
@@ -478,6 +482,70 @@ const Profile: React.FC = () => {
           )}
         </View>
 
+        {/* Bouton Import Livres Open Source */}
+        <TouchableOpacity
+          style={{
+            backgroundColor: '#4CAF50',
+            padding: 14,
+            borderRadius: 8,
+            alignItems: 'center',
+            marginHorizontal: 24,
+            marginTop: 24,
+            marginBottom: 12,
+            flexDirection: 'row',
+            justifyContent: 'center',
+          }}
+          onPress={() => setShowImportModal(true)}
+        >
+          <Ionicons name="book-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Importer des livres gratuits (Test)</Text>
+        </TouchableOpacity>
+
+        {/* Bouton pour migrer la photo de profil */}
+        <TouchableOpacity
+          style={{
+            backgroundColor: '#8B5CF6',
+            padding: 12,
+            borderRadius: 8,
+            alignItems: 'center',
+            marginHorizontal: 24,
+            marginBottom: 12,
+            flexDirection: 'row',
+            justifyContent: 'center',
+          }}
+          onPress={async () => {
+            try {
+              Alert.alert('Migration', 'Migration de votre photo de profil en cours...');
+              const ProfileMigrationService = (await import('../services/ProfileMigrationService')).default;
+              const newURL = await ProfileMigrationService.migrateCurrentUserPhoto();
+              if (newURL) {
+                Alert.alert('✅ Succès', 'Photo de profil migrée vers Firebase Storage!');
+                // Recharger la page pour voir la nouvelle photo
+                const auth = getAuth(app);
+                const user = auth.currentUser;
+                if (user) {
+                  const q = query(collection(db, 'users'), where('uid', '==', user.uid));
+                  const snap = await getDocs(q);
+                  if (!snap.empty) {
+                    const data = snap.docs[0].data();
+                    if (data?.photoURL) {
+                      setPhotoURL(data.photoURL);
+                    }
+                  }
+                }
+              } else {
+                Alert.alert('Info', 'Aucune migration nécessaire.');
+              }
+            } catch (error) {
+              console.error('Erreur migration:', error);
+              Alert.alert('Erreur', 'Impossible de migrer la photo de profil.');
+            }
+          }}
+        >
+          <Ionicons name="cloud-upload-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Migrer photo vers Storage</Text>
+        </TouchableOpacity>
+
         {/* Bouton de déconnexion */}
         <TouchableOpacity
           style={{
@@ -485,7 +553,8 @@ const Profile: React.FC = () => {
             padding: 12,
             borderRadius: 8,
             alignItems: 'center',
-            margin: 24,
+            marginHorizontal: 24,
+            marginBottom: 24,
           }}
           onPress={async () => {
             try {
@@ -504,6 +573,198 @@ const Profile: React.FC = () => {
           visible={showThemeSelector}
           onClose={() => setShowThemeSelector(false)}
         />
+
+        {/* Modal Import Livres Open Source */}
+        {showImportModal && (
+          <View style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.95)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20,
+            zIndex: 1000,
+          }}>
+            <View style={{
+              backgroundColor: '#232323',
+              borderRadius: 16,
+              padding: 24,
+              width: '100%',
+              maxWidth: 400,
+              maxHeight: '80%',
+            }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <Text style={{ color: '#FFA94D', fontSize: 20, fontWeight: 'bold' }}>
+                  📚 Livres gratuits
+                </Text>
+                <TouchableOpacity onPress={() => setShowImportModal(false)} disabled={importing}>
+                  <Ionicons name="close" size={28} color="#fff" />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={{ color: '#999', fontSize: 14, marginBottom: 20 }}>
+                Importez des classiques du domaine public pour tester l'application
+              </Text>
+
+              {importing ? (
+                <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                  <ActivityIndicator size="large" color="#FFA94D" />
+                  <Text style={{ color: '#fff', marginTop: 20, fontSize: 16 }}>
+                    Import en cours... {importProgress.current}/{importProgress.total}
+                  </Text>
+                  {importProgress.bookTitle && (
+                    <Text style={{ color: '#999', marginTop: 8, fontSize: 14, textAlign: 'center' }}>
+                      {importProgress.bookTitle}
+                    </Text>
+                  )}
+                </View>
+              ) : (
+                <ScrollView style={{ maxHeight: 400 }}>
+                  {OpenSourceBooksService.getAvailableBooks().map((book) => (
+                    <TouchableOpacity
+                      key={book.id}
+                      style={{
+                        backgroundColor: '#2a2a2a',
+                        borderRadius: 12,
+                        padding: 16,
+                        marginBottom: 12,
+                        borderWidth: 1,
+                        borderColor: '#333',
+                      }}
+                      onPress={async () => {
+                        Alert.alert(
+                          book.title,
+                          `Importer "${book.title}" de ${book.author} ?\n\nCe livre sera ajouté à votre bibliothèque avec sa couverture.`,
+                          [
+                            { text: 'Annuler', style: 'cancel' },
+                            {
+                              text: 'Importer',
+                              onPress: async () => {
+                                try {
+                                  setImporting(true);
+                                  setImportProgress({ current: 1, total: 1, bookTitle: book.title });
+
+                                  const bookId = await OpenSourceBooksService.importBook(
+                                    book,
+                                    (message, progress) => {
+                                      console.log(`${message} - ${progress}%`);
+                                    }
+                                  );
+
+                                  setImporting(false);
+                                  setShowImportModal(false);
+                                  Alert.alert(
+                                    '✅ Succès !',
+                                    `"${book.title}" a été importé avec succès !`,
+                                    [
+                                      {
+                                        text: 'Voir le livre',
+                                        onPress: () => router.push(`/book/${bookId}`),
+                                      },
+                                      { text: 'OK' },
+                                    ]
+                                  );
+                                  loadProfile(); // Recharger le profil
+                                } catch (error) {
+                                  setImporting(false);
+                                  Alert.alert('Erreur', `Impossible d'importer: ${error}`);
+                                }
+                              },
+                            },
+                          ]
+                        );
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 32, marginRight: 12 }}>📖</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: '#FFA94D', fontSize: 16, fontWeight: 'bold' }}>
+                            {book.title}
+                          </Text>
+                          <Text style={{ color: '#999', fontSize: 14, marginTop: 4 }}>
+                            {book.author}
+                          </Text>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
+                            {book.genres.slice(0, 2).map((genre, idx) => (
+                              <View key={idx} style={{
+                                backgroundColor: '#333',
+                                paddingHorizontal: 8,
+                                paddingVertical: 4,
+                                borderRadius: 8,
+                                marginRight: 6,
+                                marginBottom: 4,
+                              }}>
+                                <Text style={{ color: '#FFA94D', fontSize: 11 }}>{genre}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+
+              {!importing && (
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#4CAF50',
+                    padding: 14,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                    marginTop: 20,
+                  }}
+                  onPress={async () => {
+                    Alert.alert(
+                      'Importer tous les livres',
+                      `Importer ${OpenSourceBooksService.getAvailableBooks().length} livres ?\n\nCela peut prendre plusieurs minutes.`,
+                      [
+                        { text: 'Annuler', style: 'cancel' },
+                        {
+                          text: 'Importer tout',
+                          onPress: async () => {
+                            try {
+                              setImporting(true);
+                              const books = OpenSourceBooksService.getAvailableBooks();
+                              setImportProgress({ current: 0, total: books.length, bookTitle: '' });
+
+                              const { success, failed } = await OpenSourceBooksService.importAllBooks(
+                                (bookTitle, progress) => {
+                                  setImportProgress(prev => ({ ...prev, bookTitle }));
+                                },
+                                (completed, total) => {
+                                  setImportProgress({ current: completed, total, bookTitle: '' });
+                                }
+                              );
+
+                              setImporting(false);
+                              setShowImportModal(false);
+                              Alert.alert(
+                                '✅ Import terminé !',
+                                `${success.length} livres importés avec succès${failed.length > 0 ? `\n${failed.length} erreurs` : ''}`,
+                              );
+                              loadProfile();
+                            } catch (error) {
+                              setImporting(false);
+                              Alert.alert('Erreur', `Erreur d'import: ${error}`);
+                            }
+                          },
+                        },
+                      ]
+                    );
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
+                    📥 Tout importer ({OpenSourceBooksService.getAvailableBooks().length} livres)
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
       </ScrollView>
     </View>
   );

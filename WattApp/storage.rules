@@ -1,0 +1,106 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules for WattApp
+// These rules define who can read and write to your Cloud Storage buckets
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isValidImage() {
+      return request.resource.size < 10 * 1024 * 1024 // 10 MB
+        && request.resource.contentType.matches('image/.*');
+    }
+    
+    function isValidPDF() {
+      return request.resource.size < 100 * 1024 * 1024 // 100 MB
+        && request.resource.contentType == 'application/pdf';
+    }
+
+    // Livres (Books)
+    match /books/{userId}/{bookId}/{allPaths=**} {
+      // Lecture: tout le monde peut lire les livres publiés
+      allow read: if true;
+      
+      // Écriture: seul le propriétaire peut écrire
+      allow write: if isOwner(userId);
+      
+      // Upload de couverture
+      match /cover.jpg {
+        allow write: if isOwner(userId) && isValidImage();
+      }
+      
+      // Upload de PDF
+      match /book.pdf {
+        allow write: if isOwner(userId) && isValidPDF();
+      }
+    }
+
+    // Mangas
+    match /manga/{userId}/{mangaId}/{allPaths=**} {
+      // Lecture: tout le monde peut lire les mangas publiés
+      allow read: if true;
+      
+      // Écriture: seul le propriétaire peut écrire
+      allow write: if isOwner(userId);
+      
+      // Upload de couverture de manga
+      match /cover.jpg {
+        allow write: if isOwner(userId) && isValidImage();
+      }
+      
+      // Upload de pages de manga
+      match /pages/{pageId} {
+        allow write: if isOwner(userId) && isValidImage();
+      }
+    }
+
+    // Photos de profil
+    match /profiles/{userId}/avatar.jpg {
+      // Lecture: tout le monde peut voir les avatars
+      allow read: if true;
+      
+      // Écriture: seul le propriétaire peut modifier son avatar
+      allow write: if isOwner(userId) && isValidImage();
+    }
+
+    // Images de chat (si besoin)
+    match /chats/{chatId}/{allPaths=**} {
+      // Lecture: seuls les participants du chat
+      allow read: if isAuthenticated();
+      
+      // Écriture: seuls les utilisateurs authentifiés
+      allow write: if isAuthenticated() && isValidImage();
+    }
+
+    // Images de communauté/groupes
+    match /community/{groupId}/{allPaths=**} {
+      // Lecture: tout le monde
+      allow read: if true;
+      
+      // Écriture: utilisateurs authentifiés
+      allow write: if isAuthenticated() && isValidImage();
+    }
+
+    // Fichiers temporaires
+    match /temp/{userId}/{allPaths=**} {
+      // Lecture et écriture: seul le propriétaire
+      allow read, write: if isOwner(userId);
+      
+      // Nettoyage automatique après 24h (géré côté serveur)
+    }
+
+    // Deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
 import { collection, query, where, getDocs } from 'firebase/firestore';
+import ProfileMigrationService from '../../services/ProfileMigrationService';
 
 const Home: React.FC = () => {
 	const router = useRouter();
@@ -36,8 +37,8 @@ const Home: React.FC = () => {
 	const contentPaddingTop = topOffset + avatarSize + 12; // keep content from being hidden under avatar
 
 	const renderBookItem = (item: any) => {
-		// Champs Firestore adaptés : title, coverImage
-		let couverture = item.coverImage;
+		// Champs Firestore adaptés : title, coverImageUrl
+		let couverture = item.coverImageUrl || item.coverImage;
 		if (couverture && typeof couverture === 'object' && couverture.uri) {
 			couverture = couverture.uri;
 		}
@@ -45,8 +46,8 @@ const Home: React.FC = () => {
 			couverture = 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128';
 		}
 		const titre = item.title || 'Titre inconnu';
-		// Pas de champ auteur dans Firestore, on affiche "Auteur inconnu"
-		const auteur = item.auteur || 'Auteur inconnu';
+		// Utiliser authorName au lieu de auteur
+		const auteur = item.authorName || item.auteur || 'Auteur inconnu';
 
 		return (
 			<View key={item.id} style={isTablet ? styles.livreCardTablet : styles.livreCardHorizontal}>
@@ -75,7 +76,23 @@ const Home: React.FC = () => {
 				const snap = await getDocs(q);
 				if (!snap.empty) {
 					const data = snap.docs[0].data();
-					if (data && data.photoURL) setPhotoURL(data.photoURL);
+					if (data && data.photoURL) {
+						console.log('📷 Photo de profil trouvée, longueur:', data.photoURL.length);
+						
+						// Vérifier si la photo doit être migrée
+						if (ProfileMigrationService.shouldMigrate(data.photoURL)) {
+							console.log('🔄 Migration de la photo vers Firebase Storage...');
+							const migratedURL = await ProfileMigrationService.migrateCurrentUserPhoto();
+							if (migratedURL) {
+								console.log('✅ Photo migrée avec succès:', migratedURL.substring(0, 100) + '...');
+								setPhotoURL(migratedURL);
+							} else {
+								setPhotoURL(data.photoURL);
+							}
+						} else {
+							setPhotoURL(data.photoURL);
+						}
+					}
 					// Charger le solde du portefeuille
 					if (data && typeof data.walletBalance === 'number') {
 						setWalletBalance(data.walletBalance);
@@ -237,7 +254,7 @@ const Home: React.FC = () => {
 									onPress={() => router.push(`/book/${livre.id}`)}
 								>
 									<Image
-										source={{ uri: livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
+										source={{ uri: livre.coverImageUrl || livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
 										style={{ width: 100, height: 150, borderRadius: 8, backgroundColor: '#232323' }}
 										resizeMode="cover"
 									/>
@@ -308,7 +325,7 @@ const Home: React.FC = () => {
 									onPress={() => router.push(`/book/${livre.id}`)}
 								>
 									<Image
-										source={{ uri: livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
+										source={{ uri: livre.coverImageUrl || livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
 										style={{ width: 80, height: 120, borderRadius: 8, backgroundColor: '#232323' }}
 										resizeMode="cover"
 									/>
@@ -368,7 +385,7 @@ const Home: React.FC = () => {
 									onPress={() => router.push(`/book/${livre.id}`)}
 								>
 									<Image
-										source={{ uri: livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
+										source={{ uri: livre.coverImageUrl || livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
 										style={{ width: 80, height: 120, borderRadius: 8, backgroundColor: '#232323' }}
 										resizeMode="cover"
 									/>
