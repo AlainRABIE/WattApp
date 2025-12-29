@@ -4,6 +4,7 @@ import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { collection, getDocs, query, limit as queryLimit } from 'firebase/firestore';
 import app, { db } from '../../constants/firebaseConfig';
 import { useRouter } from 'expo-router';
+import { getAuth } from 'firebase/auth';
 
 const CATEGORIES = [
   'Roman d\'amour', 'Fanfiction', 'Fiction générale', 'Roman pour adolescents', 'Aléatoire',
@@ -15,6 +16,7 @@ export default function ExploreScreen() {
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(false);
   const [books, setBooks] = useState<any[]>([]);
+  const [libraryBookIds, setLibraryBookIds] = useState<Set<string>>(new Set());
   const [category, setCategory] = useState(CATEGORIES[0]);
   const router = useRouter();
   const debounceRef = useRef<number | null>(null);
@@ -23,6 +25,16 @@ export default function ExploreScreen() {
     (async () => {
       setLoading(true);
       try {
+        const auth = getAuth();
+        const user = auth.currentUser;
+        
+        // Charger les IDs des livres dans la bibliothèque
+        if (user) {
+          const librarySnap = await getDocs(collection(db, 'users', user.uid, 'library'));
+          const libraryIds = new Set(librarySnap.docs.map(d => d.data().bookId || d.id));
+          setLibraryBookIds(libraryIds);
+        }
+        
         const snap = await getDocs(query(collection(db, 'books'), queryLimit(40)));
         setBooks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (e) {
@@ -34,6 +46,9 @@ export default function ExploreScreen() {
   }, []);
 
   const filteredBooks = books.filter(b => {
+    // Exclure les livres dans la bibliothèque
+    if (libraryBookIds.has(b.id)) return false;
+    
     const search = q.trim().toLowerCase();
     const tags = (b.tags || []).map((t: string) => t.toLowerCase());
     const matchCat = category === CATEGORIES[0] || tags.includes(category.toLowerCase());
@@ -53,7 +68,7 @@ export default function ExploreScreen() {
       activeOpacity={0.85}
     >
       <View style={styles.bookRank}><Text style={styles.bookRankText}>{index + 1}</Text></View>
-      <Image source={{ uri: item.couverture || item.coverImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.titre || item.title || 'Livre')}&background=23232a&color=FFA94D&size=128` }} style={styles.bookCover} />
+      <Image source={{ uri: item.coverImageUrl || item.couverture || item.coverImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.titre || item.title || 'Livre')}&background=23232a&color=FFA94D&size=128` }} style={styles.bookCover} />
       <View style={styles.bookInfo}>
         <Text style={styles.bookTitle} numberOfLines={1}>{item.titre || item.title || 'Sans titre'}</Text>
         <Text style={styles.bookAuthor} numberOfLines={1}>{item.auteur || item.author || 'Auteur inconnu'}</Text>

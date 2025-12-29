@@ -273,8 +273,8 @@ const AuthorProfileScreen = () => {
               data={authorBooks}
               renderItem={({ item }) => (
                 <TouchableOpacity style={styles.bookItem} onPress={() => router.push(`/book/${item.id}`)} activeOpacity={0.8}>
-                  {item.coverImage ? (
-                    <Image source={{ uri: item.coverImage }} style={styles.bookCover} />
+                  {(item.coverImageUrl || item.coverImage) ? (
+                    <Image source={{ uri: item.coverImageUrl || item.coverImage }} style={styles.bookCover} />
                   ) : (
                     <View style={[styles.bookCover, styles.bookCoverPlaceholder]}>
                       <Ionicons name="book" size={24} color="#888" />

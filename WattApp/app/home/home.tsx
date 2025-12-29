@@ -16,6 +16,7 @@ const Home: React.FC = () => {
 
 	// State pour les livres dynamiques
 	const [books, setBooks] = useState<any[]>([]);
+	const [libraryBookIds, setLibraryBookIds] = useState<Set<string>>(new Set());
 	const [loadingBooks, setLoadingBooks] = useState(true);
 	const [email, setEmail] = useState('');
 	const [displayName, setDisplayName] = useState('');
@@ -107,6 +108,16 @@ const Home: React.FC = () => {
 
 		const loadBooks = async () => {
 			try {
+				const auth = getAuth(app);
+				const user = auth.currentUser;
+				
+				// Charger les IDs des livres dans la bibliothèque
+				if (user) {
+					const librarySnap = await getDocs(collection(db, 'users', user.uid, 'library'));
+					const libraryIds = new Set(librarySnap.docs.map(d => d.data().bookId || d.id));
+					setLibraryBookIds(libraryIds);
+				}
+				
 				const booksSnap = await getDocs(collection(db, 'books'));
 				const booksList = booksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 				// Exclure les fichiers importés
@@ -243,7 +254,9 @@ const Home: React.FC = () => {
 						if (books.length === 0) return <Text style={styles.placeholder}>Aucun livre trouvé.</Text>;
 						// Utilisé pour éviter les doublons
 						const usedIds = new Set();
-						return books.map(livre => {
+						return books
+							.filter(livre => !libraryBookIds.has(livre.id)) // Exclure les livres de la bibliothèque
+							.map(livre => {
 							if (usedIds.has(livre.id)) return null;
 							usedIds.add(livre.id);
 							return (
@@ -314,7 +327,10 @@ const Home: React.FC = () => {
 						if (books.length === 0) return <Text style={styles.placeholder}>Aucun livre trouvé.</Text>;
 						// Utilisé pour éviter les doublons
 						const usedIds = new Set();
-						return books.slice(0, 6).map(livre => {
+						return books
+							.filter(livre => !libraryBookIds.has(livre.id)) // Exclure les livres de la bibliothèque
+							.slice(0, 6)
+							.map(livre => {
 							if (usedIds.has(livre.id)) return null;
 							usedIds.add(livre.id);
 							return (
@@ -374,7 +390,10 @@ const Home: React.FC = () => {
 						if (books.length === 0) return <Text style={styles.placeholder}>Aucun livre trouvé.</Text>;
 						// Utilisé pour éviter les doublons
 						const usedIds = new Set();
-						return books.slice(3, 9).map(livre => {
+						return books
+							.filter(livre => !libraryBookIds.has(livre.id)) // Exclure les livres de la bibliothèque
+							.slice(3, 9)
+							.map(livre => {
 							if (usedIds.has(livre.id)) return null;
 							usedIds.add(livre.id);
 							return (

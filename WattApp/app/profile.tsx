@@ -103,8 +103,8 @@ const Profile: React.FC = () => {
 
   const renderWork = ({ item }: { item: any }) => (
     <TouchableOpacity style={styles.workCard} key={String(item.id)} onPress={() => router.push(`../book/${item.id}`)}>
-      {item.coverImage ? (
-        <Image source={{ uri: item.coverImage }} style={styles.workCover} />
+      {(item.coverImageUrl || item.coverImage) ? (
+        <Image source={{ uri: item.coverImageUrl || item.coverImage }} style={styles.workCover} />
       ) : (
         <View style={[styles.workCover, { backgroundColor: '#222', justifyContent: 'center', alignItems: 'center' }]}>
           <Text style={{ color: '#888', fontSize: 12 }}>Pas d'image</Text>
@@ -423,7 +423,7 @@ const Profile: React.FC = () => {
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {recentReads.map(r => (
                 <View key={String(r.id)} style={styles.workCard}>
-                  <Image source={{ uri: r.couverture || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80' }} style={styles.workCover} />
+                  <Image source={{ uri: r.coverImageUrl || r.couverture || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80' }} style={styles.workCover} />
                   <Text style={styles.workTitle} numberOfLines={2}>{r.titre || 'Titre'}</Text>
                 </View>
               ))}
