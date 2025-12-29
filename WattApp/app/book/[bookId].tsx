@@ -659,7 +659,7 @@ const BookEditor: React.FC = () => {
                     }}
                   >
                     <Image 
-                      source={{ uri: item.cover || book?.coverImage || 'https://via.placeholder.com/48x64' }} 
+                      source={{ uri: item.cover || book?.coverImageUrl || book?.coverImage || 'https://via.placeholder.com/48x64' }} 
                       style={{ width: 48, height: 64, borderRadius: 8, marginRight: 14, backgroundColor: '#333' }} 
                     />
                     <View style={{ flex: 1 }}>
@@ -692,11 +692,10 @@ const BookEditor: React.FC = () => {
       </Modal>
 
   <ScrollView contentContainerStyle={{ alignItems: 'center', paddingBottom: 60 }}>
-        {/* ...existing code... */}
-        {(book?.cover || book?.coverImage) && (
+        {(book?.coverImageUrl || book?.cover || book?.coverImage) && (
           <View style={{ alignItems: 'center', width: '100%', marginTop: 28, marginBottom: 38, borderRadius: 32, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 16, elevation: 8 }}>
             <View style={{ position: 'relative' }}>
-              <Image source={{ uri: book?.cover || book?.coverImage }} style={{ width: 240, height: 340, borderRadius: 28 }} />
+              <Image source={{ uri: book?.coverImageUrl || book?.cover || book?.coverImage }} style={{ width: 240, height: 340, borderRadius: 28 }} />
               {/* Œil d'aperçu en haut à droite de la couverture - UNIQUEMENT pour les livres payants */}
               {book && book.price && book.price > 0 && (
                 <TouchableOpacity 
