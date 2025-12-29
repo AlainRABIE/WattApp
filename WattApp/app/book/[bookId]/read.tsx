@@ -205,6 +205,11 @@ const BookReadScreen: React.FC<any> = () => {
       const position = pageIndex * charsPerPage;
       
       const progressRef = doc(db, 'users', user.uid, 'readingProgress', bookId);
+      
+      // Vérifier si c'est la première fois que l'utilisateur lit ce livre
+      const progressDoc = await getDoc(progressRef);
+      const isFirstRead = !progressDoc.exists();
+      
       await setDoc(progressRef, {
         bookId,
         bookTitle: book?.title || 'Livre sans titre',
@@ -214,6 +219,20 @@ const BookReadScreen: React.FC<any> = () => {
         lastReadAt: new Date().toISOString(),
         updatedAt: new Date()
       }, { merge: true });
+      
+      // Si c'est la première lecture, ajouter le livre à la bibliothèque
+      if (isFirstRead && book) {
+        const userBookRef = doc(db, 'users', user.uid, 'library', bookId);
+        await setDoc(userBookRef, {
+          bookId,
+          title: book.title,
+          author: book.author || book.authorName || 'Auteur inconnu',
+          coverImageUrl: book.coverImageUrl || book.coverImage || '',
+          addedAt: new Date().toISOString(),
+          lastReadAt: new Date().toISOString(),
+          status: 'reading' // en cours de lecture
+        }, { merge: true });
+      }
     } catch (error) {
       console.error('Erreur lors de la sauvegarde du progrès:', error);
     }

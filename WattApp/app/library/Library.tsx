@@ -39,6 +39,7 @@ type BookType = {
   title?: string;
   author?: string;
   coverImage?: string;
+  coverImageUrl?: string;
   tags?: string[];
   views?: number;
   status?: string;
@@ -673,23 +674,50 @@ Variables d'état:
           setDownloadedBooks(downloadedBooksSet);
         }
         
-        // Charger les livres avec ownerUid (livres de la bibliothèque)
+        // Charger les livres ajoutés à la bibliothèque de l'utilisateur
+        const qLibrary = query(collection(db, 'users', user.uid, 'library'));
+        const snapLibrary = await getDocs(qLibrary);
+        
+        // Charger les livres avec ownerUid (livres de la bibliothèque - ancien système)
         const qBooks = query(collection(db, 'books'), where('ownerUid', '==', user.uid));
         const snapBooks = await getDocs(qBooks);
+        
         // Charger les brouillons avec authorUid (créés par l'utilisateur)
         const qDrafts = query(collection(db, 'books'), where('authorUid', '==', user.uid));
         const snapDrafts = await getDocs(qDrafts);
+        
         // Charger la wishlist
         let wishlistBooks = await getWishlistBooks();
         // Filtrer pour ne pas afficher les livres dont l'ownerUid est l'utilisateur
         wishlistBooks = wishlistBooks.filter((b: any) => b.ownerUid !== user.uid);
+        
         if (mounted) {
+          // Combiner les livres de la bibliothèque (nouveau système + ancien système)
+          const libraryBooks: BookType[] = snapLibrary.docs.map((d: any) => ({ 
+            id: d.data().bookId || d.id, 
+            ...(d.data() as any) 
+          }));
+          
+          const oldBooks: BookType[] = snapBooks.docs.map((d: any) => ({ 
+            id: d.id, 
+            ...(d.data() as any) 
+          }));
+          
+          // Fusionner en évitant les doublons
+          const allBooks = [...libraryBooks];
+          oldBooks.forEach(book => {
+            if (!allBooks.find(b => b.id === book.id)) {
+              allBooks.push(book);
+            }
+          });
+          
+          setBooks(allBooks);
+          
           // Livres de la bibliothèque
           if (snapBooks.empty) {
-            setBooks([]);
+            setBooks(allBooks);
           } else {
-            const booksList: BookType[] = snapBooks.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
-            setBooks(booksList);
+            setBooks(allBooks);
           }
           // Brouillons (filtrer seulement les drafts)
           if (!snapDrafts.empty) {
@@ -1077,7 +1105,7 @@ Variables d'état:
                           </View>
                         ) : (
                           <Image
-                            source={{ uri: book.couverture || book.coverImage || 'https://via.placeholder.com/120x180.png?text=Cover' }}
+                            source={{ uri: book.coverImageUrl || book.couverture || book.coverImage || 'https://via.placeholder.com/120x180.png?text=Cover' }}
                             style={styles.horizontalCover}
                           />
                         )}
@@ -1220,10 +1248,10 @@ Variables d'état:
                           <View style={styles.horizontalCover}>
                             {book.type === 'pdf' ? (
                               // Si le PDF a une miniature, l'afficher, sinon afficher l'indicateur PDF
-                              (book.couverture || book.coverImage) ? (
+                              (book.coverImageUrl || book.couverture || book.coverImage) ? (
                                 <View style={styles.pdfCoverContainer}>
                                   <Image
-                                    source={{ uri: book.couverture || book.coverImage }}
+                                    source={{ uri: book.coverImageUrl || book.couverture || book.coverImage }}
                                     style={styles.horizontalCover}
                                   />
                                   <View style={styles.pdfBadge}>
@@ -1238,7 +1266,7 @@ Variables d'état:
                               )
                             ) : (
                               <Image
-                                source={{ uri: book.couverture || book.coverImage || 'https://via.placeholder.com/120x180.png?text=Cover' }}
+                                source={{ uri: book.coverImageUrl || book.couverture || book.coverImage || 'https://via.placeholder.com/120x180.png?text=Cover' }}
                                 style={styles.horizontalCover}
                               />
                             )}
@@ -1317,9 +1345,9 @@ Variables d'état:
                           }
                         }}>
                           <View style={styles.draftCover}>
-                            {draft.coverImage ? (
+                            {(draft.coverImageUrl || draft.coverImage) ? (
                               <Image 
-                                source={{ uri: draft.coverImage }} 
+                                source={{ uri: draft.coverImageUrl || draft.coverImage }} 
                                 style={styles.draftCoverImage}
                               />
                             ) : (
