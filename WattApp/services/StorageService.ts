@@ -270,6 +270,81 @@ class StorageService {
   }
 
   /**
+   * Upload une image depuis une URL externe
+   */
+  async uploadImageFromUrl(
+    imageUrl: string,
+    path: string,
+    onProgress?: (progress: UploadProgress) => void
+  ): Promise<string> {
+    try {
+      console.log('📤 Upload image depuis URL:', imageUrl);
+      console.log('📤 Vers path:', path);
+      
+      // Télécharger l'image depuis l'URL
+      console.log('🔄 Téléchargement de l\'image...');
+      const response = await fetch(imageUrl);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      console.log('✅ Image téléchargée, taille:', blob.size, 'type:', blob.type);
+      
+      const storageRef = ref(storage, path);
+      console.log('📁 Storage ref créé:', storageRef.fullPath);
+      
+      const metadata: UploadMetadata = {
+        contentType: blob.type || 'image/jpeg',
+      };
+
+      if (onProgress) {
+        // Upload avec suivi de progression
+        console.log('🚀 Début upload avec progression...');
+        const uploadTask = uploadBytesResumable(storageRef, blob, metadata);
+        
+        return new Promise<string>((resolve, reject) => {
+          uploadTask.on(
+            'state_changed',
+            (snapshot) => {
+              const progress = {
+                bytesTransferred: snapshot.bytesTransferred,
+                totalBytes: snapshot.totalBytes,
+                progress: (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+              };
+              onProgress(progress);
+            },
+            (error) => {
+              console.error('❌ Erreur upload:', error);
+              reject(error);
+            },
+            async () => {
+              console.log('✅ Upload terminé !');
+              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+              console.log('✅ URL de téléchargement:', downloadURL);
+              resolve(downloadURL);
+            }
+          );
+        });
+      } else {
+        // Upload direct sans progression
+        console.log('🚀 Upload direct...');
+        const snapshot = await uploadBytes(storageRef, blob, metadata);
+        console.log('✅ Upload terminé !');
+        
+        const downloadURL = await getDownloadURL(snapshot.ref);
+        console.log('✅ URL de téléchargement:', downloadURL);
+        
+        return downloadURL;
+      }
+    } catch (error) {
+      console.error('❌ Erreur uploadImageFromUrl:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Supprime un fichier du storage
    */
   async deleteFile(url: string): Promise<void> {

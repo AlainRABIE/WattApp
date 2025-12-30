@@ -11,10 +11,11 @@ import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { ThemeSelector } from './components/ThemeSelector';
 import { useTheme } from '../hooks/useTheme';
-import OpenSourceBooksService from '../services/OpenSourceBooksService';
+import { OpenSourceBooksService } from '../services/OpenSourceBooksService';
 
 const Profile: React.FC = () => {
   const router = useRouter();
+  const openSourceBooksService = OpenSourceBooksService.getInstance();
   const [displayName, setDisplayName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [photoURL, setPhotoURL] = useState<string | null>(null);
@@ -623,7 +624,7 @@ const Profile: React.FC = () => {
                 </View>
               ) : (
                 <ScrollView style={{ maxHeight: 400 }}>
-                  {OpenSourceBooksService.getAvailableBooks().map((book) => (
+                  {openSourceBooksService.getAvailableBooks().map((book) => (
                     <TouchableOpacity
                       key={book.id}
                       style={{
@@ -647,7 +648,7 @@ const Profile: React.FC = () => {
                                   setImporting(true);
                                   setImportProgress({ current: 1, total: 1, bookTitle: book.title });
 
-                                  const bookId = await OpenSourceBooksService.importBook(
+                                  const bookId = await openSourceBooksService.importBook(
                                     book,
                                     (message, progress) => {
                                       console.log(`${message} - ${progress}%`);
@@ -709,42 +710,94 @@ const Profile: React.FC = () => {
               )}
 
               {!importing && (
+                <View>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#4CAF50',
+                      padding: 14,
+                      borderRadius: 8,
+                      alignItems: 'center',
+                      marginTop: 20,
+                    }}
+                    onPress={async () => {
+                      Alert.alert(
+                        'Importer tous les livres',
+                        `Importer ${openSourceBooksService.getAvailableBooks().length} livres ?\n\nCela peut prendre plusieurs minutes.`,
+                        [
+                          { text: 'Annuler', style: 'cancel' },
+                          {
+                            text: 'Importer tout',
+                            onPress: async () => {
+                              try {
+                                setImporting(true);
+                                const books = openSourceBooksService.getAvailableBooks();
+                                setImportProgress({ current: 0, total: books.length, bookTitle: '' });
+
+                                const bookIds = books.map(b => b.id);
+                                const { success, failed } = await openSourceBooksService.importMultipleBooks(
+                                  bookIds,
+                                  (current, total, bookTitle) => {
+                                    setImportProgress({ current, total, bookTitle });
+                                  }
+                                );
+
+                                setImporting(false);
+                                setShowImportModal(false);
+                                Alert.alert(
+                                  '✅ Import terminé !',
+                                  `${success.length} livres importés avec succès${failed.length > 0 ? `\n${failed.length} erreurs` : ''}`,
+                                );
+                              loadProfile();
+                            } catch (error) {
+                              setImporting(false);
+                              Alert.alert('Erreur', `Erreur d'import: ${error}`);
+                            }
+                          },
+                        },
+                      ]
+                    );
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
+                    📥 Tout importer ({openSourceBooksService.getAvailableBooks().length} livres)
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Nouveau bouton pour les livres étendus */}
                 <TouchableOpacity
                   style={{
-                    backgroundColor: '#4CAF50',
+                    backgroundColor: '#2196F3',
                     padding: 14,
                     borderRadius: 8,
                     alignItems: 'center',
-                    marginTop: 20,
+                    marginTop: 12,
                   }}
                   onPress={async () => {
                     Alert.alert(
-                      'Importer tous les livres',
-                      `Importer ${OpenSourceBooksService.getAvailableBooks().length} livres ?\n\nCela peut prendre plusieurs minutes.`,
+                      'Importer plus de livres',
+                      `Importer ${openSourceBooksService.getExtendedBooks().length} livres supplémentaires ?\n\n📚 Jules Verne, Victor Hugo, Dickens, H.G. Wells et bien d'autres!\n\nCela peut prendre 10-15 minutes.`,
                       [
                         { text: 'Annuler', style: 'cancel' },
                         {
-                          text: 'Importer tout',
+                          text: 'Importer',
                           onPress: async () => {
                             try {
                               setImporting(true);
-                              const books = OpenSourceBooksService.getAvailableBooks();
+                              const books = openSourceBooksService.getExtendedBooks();
                               setImportProgress({ current: 0, total: books.length, bookTitle: '' });
 
-                              const { success, failed } = await OpenSourceBooksService.importAllBooks(
-                                (bookTitle, progress) => {
-                                  setImportProgress(prev => ({ ...prev, bookTitle }));
-                                },
-                                (completed, total) => {
-                                  setImportProgress({ current: completed, total, bookTitle: '' });
+                              const bookIds = books.map(b => b.id);
+                              const { success, failed } = await openSourceBooksService.importMultipleBooks(
+                                bookIds,
+                                (current, total, bookTitle) => {
+                                  setImportProgress({ current, total, bookTitle });
                                 }
                               );
 
                               setImporting(false);
-                              setShowImportModal(false);
                               Alert.alert(
-                                '✅ Import terminé !',
-                                `${success.length} livres importés avec succès${failed.length > 0 ? `\n${failed.length} erreurs` : ''}`,
+                                'Import terminé !',
+                                `✅ ${success.length} livres importés\n${failed.length > 0 ? `❌ ${failed.length} échecs` : ''}`
                               );
                               loadProfile();
                             } catch (error) {
@@ -758,9 +811,73 @@ const Profile: React.FC = () => {
                   }}
                 >
                   <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
-                    📥 Tout importer ({OpenSourceBooksService.getAvailableBooks().length} livres)
+                    🌟 Importer + de livres ({openSourceBooksService.getExtendedBooks().length} livres)
+                  </Text>
+                  <Text style={{ color: '#ccc', fontSize: 12, marginTop: 4 }}>
+                    Jules Verne, Victor Hugo, Dickens, H.G. Wells...
                   </Text>
                 </TouchableOpacity>
+
+                {/* Nouveau bouton MEGA COLLECTION */}
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#9C27B0',
+                    padding: 14,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                    marginTop: 12,
+                    borderWidth: 2,
+                    borderColor: '#FFD700',
+                  }}
+                  onPress={async () => {
+                    Alert.alert(
+                      '🎉 MÉGA COLLECTION',
+                      `Importer ${openSourceBooksService.getMegaCollection().length} livres INCONTOURNABLES ?\n\n📚 Inclus:\n• Dostoïevski, Zola, Balzac, Maupassant\n• Shakespeare, Dickens, Jane Austen\n• Lovecraft, Edgar Allan Poe\n• Contes de Grimm, Andersen, Perrault\n• Philosophie: Platon, Machiavel\n• Poésie: Baudelaire, Hugo\n\n⚠️ Temps estimé: 20-30 minutes`,
+                      [
+                        { text: 'Annuler', style: 'cancel' },
+                        {
+                          text: '🚀 IMPORTER TOUT',
+                          onPress: async () => {
+                            try {
+                              setImporting(true);
+                              const books = openSourceBooksService.getMegaCollection();
+                              setImportProgress({ current: 0, total: books.length, bookTitle: '' });
+
+                              const bookIds = books.map(b => b.id);
+                              const { success, failed } = await openSourceBooksService.importMultipleBooks(
+                                bookIds,
+                                (current, total, bookTitle) => {
+                                  setImportProgress({ current, total, bookTitle });
+                                }
+                              );
+
+                              setImporting(false);
+                              Alert.alert(
+                                '🎊 Import terminé !',
+                                `✅ ${success.length} chefs-d'œuvre importés!\n${failed.length > 0 ? `❌ ${failed.length} échecs` : ''}\n\n📚 Ta bibliothèque est maintenant ÉNORME!`
+                              );
+                              loadProfile();
+                            } catch (error) {
+                              setImporting(false);
+                              Alert.alert('Erreur', `Erreur d'import: ${error}`);
+                            }
+                          },
+                        },
+                      ]
+                    );
+                  }}
+                >
+                  <Text style={{ color: '#FFD700', fontWeight: 'bold', fontSize: 18 }}>
+                    👑 MÉGA COLLECTION 👑
+                  </Text>
+                  <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14, marginTop: 4 }}>
+                    {openSourceBooksService.getMegaCollection().length} CHEFS-D'ŒUVRE
+                  </Text>
+                  <Text style={{ color: '#E1BEE7', fontSize: 11, marginTop: 4, textAlign: 'center' }}>
+                    Dostoïevski • Zola • Shakespeare • Lovecraft • Dickens
+                  </Text>
+                </TouchableOpacity>
+              </View>
               )}
             </View>
           </View>
