@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, setDoc, doc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
@@ -26,6 +27,277 @@ const CATEGORY_LABELS: Record<string, string> = {
   'Non-Fiction': 'Non-Fiction',
   Fantastique: 'Fantastique',
   Mystère: 'Mystère',
+};
+
+// Composant pour un message individuel
+interface MessageItemProps {
+  item: any;
+  isMe: boolean;
+  onReply: (item: any) => void;
+  playingMessageId: string | null;
+  isPlaying: boolean;
+  audioPosition: number;
+  audioProgress: Animated.Value;
+  listenedAudios: Set<string>;
+  toggleAudioPlayback: (id: string, url: string, duration: number) => void;
+  formatDuration: (seconds: number) => string;
+}
+
+const MessageItem: React.FC<MessageItemProps> = ({
+  item,
+  isMe,
+  onReply,
+  playingMessageId,
+  isPlaying,
+  audioPosition,
+  audioProgress,
+  listenedAudios,
+  toggleAudioPlayback,
+  formatDuration,
+}) => {
+  const translateX = useRef(new Animated.Value(0)).current;
+  
+  const onGestureEvent = Animated.event(
+    [{ nativeEvent: { translationX: translateX } }],
+    { 
+      useNativeDriver: true,
+      listener: (event: any) => {
+        const translationX = event.nativeEvent.translationX;
+        if (translationX > 0) {
+          translateX.setValue(0);
+        } else if (translationX < -80) {
+          translateX.setValue(-80);
+        }
+      }
+    }
+  );
+  
+  const onHandlerStateChange = (event: any) => {
+    if (event.nativeEvent.oldState === State.ACTIVE) {
+      const translationX = event.nativeEvent.translationX;
+      
+      if (translationX < -60) {
+        Vibration.vibrate(50);
+        onReply(item);
+      }
+      
+      Animated.spring(translateX, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 10,
+      }).start();
+    }
+  };
+  
+  return (
+    <View style={{ position: 'relative' }}>
+      <Animated.View 
+        style={[
+          styles.swipeReplyIcon,
+          {
+            opacity: translateX.interpolate({
+              inputRange: [-80, -40, 0],
+              outputRange: [1, 0.5, 0],
+            }),
+            transform: [{
+              scale: translateX.interpolate({
+                inputRange: [-80, -40, 0],
+                outputRange: [1, 0.75, 0.5],
+              })
+            }]
+          }
+        ]}
+      >
+        <Ionicons name="arrow-redo" size={24} color="#FFA94D" />
+      </Animated.View>
+      
+      <PanGestureHandler
+        onGestureEvent={onGestureEvent}
+        onHandlerStateChange={onHandlerStateChange}
+        activeOffsetX={[-10, 10]}
+      >
+        <Animated.View style={{ transform: [{ translateX }] }}>
+          <Pressable
+            style={[
+              styles.messageRowModern,
+              isMe ? styles.messageRowMe : styles.messageRowOther
+            ]}
+            onLongPress={() => {
+              Vibration.vibrate(50);
+              onReply(item);
+            }}
+          >
+            <View style={styles.messageBubbleContainer}>
+              {!isMe && <Text style={styles.messageUserName}>{item.user}</Text>}
+              
+              <View
+                style={[
+                  styles.messageBubbleModern,
+                  isMe ? styles.messageBubbleMe : styles.messageBubbleOther,
+                  (item.type === 'image' || item.type === 'audio') && styles.mediaBubble,
+                ]}
+              >
+                {item.replyTo && (
+                  <View style={styles.replyPreview}>
+                    <View style={[styles.replyBar, isMe && styles.replyBarMe]} />
+                    <View style={styles.replyContent}>
+                      <Text style={[styles.replyUser, isMe && styles.replyUserMe]}>
+                        {item.replyTo.user}
+                      </Text>
+                      <Text style={[styles.replyText, isMe && styles.replyTextMe]} numberOfLines={1}>
+                        {item.replyTo.type === 'audio' ? '🎤 Message vocal' : 
+                         item.replyTo.type === 'image' ? '📷 Photo' : 
+                         item.replyTo.text}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+                
+                {item.type === 'image' && item.imageUrl && (
+                  <TouchableOpacity onPress={() => Linking.openURL(item.imageUrl)}>
+                    <Image 
+                      source={{ uri: item.imageUrl }} 
+                      style={styles.messageImage}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                )}
+                
+                {item.type === 'audio' && item.audioUrl && (
+                  <TouchableOpacity 
+                    style={styles.audioMessageContainer}
+                    onPress={() => toggleAudioPlayback(item.id, item.audioUrl, item.audioDuration || 0)}
+                    activeOpacity={0.7}
+                  >
+                    <Animated.View style={[
+                      styles.audioPlayButton,
+                      playingMessageId === item.id && isPlaying && !listenedAudios.has(item.id) && styles.audioPlayButtonActive,
+                      listenedAudios.has(item.id) && styles.audioPlayButtonListened,
+                      playingMessageId === item.id && isPlaying && {
+                        transform: [{
+                          scale: audioProgress.interpolate({
+                            inputRange: [0, 0.5, 1],
+                            outputRange: [1, 1.05, 1],
+                          })
+                        }]
+                      }
+                    ]}>
+                      <Ionicons 
+                        name={playingMessageId === item.id && isPlaying ? "pause" : "play"} 
+                        size={24} 
+                        color={
+                          listenedAudios.has(item.id) 
+                            ? "#666" 
+                            : (isMe ? "#181818" : "#FFA94D")
+                        } 
+                      />
+                    </Animated.View>
+                    
+                    <View style={styles.audioWaveformContainer}>
+                      <View style={styles.audioWaveform}>
+                        {(() => {
+                          const isCurrentlyPlaying = playingMessageId === item.id;
+                          const isListened = listenedAudios.has(item.id);
+                          
+                          const waveformData = item.waveformData && Array.isArray(item.waveformData) 
+                            ? item.waveformData 
+                            : [14, 22, 18, 26, 16, 24, 20, 28, 18, 22, 16, 24, 20, 26, 18, 22, 16, 20, 24, 18, 26, 20, 22, 18, 16].map(h => h / 32);
+                          
+                          const displayData = waveformData.length >= 25 
+                            ? waveformData.slice(0, 25)
+                            : [...waveformData, ...Array(25 - waveformData.length).fill(0.3)];
+                          
+                          return displayData.map((level, i) => {
+                            const barProgress = i / 25;
+                            const minHeight = 8;
+                            const maxHeight = 28;
+                            const barHeight = minHeight + (level * (maxHeight - minHeight));
+                            
+                            return (
+                              <Animated.View 
+                                key={i} 
+                                style={[
+                                  styles.audioBar,
+                                  { 
+                                    height: barHeight,
+                                    backgroundColor: isListened ? "#555" : (isMe ? "#181818" : "#FFA94D"),
+                                    opacity: isCurrentlyPlaying 
+                                      ? audioProgress.interpolate({
+                                          inputRange: [barProgress - 0.04, barProgress, barProgress + 0.04],
+                                          outputRange: [0.3 + level * 0.3, 1, 0.3 + level * 0.3],
+                                          extrapolate: 'clamp',
+                                        })
+                                      : (isListened ? 0.4 : 0.3 + level * 0.4),
+                                  }
+                                ]} 
+                              />
+                            );
+                          });
+                        })()}
+                      </View>
+                      
+                      <Text style={[
+                        styles.audioTime, 
+                        isMe && styles.audioTimeMe,
+                        listenedAudios.has(item.id) && styles.audioTimeListened
+                      ]}>
+                        {playingMessageId === item.id && audioPosition > 0
+                          ? `${formatDuration(audioPosition)} / ${formatDuration(item.audioDuration || 0)}`
+                          : formatDuration(item.audioDuration || 0)
+                        }
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+                
+                {(item.type === 'text' || !item.type) && item.text && (
+                  <>
+                    <Text style={[styles.messageTextModern, isMe && styles.messageTextMe]}>
+                      {item.text}
+                    </Text>
+                    
+                    {item.links && item.links.length > 0 && (
+                      <View style={styles.linkPreviewContainer}>
+                        {item.links.slice(0, 1).map((link: string, idx: number) => (
+                          <TouchableOpacity 
+                            key={idx}
+                            style={styles.linkPreview}
+                            onPress={() => Linking.openURL(link)}
+                          >
+                            <Ionicons name="link" size={16} color={isMe ? "#181818" : "#FFA94D"} />
+                            <Text 
+                              style={[styles.linkText, isMe && styles.linkTextMe]}
+                              numberOfLines={1}
+                            >
+                              {link}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </>
+                )}
+              </View>
+              
+              {item.createdAt?.seconds && (
+                <Text style={[styles.messageTimeModern, isMe && styles.messageTimeMeModern]}>
+                  {new Date(item.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              )}
+              
+              <View style={[styles.messageAvatarContainer, isMe && styles.messageAvatarContainerMe]}>
+                <Image 
+                  source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }} 
+                  style={styles.messageAvatarBottom} 
+                />
+              </View>
+            </View>
+          </Pressable>
+        </Animated.View>
+      </PanGestureHandler>
+    </View>
+  );
 };
 
 export default function CommunityChat() {
@@ -58,6 +330,7 @@ export default function CommunityChat() {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioProgress = useRef(new Animated.Value(0)).current;
   const [listenedAudios, setListenedAudios] = useState<Set<string>>(new Set());
+  const [replyingTo, setReplyingTo] = useState<any | null>(null);
 
   const { category } = useLocalSearchParams();
   const router = useRouter();
@@ -133,8 +406,17 @@ export default function CommunityChat() {
       uid: user.uid,
       type: 'text',
       links: urls || [],
+      ...(replyingTo && {
+        replyTo: {
+          id: replyingTo.id,
+          text: replyingTo.text || 'Média',
+          user: replyingTo.user,
+          type: replyingTo.type,
+        }
+      }),
     });
     setInput('');
+    setReplyingTo(null);
   };
   
   // Sélectionner une image depuis la galerie
@@ -560,179 +842,18 @@ export default function CommunityChat() {
             const isMe = item.uid === auth.currentUser?.uid;
             
             return (
-              <Pressable
-                style={[
-                  styles.messageRowModern,
-                  isMe ? styles.messageRowMe : styles.messageRowOther
-                ]}
-                onLongPress={() => Vibration.vibrate(50)}
-              >
-                {!isMe && (
-                  <Image 
-                    source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }} 
-                    style={styles.messageAvatar} 
-                  />
-                )}
-                
-                <View style={styles.messageBubbleContainer}>
-                  {!isMe && <Text style={styles.messageUserName}>{item.user}</Text>}
-                  
-                  <View
-                    style={[
-                      styles.messageBubbleModern,
-                      isMe ? styles.messageBubbleMe : styles.messageBubbleOther,
-                      (item.type === 'image' || item.type === 'audio') && styles.mediaBubble,
-                    ]}
-                  >
-                    {/* Message image */}
-                    {item.type === 'image' && item.imageUrl && (
-                      <TouchableOpacity onPress={() => Linking.openURL(item.imageUrl)}>
-                        <Image 
-                          source={{ uri: item.imageUrl }} 
-                          style={styles.messageImage}
-                          resizeMode="cover"
-                        />
-                      </TouchableOpacity>
-                    )}
-                    
-                    {/* Message audio */}
-                    {item.type === 'audio' && item.audioUrl && (
-                      <TouchableOpacity 
-                        style={styles.audioMessageContainer}
-                        onPress={() => toggleAudioPlayback(item.id, item.audioUrl, item.audioDuration || 0)}
-                        activeOpacity={0.7}
-                      >
-                        {/* Bouton play/pause */}
-                        <Animated.View style={[
-                          styles.audioPlayButton,
-                          playingMessageId === item.id && isPlaying && !listenedAudios.has(item.id) && styles.audioPlayButtonActive,
-                          listenedAudios.has(item.id) && styles.audioPlayButtonListened,
-                          playingMessageId === item.id && isPlaying && {
-                            transform: [{
-                              scale: audioProgress.interpolate({
-                                inputRange: [0, 0.5, 1],
-                                outputRange: [1, 1.05, 1],
-                              })
-                            }]
-                          }
-                        ]}>
-                          <Ionicons 
-                            name={playingMessageId === item.id && isPlaying ? "pause" : "play"} 
-                            size={24} 
-                            color={
-                              listenedAudios.has(item.id) 
-                                ? "#666" 
-                                : (isMe ? "#181818" : "#FFA94D")
-                            } 
-                          />
-                        </Animated.View>
-                        
-                        {/* Barre de progression et forme d'onde */}
-                        <View style={styles.audioWaveformContainer}>
-                          <View style={styles.audioWaveform}>
-                            {(() => {
-                              const isCurrentlyPlaying = playingMessageId === item.id;
-                              const isListened = listenedAudios.has(item.id);
-                              
-                              // Utiliser les vraies données si disponibles, sinon générer
-                              const waveformData = item.waveformData && Array.isArray(item.waveformData) 
-                                ? item.waveformData 
-                                : [14, 22, 18, 26, 16, 24, 20, 28, 18, 22, 16, 24, 20, 26, 18, 22, 16, 20, 24, 18, 26, 20, 22, 18, 16].map(h => h / 32);
-                              
-                              // Normaliser pour avoir exactement 25 barres
-                              const displayData = waveformData.length >= 25 
-                                ? waveformData.slice(0, 25)
-                                : [...waveformData, ...Array(25 - waveformData.length).fill(0.3)];
-                              
-                              return displayData.map((level, i) => {
-                                const barProgress = i / 25;
-                                const minHeight = 8;
-                                const maxHeight = 28;
-                                const barHeight = minHeight + (level * (maxHeight - minHeight));
-                                
-                                return (
-                                  <Animated.View 
-                                    key={i} 
-                                    style={[
-                                      styles.audioBar,
-                                      { 
-                                        height: barHeight,
-                                        backgroundColor: isListened ? "#555" : (isMe ? "#181818" : "#FFA94D"),
-                                        opacity: isCurrentlyPlaying 
-                                          ? audioProgress.interpolate({
-                                              inputRange: [barProgress - 0.04, barProgress, barProgress + 0.04],
-                                              outputRange: [0.3 + level * 0.3, 1, 0.3 + level * 0.3],
-                                              extrapolate: 'clamp',
-                                            })
-                                          : (isListened ? 0.4 : 0.3 + level * 0.4),
-                                      }
-                                    ]} 
-                                  />
-                                );
-                              });
-                            })()}
-                          </View>
-                          
-                          {/* Durée ou position actuelle */}
-                          <Text style={[
-                            styles.audioTime, 
-                            isMe && styles.audioTimeMe,
-                            listenedAudios.has(item.id) && styles.audioTimeListened
-                          ]}>
-                            {playingMessageId === item.id && audioPosition > 0
-                              ? `${formatDuration(audioPosition)} / ${formatDuration(item.audioDuration || 0)}`
-                              : formatDuration(item.audioDuration || 0)
-                            }
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    )}
-                    
-                    {/* Message texte avec liens */}
-                    {(item.type === 'text' || !item.type) && item.text && (
-                      <>
-                        <Text style={[styles.messageTextModern, isMe && styles.messageTextMe]}>
-                          {item.text}
-                        </Text>
-                        
-                        {/* Prévisualisation des liens */}
-                        {item.links && item.links.length > 0 && (
-                          <View style={styles.linkPreviewContainer}>
-                            {item.links.slice(0, 1).map((link: string, idx: number) => (
-                              <TouchableOpacity 
-                                key={idx}
-                                style={styles.linkPreview}
-                                onPress={() => Linking.openURL(link)}
-                              >
-                                <Ionicons name="link" size={16} color={isMe ? "#181818" : "#FFA94D"} />
-                                <Text 
-                                  style={[styles.linkText, isMe && styles.linkTextMe]}
-                                  numberOfLines={1}
-                                >
-                                  {link}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        )}
-                      </>
-                    )}
-                  </View>
-                  
-                  {item.createdAt?.seconds && (
-                    <Text style={[styles.messageTimeModern, isMe && styles.messageTimeMeModern]}>
-                      {new Date(item.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                  )}
-                </View>
-                
-                {isMe && (
-                  <Image 
-                    source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }} 
-                    style={styles.messageAvatar} 
-                  />
-                )}
-              </Pressable>
+              <MessageItem
+                item={item}
+                isMe={isMe}
+                onReply={setReplyingTo}
+                playingMessageId={playingMessageId}
+                isPlaying={isPlaying}
+                audioPosition={audioPosition}
+                audioProgress={audioProgress}
+                listenedAudios={listenedAudios}
+                toggleAudioPlayback={toggleAudioPlayback}
+                formatDuration={formatDuration}
+              />
             );
           }}
           contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 16, paddingBottom: 150 }}
@@ -800,49 +921,73 @@ export default function CommunityChat() {
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={[styles.composerModern, composerFocused && styles.composerFocused]}>
-              <TouchableOpacity 
-                style={styles.attachButton}
-                onPress={() => setShowMediaOptions(true)}
-              >
-                <Ionicons name="add-circle" size={28} color="#FFA94D" />
-              </TouchableOpacity>
-              
-              <View style={styles.inputWrapper}>
-                <TextInput
-                  value={input}
-                  onChangeText={setInput}
-                  placeholder="Écris ton message..."
-                  placeholderTextColor="#666"
-                  style={styles.inputModern}
-                  onSubmitEditing={sendMessage}
-                  onFocus={() => setComposerFocused(true)}
-                  onBlur={() => setComposerFocused(false)}
-                  returnKeyType="send"
-                  multiline
-                  maxLength={1000}
-                />
-              </View>
-              
-              {input.trim() ? (
-                <TouchableOpacity onPress={sendMessage} style={styles.sendButtonContainer}>
-                  <LinearGradient
-                    colors={['#FFA94D', '#FF8C42']}
-                    style={styles.sendButton}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  >
-                    <Ionicons name="send" size={20} color="#181818" style={{ marginLeft: 2 }} />
-                  </LinearGradient>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity 
-                  style={styles.voiceButton}
-                  onPress={startRecording}
-                >
-                  <Ionicons name="mic" size={24} color="#FFA94D" />
-                </TouchableOpacity>
+            <View style={{ width: '100%' }}>
+              {/* Barre de réponse */}
+              {replyingTo && (
+                <BlurView intensity={80} tint="dark" style={styles.replyBar}>
+                  <View style={styles.replyBarContent}>
+                    <View style={styles.replyBarLeft}>
+                      <View style={styles.replyBarIndicator} />
+                      <View style={styles.replyBarTextContainer}>
+                        <Text style={styles.replyBarUser}>{replyingTo.user}</Text>
+                        <Text style={styles.replyBarMessage} numberOfLines={1}>
+                          {replyingTo.type === 'audio' ? '🎤 Message vocal' : 
+                           replyingTo.type === 'image' ? '📷 Photo' : 
+                           replyingTo.text}
+                        </Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity onPress={() => setReplyingTo(null)}>
+                      <Ionicons name="close-circle" size={24} color="#FFA94D" />
+                    </TouchableOpacity>
+                  </View>
+                </BlurView>
               )}
+              
+              <View style={[styles.composerModern, composerFocused && styles.composerFocused]}>
+                <TouchableOpacity 
+                  style={styles.attachButton}
+                  onPress={() => setShowMediaOptions(true)}
+                >
+                  <Ionicons name="add-circle" size={28} color="#FFA94D" />
+                </TouchableOpacity>
+                
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    value={input}
+                    onChangeText={setInput}
+                    placeholder="Écris ton message..."
+                    placeholderTextColor="#666"
+                    style={styles.inputModern}
+                    onSubmitEditing={sendMessage}
+                    onFocus={() => setComposerFocused(true)}
+                    onBlur={() => setComposerFocused(false)}
+                    returnKeyType="send"
+                    multiline
+                    maxLength={1000}
+                  />
+                </View>
+                
+                {input.trim() ? (
+                  <TouchableOpacity onPress={sendMessage} style={styles.sendButtonContainer}>
+                    <LinearGradient
+                      colors={['#FFA94D', '#FF8C42']}
+                      style={styles.sendButton}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                    >
+                      <Ionicons name="send" size={20} color="#181818" style={{ marginLeft: 2 }} />
+                    </LinearGradient>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity 
+                    style={styles.voiceButton}
+                    onPress={startRecording}
+                  >
+                    <Ionicons name="mic" size={24} color="#FFA94D" />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           )}
         </KeyboardAvoidingView>
@@ -1216,8 +1361,26 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#FFA94D',
   },
+  messageAvatarContainer: {
+    alignItems: 'flex-start',
+    marginTop: 8,
+    marginLeft: 12,
+  },
+  messageAvatarContainerMe: {
+    alignItems: 'flex-end',
+    marginLeft: 0,
+    marginRight: 12,
+  },
+  messageAvatarBottom: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#232323',
+    borderWidth: 2,
+    borderColor: '#FFA94D',
+  },
   messageBubbleContainer: {
-    maxWidth: '70%',
+    maxWidth: '80%',
   },
   messageUserName: {
     color: '#FFA94D',
@@ -1702,5 +1865,93 @@ const styles = StyleSheet.create({
   sidebarMemberStatusModern: {
     fontSize: 13,
     color: '#4CAF50',
+  },
+  // Styles pour les réponses
+  replyPreview: {
+    marginBottom: 8,
+    paddingLeft: 12,
+    paddingRight: 12,
+    paddingTop: 8,
+    paddingBottom: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    flexDirection: 'row',
+  },
+  replyBar: {
+    width: 3,
+    borderRadius: 2,
+    backgroundColor: '#FFA94D',
+    marginRight: 8,
+  },
+  replyBarMe: {
+    backgroundColor: '#181818',
+  },
+  replyContent: {
+    flex: 1,
+  },
+  replyUser: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFA94D',
+    marginBottom: 2,
+  },
+  replyUserMe: {
+    color: '#181818',
+  },
+  replyText: {
+    fontSize: 12,
+    color: '#999',
+  },
+  replyTextMe: {
+    color: 'rgba(24, 24, 24, 0.6)',
+  },
+  replyBarContainer: {
+    position: 'absolute',
+    bottom: 70,
+    left: 0,
+    right: 0,
+  },
+  replyBarContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    marginHorizontal: 12,
+    backgroundColor: 'rgba(35, 35, 35, 0.95)',
+  },
+  replyBarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
+  },
+  replyBarIndicator: {
+    width: 3,
+    height: 36,
+    borderRadius: 2,
+    backgroundColor: '#FFA94D',
+    marginRight: 12,
+  },
+  replyBarTextContainer: {
+    flex: 1,
+  },
+  replyBarUser: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFA94D',
+    marginBottom: 3,
+  },
+  replyBarMessage: {
+    fontSize: 13,
+    color: '#ccc',
+  },
+  swipeReplyIcon: {
+    position: 'absolute',
+    right: 16,
+    top: '50%',
+    marginTop: -12,
+    zIndex: -1,
   },
 });
