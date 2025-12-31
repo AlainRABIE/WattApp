@@ -62,12 +62,11 @@ export default function CommunityChat() {
   const { category } = useLocalSearchParams();
   const router = useRouter();
 
-  // Filtrage des messages pour ne pas afficher le message système de join à l'utilisateur qui vient de rejoindre
+  // Filtrage des messages pour ne pas afficher les messages système de join
   const filteredMessages = messages.filter((item: any) => {
+    // Filtrer tous les messages système de join
     if (item.system && item.text && item.text.endsWith('a rejoint le groupe')) {
-      const auth = getAuth(app);
-      const user = auth.currentUser;
-      if (user && item.uid === user.uid) return false;
+      return false;
     }
     return true;
   });
@@ -278,7 +277,10 @@ export default function CommunityChat() {
           // On convertit en valeur entre 0 et 1
           const normalizedLevel = Math.max(0, Math.min(1, (status.metering + 60) / 60));
           
-          // Décaler l'historique et ajouter la nouvelle valeur
+          // Sauvegarder toutes les données pour l'envoi
+          fullMeteringData.current.push(normalizedLevel);
+          
+          // Décaler l'historique et ajouter la nouvelle valeur (pour affichage)
           meteringHistory.current = [...meteringHistory.current.slice(1), normalizedLevel];
           setAudioMetering([...meteringHistory.current]);
         }
@@ -290,6 +292,7 @@ export default function CommunityChat() {
       setShowMediaOptions(false);
       meteringHistory.current = Array(35).fill(0);
       setAudioMetering(Array(35).fill(0));
+      fullMeteringData.current = [];
       Vibration.vibrate(20);
       
       // Démarrer le compteur
@@ -365,6 +368,9 @@ export default function CommunityChat() {
       await uploadBytes(storageRef, blob);
       const downloadURL = await getDownloadURL(storageRef);
       
+      // Réduire les données de metering pour le stockage (prendre 1 point tous les 5)
+      const sampledMetering = fullMeteringData.current.filter((_, i) => i % 5 === 0).slice(0, 25);
+      
       await addDoc(collection(db, 'communityChats', String(category), 'messages'), {
         text: '',
         user: user.displayName || user.email || 'Utilisateur',
@@ -374,7 +380,11 @@ export default function CommunityChat() {
         type: 'audio',
         audioUrl: downloadURL,
         audioDuration: recordingDuration,
+        waveformData: sampledMetering, // Données de visualisation
       });
+      
+      // Réinitialiser les données
+      fullMeteringData.current = [];
     } catch (error) {
       console.error('Erreur upload audio:', error);
       Alert.alert('Erreur', 'Impossible d\'envoyer le message vocal');
@@ -531,42 +541,11 @@ export default function CommunityChat() {
         </BlurView>
       </LinearGradient>
 
-      {/* Section membres avec design moderne */}
-      {members.length > 0 && (
-        <View style={styles.membersSection}>
-          <LinearGradient
-            colors={['rgba(255, 169, 77, 0.15)', 'rgba(255, 169, 77, 0.05)']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.membersGradient}
-          >
-          <FlatList
-            data={members}
-            keyExtractor={(item, idx) => item.user + idx}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12 }}
-            renderItem={({ item }) => (
-              <Pressable style={styles.memberCard}>
-                <Image
-                  source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }}
-                  style={styles.memberAvatarModern}
-                />
-                <View style={styles.onlineIndicatorSmall} />
-              </Pressable>
-            )}
-            ListFooterComponent={
-              <View style={styles.membersCountBubble}>
-                <Text style={styles.membersCountText}>+{members.length}</Text>
-              </View>
-            }
-          />
-          </LinearGradient>
-        </View>
-      )}
-
       {/* Liste des messages avec design moderne */}
-      <View style={[styles.chatContainer, !isMember && styles.chatDisabled]}>
+      <View 
+        style={[styles.chatContainer, !isMember && styles.chatDisabled]}
+        pointerEvents={!isMember ? 'none' : 'auto'}
+      >
         <Animated.FlatList
           ref={flatListRef}
           data={filteredMessages}
@@ -651,35 +630,47 @@ export default function CommunityChat() {
                         {/* Barre de progression et forme d'onde */}
                         <View style={styles.audioWaveformContainer}>
                           <View style={styles.audioWaveform}>
-                            {[...Array(25)].map((_, i) => {
+                            {(() => {
                               const isCurrentlyPlaying = playingMessageId === item.id;
                               const isListened = listenedAudios.has(item.id);
-                              const barProgress = i / 25;
                               
-                              // Hauteur variée pour effet de forme d'onde
-                              const heights = [14, 22, 18, 26, 16, 24, 20, 28, 18, 22, 16, 24, 20, 26, 18, 22, 16, 20, 24, 18, 26, 20, 22, 18, 16];
-                              const barHeight = heights[i];
+                              // Utiliser les vraies données si disponibles, sinon générer
+                              const waveformData = item.waveformData && Array.isArray(item.waveformData) 
+                                ? item.waveformData 
+                                : [14, 22, 18, 26, 16, 24, 20, 28, 18, 22, 16, 24, 20, 26, 18, 22, 16, 20, 24, 18, 26, 20, 22, 18, 16].map(h => h / 32);
                               
-                              return (
-                                <Animated.View 
-                                  key={i} 
-                                  style={[
-                                    styles.audioBar,
-                                    { 
-                                      height: barHeight,
-                                      backgroundColor: isListened ? "#555" : (isMe ? "#181818" : "#FFA94D"),
-                                      opacity: isCurrentlyPlaying 
-                                        ? audioProgress.interpolate({
-                                            inputRange: [barProgress - 0.04, barProgress, barProgress + 0.04],
-                                            outputRange: [0.3, 1, 0.3],
-                                            extrapolate: 'clamp',
-                                          })
-                                        : (isListened ? 0.4 : 0.3),
-                                    }
-                                  ]} 
-                                />
-                              );
-                            })}
+                              // Normaliser pour avoir exactement 25 barres
+                              const displayData = waveformData.length >= 25 
+                                ? waveformData.slice(0, 25)
+                                : [...waveformData, ...Array(25 - waveformData.length).fill(0.3)];
+                              
+                              return displayData.map((level, i) => {
+                                const barProgress = i / 25;
+                                const minHeight = 8;
+                                const maxHeight = 28;
+                                const barHeight = minHeight + (level * (maxHeight - minHeight));
+                                
+                                return (
+                                  <Animated.View 
+                                    key={i} 
+                                    style={[
+                                      styles.audioBar,
+                                      { 
+                                        height: barHeight,
+                                        backgroundColor: isListened ? "#555" : (isMe ? "#181818" : "#FFA94D"),
+                                        opacity: isCurrentlyPlaying 
+                                          ? audioProgress.interpolate({
+                                              inputRange: [barProgress - 0.04, barProgress, barProgress + 0.04],
+                                              outputRange: [0.3 + level * 0.3, 1, 0.3 + level * 0.3],
+                                              extrapolate: 'clamp',
+                                            })
+                                          : (isListened ? 0.4 : 0.3 + level * 0.4),
+                                      }
+                                    ]} 
+                                  />
+                                );
+                              });
+                            })()}
                           </View>
                           
                           {/* Durée ou position actuelle */}
@@ -744,7 +735,7 @@ export default function CommunityChat() {
               </Pressable>
             );
           }}
-          contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 16, paddingBottom: 120 }}
+          contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 16, paddingBottom: 150 }}
           showsVerticalScrollIndicator={false}
         />
       </View>
@@ -1197,11 +1188,10 @@ const styles = StyleSheet.create({
   chatContainer: {
     flex: 1,
     backgroundColor: '#181818',
-    marginTop: 110,
+    marginTop: 80,
   },
   chatDisabled: {
     opacity: 0.3,
-    pointerEvents: 'none',
   },
   
   // Messages
