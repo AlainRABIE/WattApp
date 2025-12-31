@@ -1,7 +1,7 @@
 import { collectionGroup, getDocs, where, query as fsQuery } from 'firebase/firestore';
 export const unstable_settings = { layout: null };
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, KeyboardAvoidingView, Platform, Image, Animated, StatusBar, Pressable, Vibration, Modal, Alert, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, KeyboardAvoidingView, Platform, Image, Animated, StatusBar, Pressable, Vibration, Modal, Alert, Linking, ActivityIndicator, TouchableWithoutFeedback } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -331,6 +331,10 @@ export default function CommunityChat() {
   const audioProgress = useRef(new Animated.Value(0)).current;
   const [listenedAudios, setListenedAudios] = useState<Set<string>>(new Set());
   const [replyingTo, setReplyingTo] = useState<any | null>(null);
+  const [isHoldingMic, setIsHoldingMic] = useState(false);
+  const micSwipeX = useRef(new Animated.Value(0)).current;
+  const [showCancelIndicator, setShowCancelIndicator] = useState(false);
+  const isRecordingRef = useRef(false);
 
   const { category } = useLocalSearchParams();
   const router = useRouter();
@@ -514,8 +518,18 @@ export default function CommunityChat() {
   };
   
   // Démarrer l'enregistrement audio
-  const startRecording = async () => {
+  const startRecording = async (fromHold = false) => {
     try {
+      // Vérifier et nettoyer tout enregistrement existant d'abord
+      if (recording) {
+        try {
+          await recording.stopAndUnloadAsync();
+        } catch (err) {
+          console.log('Erreur nettoyage enregistrement existant:', err);
+        }
+        setRecording(null);
+      }
+      
       const permission = await Audio.requestPermissionsAsync();
       
       if (permission.status !== 'granted') {
@@ -570,6 +584,12 @@ export default function CommunityChat() {
       
       setRecording(newRecording);
       setIsRecording(true);
+      isRecordingRef.current = true;
+      if (fromHold) {
+        setIsHoldingMic(true);
+        micSwipeX.setValue(0);
+        setShowCancelIndicator(false);
+      }
       setRecordingDuration(0);
       setShowMediaOptions(false);
       meteringHistory.current = Array(35).fill(0);
@@ -588,25 +608,42 @@ export default function CommunityChat() {
   };
   
   // Arrêter et envoyer l'enregistrement
-  const stopRecording = async () => {
-    if (!recording) return;
+  const stopRecording = async (shouldSend = true) => {
+    console.log('🛑 stopRecording appelé, recording:', !!recording, 'isRecordingRef:', isRecordingRef.current);
+    
+    if (!recording) {
+      console.log('⚠️ Pas de recording à arrêter!');
+      return;
+    }
+    
+    const currentRecording = recording;
+    const currentDuration = recordingDuration;
+    
+    console.log('✅ Arrêt en cours, durée:', currentDuration);
     
     try {
       setIsRecording(false);
+      isRecordingRef.current = false;
+      setIsHoldingMic(false);
+      setShowCancelIndicator(false);
+      micSwipeX.setValue(0);
       clearInterval(recordingInterval.current);
       meteringHistory.current = Array(35).fill(0);
       setAudioMetering(Array(35).fill(0));
       Vibration.vibrate(20);
       
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      
-      if (uri && recordingDuration > 1) {
-        await uploadAndSendAudio(uri);
-      }
-      
+      // Nettoyer l'état avant d'arrêter pour éviter les conflits
       setRecording(null);
       setRecordingDuration(0);
+      
+      await currentRecording.stopAndUnloadAsync();
+      const uri = currentRecording.getURI();
+      
+      console.log('📁 URI:', uri, 'durée:', currentDuration);
+      
+      if (shouldSend && uri && currentDuration > 1) {
+        await uploadAndSendAudio(uri);
+      }
     } catch (error) {
       console.error('Erreur arrêt enregistrement:', error);
       Alert.alert('Erreur', 'Impossible d\'arrêter l\'enregistrement');
@@ -617,14 +654,23 @@ export default function CommunityChat() {
   const cancelRecording = async () => {
     if (!recording) return;
     
+    const currentRecording = recording;
+    
     try {
       setIsRecording(false);
+      isRecordingRef.current = false;
+      setIsHoldingMic(false);
+      setShowCancelIndicator(false);
+      micSwipeX.setValue(0);
       clearInterval(recordingInterval.current);
       meteringHistory.current = Array(35).fill(0);
       setAudioMetering(Array(35).fill(0));
-      await recording.stopAndUnloadAsync();
+      
+      // Nettoyer l'état avant d'arrêter
       setRecording(null);
       setRecordingDuration(0);
+      
+      await currentRecording.stopAndUnloadAsync();
       Vibration.vibrate(10);
     } catch (error) {
       console.error('Erreur annulation:', error);
@@ -878,52 +924,44 @@ export default function CommunityChat() {
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
           {/* UI d'enregistrement audio */}
-          {isRecording ? (
-            <View style={styles.recordingContainer}>
-              <TouchableOpacity onPress={cancelRecording} style={styles.cancelRecordButton}>
-                <Ionicons name="close-circle" size={32} color="#FF4444" />
-              </TouchableOpacity>
-              
-              <View style={styles.recordingWaveform}>
-                {audioMetering.map((level, i) => {
-                  // Calculer la hauteur basée sur le niveau audio réel
-                  const minHeight = 4;
-                  const maxHeight = 32;
-                  const barHeight = minHeight + (level * (maxHeight - minHeight));
-                  
-                  return (
-                    <View 
-                      key={i} 
-                      style={[
-                        styles.recordingBar,
-                        { 
-                          height: barHeight,
-                          backgroundColor: "#FFA94D",
-                          opacity: 0.4 + (level * 0.6), // Opacité variable selon le niveau
-                        }
-                      ]} 
-                    />
-                  );
-                })}
+          <View style={{ width: '100%' }}>
+            {isRecording && (
+              <View style={styles.recordingContainer}>
+                <TouchableOpacity onPress={cancelRecording} style={styles.cancelRecordButton}>
+                  <Ionicons name="close-circle" size={32} color="#FF4444" />
+                </TouchableOpacity>
+                
+                <View style={styles.recordingWaveform}>
+                  {audioMetering.map((level, i) => {
+                    // Calculer la hauteur basée sur le niveau audio réel
+                    const minHeight = 4;
+                    const maxHeight = 32;
+                    const barHeight = minHeight + (level * (maxHeight - minHeight));
+                    
+                    return (
+                      <View 
+                        key={i} 
+                        style={[
+                          styles.recordingBar,
+                          { 
+                            height: barHeight,
+                            backgroundColor: "#FFA94D",
+                            opacity: 0.4 + (level * 0.6), // Opacité variable selon le niveau
+                          }
+                        ]} 
+                      />
+                    );
+                  })}
+                </View>
+                
+                <Text style={styles.recordingTimer}>{formatDuration(recordingDuration)}</Text>
               </View>
-              
-              <Text style={styles.recordingTimer}>{formatDuration(recordingDuration)}</Text>
-              
-              <TouchableOpacity onPress={stopRecording} style={styles.sendRecordButton}>
-                <LinearGradient
-                  colors={['#FFA94D', '#FF8C42']}
-                  style={styles.sendButton}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <Ionicons name="send" size={20} color="#181818" style={{ marginLeft: 2 }} />
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={{ width: '100%' }}>
-              {/* Barre de réponse */}
-              {replyingTo && (
+            )}
+            
+            {!isRecording && (
+              <>
+                {/* Barre de réponse */}
+                {replyingTo && (
                 <BlurView intensity={80} tint="dark" style={styles.replyBarComposer}>
                   <View style={styles.replyBarContent}>
                     <View style={styles.replyBarLeft}>
@@ -980,16 +1018,37 @@ export default function CommunityChat() {
                     </LinearGradient>
                   </TouchableOpacity>
                 ) : (
-                  <TouchableOpacity 
-                    style={styles.voiceButton}
-                    onPress={startRecording}
-                  >
-                    <Ionicons name="mic" size={24} color="#FFA94D" />
-                  </TouchableOpacity>
+                  <View style={{ position: 'relative', width: 44, height: 44 }}>
+                    <TouchableWithoutFeedback
+                      onPressIn={() => {
+                        console.log('🎤 PRESS IN - début enregistrement');
+                        Vibration.vibrate(20);
+                        startRecording(true);
+                      }}
+                      onPressOut={() => {
+                        console.log('🎤 PRESS OUT - relâché, envoi');
+                        Vibration.vibrate(10);
+                        stopRecording(true);
+                      }}
+                    >
+                      <Animated.View
+                        style={[
+                          styles.voiceButton,
+                          isHoldingMic && {
+                            transform: [{ scale: 1.1 }],
+                            backgroundColor: 'rgba(255, 169, 77, 0.2)',
+                          }
+                        ]}
+                      >
+                        <Ionicons name="mic" size={24} color="#FFA94D" />
+                      </Animated.View>
+                    </TouchableWithoutFeedback>
+                  </View>
                 )}
               </View>
-            </View>
-          )}
+            </>
+            )}
+          </View>
         </KeyboardAvoidingView>
       </BlurView>
 
@@ -1068,7 +1127,6 @@ export default function CommunityChat() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Overlay moderne pour non-membres */}
       {!isMember && (
         <View style={styles.joinOverlayModern} pointerEvents="box-none">
           <BlurView intensity={80} tint="dark" style={styles.joinOverlayBlur}>
@@ -1621,6 +1679,28 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     minWidth: 50,
     textAlign: 'center',
+  },
+  swipeToCancelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'absolute',
+    left: 16,
+    gap: 8,
+  },
+  swipeToCancelText: {
+    color: '#FFA94D',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  holdIndicator: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 169, 77, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFA94D',
   },
   sendRecordButton: {
     borderRadius: 22,
