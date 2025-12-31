@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Modal } from 'react-native';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
+import { Modal, StatusBar, TextInput, Animated } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import BottomNav from '../components/BottomNav';
 import { getAuth } from 'firebase/auth';
 import { db } from '../../constants/firebaseConfig';
 import { collectionGroup, onSnapshot, query, where, doc, getDoc, collection, orderBy, limit, getDocs, addDoc, deleteDoc } from 'firebase/firestore';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Swipeable } from 'react-native-gesture-handler';
+import { Swipeable, GestureHandlerRootView } from 'react-native-gesture-handler';
 
 // Type pour un chat (DM ou groupe)
 type ChatItem = {
@@ -22,10 +24,42 @@ type ChatItem = {
 
 export default function MessengerList() {
   const [chats, setChats] = useState<ChatItem[]>([]);
+  const [filteredChats, setFilteredChats] = useState<ChatItem[]>([]);
   const [showFriendsModal, setShowFriendsModal] = useState(false);
   const [friends, setFriends] = useState<any[]>([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+  const scrollY = new Animated.Value(0);
   const router = useRouter();
+
+  // Formater le temps relatif
+  const formatTime = (date: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    
+    if (minutes < 1) return 'À l\'instant';
+    if (minutes < 60) return `${minutes}min`;
+    if (hours < 24) return `${hours}h`;
+    if (days < 7) return `${days}j`;
+    return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+  };
+  
+  // Filtrer les chats en fonction de la recherche
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredChats(chats);
+    } else {
+      const filtered = chats.filter(chat => 
+        chat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        chat.lastMsg.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredChats(filtered);
+    }
+  }, [searchQuery, chats]);
 
   // Charge la liste des amis pour le modal
   async function loadFriendsForModal() {
@@ -185,93 +219,216 @@ export default function MessengerList() {
   };
 
   return (
-    <View style={{ flex: 1 }}>
-      <View style={styles.container}>
-        <Text style={styles.header}>Tous mes messages</Text>
-        <FlatList
-          data={chats}
-          keyExtractor={(item, idx) => item.id + '-' + idx}
-          ListEmptyComponent={<Text style={styles.empty}>Aucune conversation.</Text>}
-          renderItem={({ item }) =>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
+        <StatusBar barStyle="light-content" />
+        <View style={styles.container}>
+          {/* Header moderne avec recherche */}
+          <LinearGradient
+            colors={['#232323', '#1a1a1a']}
+            style={styles.headerGradient}
+          >
+            <View style={styles.headerContent}>
+              {showSearch ? (
+                <View style={styles.searchContainer}>
+                  <Ionicons name="search" size={20} color="#FFA94D" style={styles.searchIcon} />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Rechercher une conversation..."
+                    placeholderTextColor="#666"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    autoFocus
+                  />
+                  <TouchableOpacity onPress={() => {
+                    setShowSearch(false);
+                    setSearchQuery('');
+                  }}>
+                    <Ionicons name="close" size={24} color="#666" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <>
+                  <View>
+                    <Text style={styles.headerTitle}>Messages</Text>
+                    <Text style={styles.headerSubtitle}>{chats.length} conversation{chats.length > 1 ? 's' : ''}</Text>
+                  </View>
+                  <View style={styles.headerActions}>
+                    <TouchableOpacity 
+                      style={styles.searchButton}
+                      onPress={() => setShowSearch(true)}
+                    >
+                      <Ionicons name="search" size={24} color="#FFA94D" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.searchButton}>
+                      <Ionicons name="filter" size={22} color="#FFA94D" />
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </View>
+          </LinearGradient>
+          
+          <Animated.FlatList
+            data={filteredChats}
+            keyExtractor={(item, idx) => item.id + '-' + idx}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+              { useNativeDriver: false }
+            )}
+            scrollEventThrottle={16}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <View style={styles.emptyIconCircle}>
+                  <Ionicons name="chatbubbles-outline" size={48} color="#FFA94D" />
+                </View>
+                <Text style={styles.emptyTitle}>
+                  {searchQuery ? 'Aucun résultat' : 'Aucune conversation'}
+                </Text>
+                <Text style={styles.emptyText}>
+                  {searchQuery ? 'Essaie une autre recherche' : 'Commence à discuter avec tes amis'}
+                </Text>
+              </View>
+            }
+            renderItem={({ item }) =>
             item.type === 'dm' ? (
               <Swipeable
                 renderRightActions={(_, dragX) => (
-                  <TouchableOpacity
-                    style={styles.deleteAction}
-                    onPress={() => handleDeleteDM(item.id)}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="trash" size={28} color="#fff" />
-                  </TouchableOpacity>
+                  <View style={styles.deleteActionContainer}>
+                    <TouchableOpacity
+                      style={styles.deleteAction}
+                      onPress={() => handleDeleteDM(item.id)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="trash" size={24} color="#fff" />
+                      <Text style={styles.deleteText}>Supprimer</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
+                overshootRight={false}
               >
                 <TouchableOpacity
                   style={styles.chatRow}
-                  activeOpacity={0.85}
+                  activeOpacity={0.9}
                   onPress={() => router.push({ pathname: `/chat/[chatId]`, params: { chatId: item.id } })}
                 >
-                  <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                  <View style={styles.avatarContainer}>
+                    <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                    <View style={styles.onlineDot} />
+                  </View>
                   <View style={styles.chatContent}>
                     <View style={styles.chatHeaderRow}>
                       <Text style={styles.chatName}>{item.name}</Text>
-                      <Text style={styles.chatTime}>14:32</Text>
+                      <Text style={styles.chatTime}>{formatTime(item.lastMsgAt)}</Text>
                     </View>
                     <View style={styles.chatFooterRow}>
-                      <Text style={styles.chatLastMsg} numberOfLines={1}>{item.lastMsg}</Text>
+                      <Ionicons name="chatbubble-ellipses" size={14} color="#666" style={{ marginRight: 6 }} />
+                      <Text style={styles.chatLastMsg} numberOfLines={2}>{item.lastMsg}</Text>
                       {item.unread > 0 && (
-                        <View style={styles.badgeUnread}><Text style={styles.badgeUnreadText}>{item.unread}</Text></View>
+                        <View style={styles.badgeUnread}>
+                          <Text style={styles.badgeUnreadText}>{item.unread}</Text>
+                        </View>
                       )}
                     </View>
                   </View>
+                  <Ionicons name="chevron-forward" size={20} color="#666" />
                 </TouchableOpacity>
               </Swipeable>
             ) : (
               <TouchableOpacity
-                style={styles.chatRow}
-                activeOpacity={0.85}
+                style={[styles.chatRow, styles.groupChat]}
+                activeOpacity={0.9}
                 onPress={() => router.push({ pathname: `/community/[category]`, params: { category: item.id } })}
               >
-                <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                <View style={styles.avatarContainer}>
+                  <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                  <View style={styles.groupBadge}>
+                    <Ionicons name="people" size={12} color="#181818" />
+                  </View>
+                </View>
                 <View style={styles.chatContent}>
                   <View style={styles.chatHeaderRow}>
-                    <Text style={styles.chatName}>{item.name}</Text>
-                    <Text style={styles.chatTime}>14:32</Text>
+                    <View style={styles.groupNameContainer}>
+                      <MaterialCommunityIcons name="shield-account" size={16} color="#FFA94D" style={{ marginRight: 6 }} />
+                      <Text style={styles.chatName}>{item.name}</Text>
+                    </View>
+                    <Text style={styles.chatTime}>{formatTime(item.lastMsgAt)}</Text>
                   </View>
                   <View style={styles.chatFooterRow}>
-                    <Text style={styles.chatLastMsg} numberOfLines={1}>{item.lastMsg}</Text>
+                    <Ionicons name="chatbubbles" size={14} color="#666" style={{ marginRight: 6 }} />
+                    <Text style={styles.chatLastMsg} numberOfLines={2}>{item.lastMsg}</Text>
                     {item.unread > 0 && (
-                      <View style={styles.badgeUnread}><Text style={styles.badgeUnreadText}>{item.unread}</Text></View>
+                      <View style={styles.badgeUnread}>
+                        <Text style={styles.badgeUnreadText}>{item.unread}</Text>
+                      </View>
                     )}
                   </View>
                 </View>
+                <Ionicons name="chevron-forward" size={20} color="#666" />
               </TouchableOpacity>
             )
           }
           style={{ flexGrow: 0 }}
+          contentContainerStyle={{ paddingBottom: 100 }}
         />
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => {
-            setShowFriendsModal(true);
-            loadFriendsForModal();
-          }}
+        
+        {/* Bouton FAB moderne avec animation */}
+        <Animated.View
+          style={[
+            styles.fabContainer,
+            {
+              transform: [{
+                scale: scrollY.interpolate({
+                  inputRange: [0, 100],
+                  outputRange: [1, 0.9],
+                  extrapolate: 'clamp',
+                }),
+              }],
+            },
+          ]}
         >
-          <Ionicons name="chatbubble-ellipses" size={30} color="#fff" />
-        </TouchableOpacity>
-        {/* Modal de sélection d'ami */}
+          <TouchableOpacity
+            onPress={() => {
+              setShowFriendsModal(true);
+              loadFriendsForModal();
+            }}
+            activeOpacity={0.9}
+          >
+            <LinearGradient
+              colors={['#FFA94D', '#FF8C42']}
+              style={styles.fab}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Ionicons name="add" size={32} color="#181818" />
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
+        
+        {/* Modal de sélection d'ami modernisé */}
         <Modal
           visible={showFriendsModal}
           animationType="slide"
           transparent={true}
           onRequestClose={() => setShowFriendsModal(false)}
         >
-          <View style={{ flex: 1, backgroundColor: 'rgba(24,24,24,0.85)', justifyContent: 'center', alignItems: 'center' }}>
-            <View style={{ backgroundColor: '#23232a', borderRadius: 18, padding: 24, width: '85%', maxHeight: '70%' }}>
-              <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 20, marginBottom: 16 }}>Choisis un ami</Text>
+          <BlurView intensity={90} tint="dark" style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Nouveau message</Text>
+                <TouchableOpacity onPress={() => setShowFriendsModal(false)} style={styles.modalCloseButton}>
+                  <Ionicons name="close" size={28} color="#FFA94D" />
+                </TouchableOpacity>
+              </View>
               {loadingFriends ? (
-                <Text style={{ color: '#fff' }}>Chargement...</Text>
+                <View style={styles.loadingContainer}>
+                  <Text style={styles.loadingText}>Chargement...</Text>
+                </View>
               ) : friends.length === 0 ? (
-                <Text style={{ color: '#fff' }}>Aucun ami trouvé.</Text>
+                <View style={styles.emptyFriendsContainer}>
+                  <Ionicons name="people-outline" size={48} color="#666" />
+                  <Text style={styles.emptyFriendsText}>Aucun ami trouvé</Text>
+                </View>
               ) : (
                 <FlatList
                   data={friends}
@@ -280,7 +437,8 @@ export default function MessengerList() {
                     const user = item.otherUser;
                     return (
                       <TouchableOpacity
-                        style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10 }}
+                        style={styles.friendItem}
+                        activeOpacity={0.8}
                         onPress={async () => {
                           setShowFriendsModal(false);
                           // Ouvre ou crée le chat DM
@@ -311,26 +469,28 @@ export default function MessengerList() {
                           router.push({ pathname: `/chat/[chatId]`, params: { chatId: threadRef.id } });
                         }}
                       >
-                        <Image source={{ uri: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.pseudo || user.displayName || 'User')}&background=FFA94D&color=181818&size=128` }} style={{ width: 44, height: 44, borderRadius: 22, marginRight: 14, backgroundColor: '#FFA94D33' }} />
-                        <View>
-                          <Text style={{ color: '#fff', fontSize: 16 }}>{user.pseudo || user.displayName || 'Utilisateur'}</Text>
-                          <Text style={{ color: '#aaa', fontSize: 13 }}>{user.mail || user.email || ''}</Text>
+                        <View style={styles.friendAvatarContainer}>
+                          <Image source={{ uri: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.pseudo || user.displayName || 'User')}&background=FFA94D&color=181818&size=128` }} style={styles.friendAvatar} />
                         </View>
+                        <View style={styles.friendInfo}>
+                          <Text style={styles.friendName}>{user.pseudo || user.displayName || 'Utilisateur'}</Text>
+                          <Text style={styles.friendEmail}>{user.mail || user.email || ''}</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="#666" />
                       </TouchableOpacity>
                     );
                   }}
-                  style={{ maxHeight: 300 }}
+                  style={styles.friendsList}
+                  contentContainerStyle={styles.friendsListContent}
                 />
               )}
-              <TouchableOpacity onPress={() => setShowFriendsModal(false)} style={{ marginTop: 18, alignSelf: 'center' }}>
-                <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 16 }}>Annuler</Text>
-              </TouchableOpacity>
             </View>
-          </View>
+          </BlurView>
         </Modal>
+        </View>
       </View>
       <BottomNav />
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -338,37 +498,122 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#181818',
-    paddingTop: 24,
   },
-  header: {
+  headerGradient: {
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  searchContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 48,
+    borderWidth: 1,
+    borderColor: '#FFA94D',
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 15,
+  },
+  headerTitle: {
     color: '#FFA94D',
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginTop: 18,
-    marginBottom: 10,
-    marginLeft: 18,
+    letterSpacing: 0.5,
+  },
+  headerSubtitle: {
+    color: '#999',
+    fontSize: 14,
+    marginTop: 4,
+  },
+  searchButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 169, 77, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   chatRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#232323',
-    borderRadius: 16,
-    marginHorizontal: 14,
-    marginBottom: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    marginHorizontal: 16,
+    marginVertical: 6,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+    elevation: 3,
     shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+  },
+  groupChat: {
+    backgroundColor: 'rgba(255, 169, 77, 0.08)',
+    borderColor: 'rgba(255, 169, 77, 0.2)',
+  },
+  groupNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 14,
   },
   avatar: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    marginRight: 14,
-    backgroundColor: '#FFA94D33',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#333',
+    borderWidth: 2,
+    borderColor: '#FFA94D',
+  },
+  onlineDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#4CAF50',
+    borderWidth: 2,
+    borderColor: '#232323',
+  },
+  groupBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#FFA94D',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#232323',
   },
   chatContent: {
     flex: 1,
@@ -378,76 +623,204 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 2,
+    marginBottom: 6,
   },
   chatName: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 17,
     flex: 1,
+    letterSpacing: 0.2,
   },
   chatTime: {
-    color: '#aaa',
+    color: '#FFA94D',
     fontSize: 12,
+    fontWeight: '600',
     marginLeft: 8,
   },
   chatFooterRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
   },
   chatLastMsg: {
-    color: '#aaa',
+    color: '#999',
     fontSize: 14,
     flex: 1,
     marginRight: 8,
+    lineHeight: 18,
   },
   badgeUnread: {
     backgroundColor: '#FFA94D',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 6,
-    marginLeft: 4,
+    paddingHorizontal: 8,
   },
   badgeUnreadText: {
     color: '#181818',
     fontWeight: 'bold',
     fontSize: 12,
   },
-  fab: {
+  fabContainer: {
     position: 'absolute',
     right: 24,
-    bottom: 32,
-    backgroundColor: '#FFA94D',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    bottom: 100,
+    borderRadius: 30,
+    elevation: 8,
+    shadowColor: '#FFA94D',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  fab: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
   },
-  empty: {
-    color: '#888',
-    fontStyle: 'italic',
-    marginLeft: 18,
-    marginBottom: 10,
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 80,
+    paddingHorizontal: 40,
+  },
+  emptyIconCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255, 169, 77, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  emptyTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  emptyText: {
+    color: '#666',
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  deleteActionContainer: {
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    marginVertical: 6,
   },
   deleteAction: {
     backgroundColor: '#E53935',
     justifyContent: 'center',
     alignItems: 'center',
-    width: 70,
-    height: '90%',
-    marginVertical: 6,
+    width: 90,
+    height: '100%',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    marginRight: 16,
+  },
+  deleteText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: '#232323',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 40,
+    maxHeight: '80%',
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  modalTitle: {
+    color: '#FFA94D',
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  modalCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 169, 77, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingContainer: {
+    paddingVertical: 60,
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#999',
+    fontSize: 15,
+  },
+  emptyFriendsContainer: {
+    paddingVertical: 60,
+    alignItems: 'center',
+  },
+  emptyFriendsText: {
+    color: '#666',
+    fontSize: 15,
+    marginTop: 16,
+  },
+  friendsList: {
+    maxHeight: 400,
+  },
+  friendsListContent: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  friendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: '#2a2a2a',
     borderRadius: 16,
-    alignSelf: 'flex-end',
-    marginRight: 10,
+    marginVertical: 6,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  friendAvatarContainer: {
+    marginRight: 14,
+  },
+  friendAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#333',
+    borderWidth: 2,
+    borderColor: '#FFA94D',
+  },
+  friendInfo: {
+    flex: 1,
+  },
+  friendName: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  friendEmail: {
+    color: '#999',
+    fontSize: 13,
   },
 });

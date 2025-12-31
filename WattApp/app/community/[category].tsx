@@ -1,9 +1,10 @@
 import { collectionGroup, getDocs, where, query as fsQuery } from 'firebase/firestore';
 export const unstable_settings = { layout: null };
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, KeyboardAvoidingView, Platform, Image, Animated, StatusBar, Pressable, Vibration } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, setDoc, doc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
@@ -32,6 +33,8 @@ export default function CommunityChat() {
   const flatListRef = useRef<FlatList>(null);
   const [isMember, setIsMember] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [composerFocused, setComposerFocused] = useState(false);
 
   const { category } = useLocalSearchParams();
   const router = useRouter();
@@ -93,6 +96,9 @@ export default function CommunityChat() {
     const auth = getAuth(app);
     const user = auth.currentUser;
     if (!user) return;
+    
+    Vibration.vibrate(10);
+    
     await addDoc(collection(db, 'communityChats', String(category), 'messages'), {
       text: input.trim(),
       user: user.displayName || user.email || 'Utilisateur',
@@ -104,555 +110,751 @@ export default function CommunityChat() {
   };
 
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: '#181818' }}>
+      <StatusBar barStyle="light-content" />
+      
+      {/* Header moderne avec glassmorphism */}
       <LinearGradient
-        colors={["#fff7ef", "#ffe0c2"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.bg}
+        colors={['#232323', '#1a1a1a']}
+        style={styles.headerModern}
       >
-        {/* Nom du groupe toujours visible en haut */}
+        <BlurView intensity={20} tint="dark" style={styles.headerBlur}>
         <View style={styles.groupHeaderBar}>
-          {isMember ? (
-            <TouchableOpacity onPress={() => router.back()} style={styles.backBtnRound}>
-              <Ionicons name="arrow-back" size={22} color="#FFA94D" />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity onPress={() => router.back()} style={styles.backBtnPreview}>
-              <Ionicons name="arrow-back" size={22} color="#FFD600" />
-            </TouchableOpacity>
-          )}
-          <View style={styles.bubbleHeaderWrap}>
-            <Text style={styles.groupHeaderTitle}>{CATEGORY_LABELS[String(category)] || category}</Text>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtnModern}>
+            <Ionicons name="chevron-back" size={28} color="#FFA94D" />
+          </TouchableOpacity>
+          
+          <View style={styles.headerCenterContent}>
+            <MaterialCommunityIcons name="shield-account" size={20} color="#FFA94D" style={{ marginRight: 8 }} />
+            <Text style={styles.groupTitleModern}>{CATEGORY_LABELS[String(category)] || category}</Text>
           </View>
-          {isMember && (
-            <TouchableOpacity style={styles.membersBtn} onPress={() => setShowMembersSidebar(true)}>
-              <Ionicons name="people-outline" size={22} color="#FFA94D" />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Section Mes groupes */}
-        {myGroups.length > 0 && (
-          <View style={styles.myGroupsSection}>
-            <Text style={styles.myGroupsTitle}>Mes groupes</Text>
-            <FlatList
-              data={myGroups}
-              keyExtractor={(item, idx) => `${item.groupId}-${item.uid || ''}-${idx}`}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 8 }}
-              renderItem={({ item }) => (
-                <View style={styles.myGroupBubble}>
-                  <Text style={styles.myGroupText}>{item.groupId}</Text>
+          
+          <View style={styles.headerActionsRow}>
+            {isMember && (
+              <TouchableOpacity style={styles.headerActionBtn} onPress={() => setShowMembersSidebar(true)}>
+                <Ionicons name="people" size={22} color="#FFA94D" />
+                <View style={styles.membersBadge}>
+                  <Text style={styles.membersBadgeText}>{members.length}</Text>
                 </View>
-              )}
-            />
-          </View>
-        )}
-        {members.length > 0 && (
-          <View style={styles.membersBar}>
-            <FlatList
-              data={members}
-              keyExtractor={(item, idx) => item.user + idx}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 8 }}
-              renderItem={({ item }) => (
-                <View style={styles.memberAvatarWrap}>
-                  <Image
-                    source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }}
-                    style={styles.memberAvatar}
-                  />
-                </View>
-              )}
-              ListFooterComponent={<Text style={styles.membersCount}>+{members.length}</Text>}
-            />
-          </View>
-        )}
-
-        {/* Chat et input toujours visibles, mais assombris si non membre */}
-        <View style={isMember ? undefined : { opacity: 0.25, pointerEvents: 'none' }}>
-          <FlatList
-            ref={flatListRef}
-            data={filteredMessages}
-            keyExtractor={item => item.id}
-            renderItem={({ item, index }) => {
-              const isEven = index % 2 === 0;
-              return (
-                <View style={styles.messageRowPremium}>
-                  <Image source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }} style={styles.avatarPremium} />
-                  <View style={styles.bubbleWrapPremium}>
-                    <Text style={styles.userPremium}>{item.user}</Text>
-                    <LinearGradient
-                      colors={isEven ? ["#FFA94D", "#FFCC80"] : ["#fff", "#ffe0c2"]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.bubblePremium}
-                    >
-                      <Text style={[styles.textPremium, { color: isEven ? '#23232a' : '#FFA94D' }]}>{item.text}</Text>
-                    </LinearGradient>
-                    {item.createdAt?.seconds ? (
-                      <Text style={styles.timePremium}>{new Date(item.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
-                    ) : null}
-                  </View>
-                </View>
-              );
-            }}
-            contentContainerStyle={{ padding: 18, paddingBottom: 100 }}
-            showsVerticalScrollIndicator={false}
-          />
-        </View>
-
-        {/* Barre d'écriture toujours en bas de l'écran */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 38 : 0}
-          style={styles.inputBarWrapPremium}
-        >
-          <View style={styles.inputBarPremium}>
-            <TextInput
-              value={input}
-              onChangeText={setInput}
-              placeholder="Écrire un message..."
-              placeholderTextColor="#FFA94D"
-              style={styles.inputPremium}
-              onSubmitEditing={sendMessage}
-              returnKeyType="send"
-            />
-            <TouchableOpacity onPress={sendMessage} style={styles.sendBtnPremium}>
-              <Ionicons name="send" size={22} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
-
-        {/* Overlay d'assombrissement + bouton rejoindre en bas si non membre */}
-        {!isMember && (
-          <View style={styles.previewOverlay} pointerEvents="box-none">
-            <FlatList
-              data={members}
-              keyExtractor={(item, idx) => item.user + idx}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 8, marginBottom: 8 }}
-              style={{ maxHeight: 54 }}
-              renderItem={({ item }) => (
-                <View style={styles.memberAvatarWrap}>
-                  <Image
-                    source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }}
-                    style={styles.memberAvatar}
-                  />
-                </View>
-              )}
-            />
-            <Text style={styles.memberCountText}>{members.length} membre{members.length > 1 ? 's' : ''} dans ce groupe</Text>
-            <TouchableOpacity
-              style={styles.joinBtn}
-              onPress={async () => {
-                const auth = getAuth(app);
-                const user = auth.currentUser;
-                if (!user) return;
-                try {
-                  await setDoc(
-                    doc(db, 'communityChats', String(category), 'members', user.uid),
-                    {
-                      uid: user.uid,
-                      user: user.displayName || user.email || 'Utilisateur',
-                      photoURL: user.photoURL || '',
-                      joinedAt: serverTimestamp(),
-                    },
-                    { merge: true }
-                  );
-                  setMembers(prev => [
-                    ...prev.filter(m => m.uid !== user.uid),
-                    {
-                      uid: user.uid,
-                      user: user.displayName || user.email || 'Utilisateur',
-                      photoURL: user.photoURL || '',
-                      joinedAt: new Date(),
-                    }
-                  ]);
-                  // Envoie un message système dans le chat
-                  await addDoc(
-                    collection(db, 'communityChats', String(category), 'messages'),
-                    {
-                      text: `${user.displayName || user.email || 'Utilisateur'} a rejoint le groupe`,
-                      uid: user.uid,
-                      user: user.displayName || user.email || 'Utilisateur',
-                      photoURL: user.photoURL || '',
-                      createdAt: serverTimestamp(),
-                      system: true,
-                    }
-                  );
-                  setIsMember(true);
-                } catch (e) {
-                  alert('Erreur lors de la tentative de rejoindre le groupe.');
-                }
-              }}
-            >
-              <Text style={styles.joinBtnText}>Rejoindre</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </LinearGradient>
-      {/* Sidebar membres */}
-      {showMembersSidebar && (
-        <View style={styles.sidebarOverlay}>
-          <View style={styles.sidebarContainer}>
-            <View style={styles.sidebarHeader}>
-              <Text style={styles.sidebarTitle}>Membres du groupe</Text>
-              <TouchableOpacity onPress={() => setShowMembersSidebar(false)} style={styles.sidebarCloseBtn}>
-                <Ionicons name="close" size={26} color="#FFA94D" />
               </TouchableOpacity>
-            </View>
-            <FlatList
-              data={members}
-              keyExtractor={(item, idx) => (item.user || 'U') + idx}
-              renderItem={({ item }) => (
-                <View style={styles.sidebarMemberRow}>
-                  <Image
-                    source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }}
-                    style={styles.sidebarMemberAvatar}
-                  />
-                  <Text style={styles.sidebarMemberName}>{item.user}</Text>
-                </View>
-              )}
-              contentContainerStyle={{ paddingVertical: 16 }}
-              showsVerticalScrollIndicator={false}
-            />
+            )}
           </View>
+        </View>
+        </BlurView>
+      </LinearGradient>
+
+      {/* Section membres avec design moderne */}
+      {members.length > 0 && (
+        <View style={styles.membersSection}>
+          <LinearGradient
+            colors={['rgba(255, 169, 77, 0.15)', 'rgba(255, 169, 77, 0.05)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.membersGradient}
+          >
+          <FlatList
+            data={members}
+            keyExtractor={(item, idx) => item.user + idx}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12 }}
+            renderItem={({ item }) => (
+              <Pressable style={styles.memberCard}>
+                <Image
+                  source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }}
+                  style={styles.memberAvatarModern}
+                />
+                <View style={styles.onlineIndicatorSmall} />
+              </Pressable>
+            )}
+            ListFooterComponent={
+              <View style={styles.membersCountBubble}>
+                <Text style={styles.membersCountText}>+{members.length}</Text>
+              </View>
+            }
+          />
+          </LinearGradient>
         </View>
       )}
-    </>
+
+      {/* Liste des messages avec design moderne */}
+      <View style={[styles.chatContainer, !isMember && styles.chatDisabled]}>
+        <Animated.FlatList
+          ref={flatListRef}
+          data={filteredMessages}
+          keyExtractor={item => item.id}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: false }
+          )}
+          scrollEventThrottle={16}
+          renderItem={({ item, index }) => {
+            const auth = getAuth(app);
+            const isMe = item.uid === auth.currentUser?.uid;
+            
+            return (
+              <Pressable
+                style={[
+                  styles.messageRowModern,
+                  isMe ? styles.messageRowMe : styles.messageRowOther
+                ]}
+                onLongPress={() => Vibration.vibrate(50)}
+              >
+                {!isMe && (
+                  <Image 
+                    source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }} 
+                    style={styles.messageAvatar} 
+                  />
+                )}
+                
+                <View style={styles.messageBubbleContainer}>
+                  {!isMe && <Text style={styles.messageUserName}>{item.user}</Text>}
+                  
+                  <View
+                    style={[
+                      styles.messageBubbleModern,
+                      isMe ? styles.messageBubbleMe : styles.messageBubbleOther,
+                    ]}
+                  >
+                    <Text style={[styles.messageTextModern, isMe && styles.messageTextMe]}>
+                      {item.text}
+                    </Text>
+                  </View>
+                  
+                  {item.createdAt?.seconds && (
+                    <Text style={[styles.messageTimeModern, isMe && styles.messageTimeMeModern]}>
+                      {new Date(item.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  )}
+                </View>
+                
+                {isMe && (
+                  <Image 
+                    source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }} 
+                    style={styles.messageAvatar} 
+                  />
+                )}
+              </Pressable>
+            );
+          }}
+          contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 16, paddingBottom: 120 }}
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
+
+      {/* Composer moderne avec BlurView */}
+      <BlurView intensity={95} tint="dark" style={styles.composerBlur}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <View style={[styles.composerModern, composerFocused && styles.composerFocused]}>
+            <TouchableOpacity style={styles.attachButton}>
+              <Ionicons name="add-circle" size={28} color="#FFA94D" />
+            </TouchableOpacity>
+            
+            <View style={styles.inputWrapper}>
+              <TextInput
+                value={input}
+                onChangeText={setInput}
+                placeholder="Écris ton message..."
+                placeholderTextColor="#666"
+                style={styles.inputModern}
+                onSubmitEditing={sendMessage}
+                onFocus={() => setComposerFocused(true)}
+                onBlur={() => setComposerFocused(false)}
+                returnKeyType="send"
+                multiline
+                maxLength={1000}
+              />
+            </View>
+            
+            {input.trim() ? (
+              <TouchableOpacity onPress={sendMessage} style={styles.sendButtonContainer}>
+                <LinearGradient
+                  colors={['#FFA94D', '#FF8C42']}
+                  style={styles.sendButton}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <Ionicons name="send" size={20} color="#181818" style={{ marginLeft: 2 }} />
+                </LinearGradient>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.voiceButton}>
+                <Ionicons name="mic" size={24} color="#FFA94D" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </BlurView>
+
+      {/* Overlay moderne pour non-membres */}
+      {!isMember && (
+        <View style={styles.joinOverlayModern} pointerEvents="box-none">
+          <BlurView intensity={80} tint="dark" style={styles.joinOverlayBlur}>
+            <View style={styles.joinContent}>
+              <LinearGradient
+                colors={['rgba(255, 169, 77, 0.2)', 'rgba(255, 140, 66, 0.1)']}
+                style={styles.joinCard}
+              >
+                <MaterialCommunityIcons name="shield-account" size={48} color="#FFA94D" style={{ marginBottom: 16 }} />
+                <Text style={styles.joinTitle}>Rejoindre le groupe</Text>
+                <Text style={styles.joinSubtitle}>{members.length} membre{members.length > 1 ? 's' : ''} actif{members.length > 1 ? 's' : ''}</Text>
+                
+                {/* Mini preview des membres */}
+                <View style={styles.membersMiniPreview}>
+                  {members.slice(0, 5).map((item, idx) => (
+                    <Image
+                      key={idx}
+                      source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }}
+                      style={[styles.miniMemberAvatar, { marginLeft: idx > 0 ? -12 : 0 }]}
+                    />
+                  ))}
+                  {members.length > 5 && (
+                    <View style={[styles.miniMemberAvatar, styles.miniMemberMore, { marginLeft: -12 }]}>
+                      <Text style={styles.miniMemberMoreText}>+{members.length - 5}</Text>
+                    </View>
+                  )}
+                </View>
+                
+                <TouchableOpacity
+                  style={styles.joinBtnModern}
+                  activeOpacity={0.9}
+                  onPress={async () => {
+                    const auth = getAuth(app);
+                    const user = auth.currentUser;
+                    if (!user) return;
+                    
+                    Vibration.vibrate(30);
+                    
+                    try {
+                      await setDoc(
+                        doc(db, 'communityChats', String(category), 'members', user.uid),
+                        {
+                          uid: user.uid,
+                          user: user.displayName || user.email || 'Utilisateur',
+                          photoURL: user.photoURL || '',
+                          joinedAt: serverTimestamp(),
+                        },
+                        { merge: true }
+                      );
+                      setMembers(prev => [
+                        ...prev.filter(m => m.uid !== user.uid),
+                        {
+                          uid: user.uid,
+                          user: user.displayName || user.email || 'Utilisateur',
+                          photoURL: user.photoURL || '',
+                          joinedAt: new Date(),
+                        }
+                      ]);
+                      await addDoc(
+                        collection(db, 'communityChats', String(category), 'messages'),
+                        {
+                          text: `${user.displayName || user.email || 'Utilisateur'} a rejoint le groupe`,
+                          uid: user.uid,
+                          user: user.displayName || user.email || 'Utilisateur',
+                          photoURL: user.photoURL || '',
+                          createdAt: serverTimestamp(),
+                          system: true,
+                        }
+                      );
+                      setIsMember(true);
+                    } catch (e) {
+                      alert('Erreur lors de la tentative de rejoindre le groupe.');
+                    }
+                  }}
+                >
+                  <LinearGradient
+                    colors={['#FFA94D', '#FF8C42']}
+                    style={styles.joinBtnGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <Ionicons name="enter" size={22} color="#181818" style={{ marginRight: 8 }} />
+                    <Text style={styles.joinBtnTextModern}>Rejoindre</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </LinearGradient>
+            </View>
+          </BlurView>
+        </View>
+      )}
+
+      {/* Sidebar moderne pour les membres */}
+      {/* Sidebar moderne pour les membres */}
+      {showMembersSidebar && (
+        <Pressable style={styles.sidebarOverlayModern} onPress={() => setShowMembersSidebar(false)}>
+          <Pressable style={styles.sidebarContainerModern} onPress={(e) => e.stopPropagation()}>
+            <LinearGradient
+              colors={['#232323', '#1a1a1a']}
+              style={styles.sidebarGradient}
+            >
+              <BlurView intensity={30} tint="dark" style={styles.sidebarBlur}>
+                <View style={styles.sidebarHeaderModern}>
+                  <View style={styles.sidebarHeaderContent}>
+                    <Ionicons name="people" size={24} color="#FFA94D" />
+                    <Text style={styles.sidebarTitleModern}>Membres ({members.length})</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setShowMembersSidebar(false)} style={styles.sidebarCloseBtnModern}>
+                    <Ionicons name="close" size={28} color="#FFA94D" />
+                  </TouchableOpacity>
+                </View>
+                
+                <FlatList
+                  data={members}
+                  keyExtractor={(item, idx) => (item.user || 'U') + idx}
+                  renderItem={({ item }) => (
+                    <View style={styles.sidebarMemberRowModern}>
+                      <Image
+                        source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }}
+                        style={styles.sidebarMemberAvatarModern}
+                      />
+                      <View style={styles.sidebarMemberInfo}>
+                        <Text style={styles.sidebarMemberNameModern}>{item.user}</Text>
+                        <Text style={styles.sidebarMemberStatusModern}>En ligne</Text>
+                      </View>
+                      <View style={styles.onlineIndicatorSmall} />
+                    </View>
+                  )}
+                  contentContainerStyle={{ paddingVertical: 16 }}
+                  showsVerticalScrollIndicator={false}
+                />
+              </BlurView>
+            </LinearGradient>
+          </Pressable>
+        </Pressable>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // Ajout des styles manquants utilisés dans le composant
-  bg: { flex: 1 },
-  groupHeaderBar: {
+  // Header moderne
+  headerModern: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     zIndex: 200,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  headerBlur: {
+    paddingTop: 50,
+    paddingBottom: 12,
+  },
+  groupHeaderBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 38,
-    paddingBottom: 10,
-    paddingHorizontal: 18,
-    borderBottomLeftRadius: 22,
-    borderBottomRightRadius: 22,
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.13,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 10,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
   },
-  groupHeaderTitle: {
+  backBtnModern: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 169, 77, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCenterContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 12,
+  },
+  groupTitleModern: {
     color: '#FFA94D',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
     letterSpacing: 0.5,
-    textShadowColor: '#fff7',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
-  backBtnRound: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#fff7ef',
+  headerActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerActionBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 169, 77, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.10,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    position: 'relative',
   },
-  backBtnPreview: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(24,24,24,0.72)',
+  membersBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#FFA94D',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.10,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    paddingHorizontal: 4,
   },
-  bubbleHeaderWrap: {
+  membersBadgeText: {
+    color: '#181818',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  
+  // Section membres
+  membersSection: {
+    marginTop: 110,
+    marginBottom: 8,
+  },
+  membersGradient: {
+    paddingVertical: 0,
+  },
+  memberCard: {
+    alignItems: 'center',
+    marginRight: 12,
+    position: 'relative',
+  },
+  memberAvatarModern: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: '#FFA94D',
+    backgroundColor: '#232323',
+  },
+  onlineIndicatorSmall: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#4CAF50',
+    borderWidth: 2,
+    borderColor: '#181818',
+  },
+  membersCountBubble: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 169, 77, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 169, 77, 0.4)',
+  },
+  membersCountText: {
+    color: '#FFA94D',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  
+  // Chat container
+  chatContainer: {
+    flex: 1,
+    backgroundColor: '#181818',
+    marginTop: 110,
+  },
+  chatDisabled: {
+    opacity: 0.3,
+    pointerEvents: 'none',
+  },
+  
+  // Messages
+  messageRowModern: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginVertical: 6,
+    paddingHorizontal: 4,
+  },
+  messageRowMe: {
+    justifyContent: 'flex-end',
+  },
+  messageRowOther: {
+    justifyContent: 'flex-start',
+  },
+  messageAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginHorizontal: 6,
+    backgroundColor: '#232323',
+    borderWidth: 2,
+    borderColor: '#FFA94D',
+  },
+  messageBubbleContainer: {
+    maxWidth: '70%',
+  },
+  messageUserName: {
+    color: '#FFA94D',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 4,
+    marginLeft: 12,
+  },
+  messageBubbleModern: {
+    borderRadius: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  messageBubbleMe: {
+    backgroundColor: '#FFA94D',
+    borderBottomRightRadius: 4,
+  },
+  messageBubbleOther: {
+    backgroundColor: '#2a2a2a',
+    borderBottomLeftRadius: 4,
+  },
+  messageTextModern: {
+    color: '#fff',
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  messageTextMe: {
+    color: '#181818',
+  },
+  messageTimeModern: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 4,
+    marginLeft: 12,
+  },
+  messageTimeMeModern: {
+    textAlign: 'right',
+    marginRight: 12,
+    marginLeft: 0,
+  },
+  
+  // Composer
+  composerBlur: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+  },
+  composerModern: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  composerFocused: {
+    paddingBottom: 16,
+  },
+  attachButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inputWrapper: {
+    flex: 1,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  inputModern: {
+    minHeight: 44,
+    maxHeight: 120,
+    color: '#fff',
+    fontSize: 15,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  sendButtonContainer: {
+    borderRadius: 22,
+    overflow: 'hidden',
+  },
+  sendButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voiceButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 169, 77, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
+  // Join overlay
+  joinOverlayModern: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 99,
+  },
+  joinOverlayBlur: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
-    marginLeft: -38,
+    padding: 24,
   },
-  membersBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#fff7ef',
+  joinContent: {
+    width: '100%',
+    maxWidth: 360,
+  },
+  joinCard: {
+    backgroundColor: '#232323',
+    borderRadius: 24,
+    padding: 32,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 14,
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.10,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 169, 77, 0.3)',
   },
-  myGroupsSection: {
-    marginTop: 70,
-    marginBottom: 8,
-    paddingHorizontal: 8,
-  },
-  myGroupsTitle: {
+  joinTitle: {
     color: '#FFA94D',
+    fontSize: 24,
     fontWeight: 'bold',
-    fontSize: 17,
-    marginBottom: 6,
-    marginLeft: 8,
+    marginBottom: 8,
+    textAlign: 'center',
   },
-  myGroupBubble: {
-    backgroundColor: '#FFA94D',
-    borderRadius: 999,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    marginRight: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  myGroupText: {
-    color: '#fff',
-    fontWeight: 'bold',
+  joinSubtitle: {
+    color: '#999',
     fontSize: 15,
+    marginBottom: 24,
+    textAlign: 'center',
   },
-  membersBar: {
+  membersMiniPreview: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-    marginTop: 70,
-    minHeight: 54,
-    paddingBottom: 2,
-  },
-  memberAvatarWrap: {
-    marginRight: 8,
-    alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 24,
   },
-  memberAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+  miniMemberAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 2,
-    borderColor: '#FFA94D',
-    backgroundColor: '#fff',
+    borderColor: '#232323',
+    backgroundColor: '#2a2a2a',
   },
-  membersCount: {
-    color: '#FFA94D',
-    fontWeight: 'bold',
-    fontSize: 15,
-    marginLeft: 6,
-    marginRight: 2,
-  },
-  previewOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(24,24,24,0.72)',
-    zIndex: 99,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingBottom: 24,
-  },
-  joinBtn: {
-    backgroundColor: '#FFA94D',
-    borderRadius: 18,
-    paddingVertical: 12,
-    paddingHorizontal: 36,
+  miniMemberMore: {
+    backgroundColor: 'rgba(255, 169, 77, 0.3)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.13,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
   },
-  joinBtnText: {
-    color: '#fff',
+  miniMemberMoreText: {
+    color: '#FFA94D',
+    fontSize: 12,
     fontWeight: 'bold',
-    fontSize: 16,
+  },
+  joinBtnModern: {
+    width: '100%',
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#FFA94D',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  joinBtnGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+  },
+  joinBtnTextModern: {
+    color: '#181818',
+    fontSize: 17,
+    fontWeight: 'bold',
     letterSpacing: 0.5,
   },
-  memberCountText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
-    marginBottom: 18,
-    textAlign: 'center',
-    textShadowColor: '#0008',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  sidebarOverlay: {
+  
+  // Sidebar
+  sidebarOverlayModern: {
     position: 'absolute',
     top: 0,
     right: 0,
     bottom: 0,
     left: 0,
-    backgroundColor: 'rgba(0,0,0,0.18)',
-    zIndex: 100,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    zIndex: 300,
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
   },
-  sidebarContainer: {
-    width: 300,
+  sidebarContainerModern: {
+    width: 320,
     height: '100%',
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 18,
-    borderBottomLeftRadius: 18,
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: -2, height: 0 },
-    elevation: 8,
-    paddingHorizontal: 0,
-    paddingTop: 0,
   },
-  sidebarHeader: {
+  sidebarGradient: {
+    flex: 1,
+    borderTopLeftRadius: 24,
+    borderBottomLeftRadius: 24,
+  },
+  sidebarBlur: {
+    flex: 1,
+  },
+  sidebarHeaderModern: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingTop: 24,
-    paddingBottom: 12,
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#FFA94D22',
+    borderBottomColor: '#333',
   },
-  sidebarTitle: {
-    fontSize: 19,
+  sidebarHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  sidebarTitleModern: {
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#FFA94D',
   },
-  sidebarCloseBtn: {
-    padding: 4,
-  },
-  sidebarMemberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: '#FFA94D11',
-  },
-  sidebarMemberAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    marginRight: 12,
-    backgroundColor: '#FFA94D33',
-  },
-  sidebarMemberName: {
-    fontSize: 15,
-    color: '#23232a',
-    fontWeight: '600',
-  },
-  bubbleWrapPremium: {
-    flex: 1,
-    marginLeft: 8,
-    backgroundColor: 'transparent',
-  },
-  userPremium: {
-    fontWeight: 'bold',
-    color: '#FFA94D',
-    marginBottom: 2,
-    fontSize: 14,
-  },
-  bubblePremium: {
-    borderRadius: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    marginBottom: 2,
-    minWidth: 60,
-    alignSelf: 'flex-start',
-  },
-  textPremium: {
-    fontSize: 15,
-    fontWeight: '500',
-    lineHeight: 20,
-  },
-  timePremium: {
-    color: '#FFA94D',
-    fontSize: 11,
-    marginTop: 2,
-    alignSelf: 'flex-end',
-    marginRight: 2,
-    opacity: 0.7,
-  },
-  inputBarWrapPremium: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'transparent',
-  },
-  inputBarPremium: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 28,
-    margin: 18,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.13,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
-  },
-  inputPremium: {
-    flex: 1,
-    color: '#FFA94D',
-    fontSize: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-  },
-  sendBtnPremium: {
-    marginLeft: 8,
-    padding: 10,
-    backgroundColor: '#FFA94D',
+  sidebarCloseBtnModern: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
+    backgroundColor: 'rgba(255, 169, 77, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.13,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
   },
-    messageRowPremium: {
+  sidebarMemberRowModern: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 26,
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
   },
-  avatarPremium: {
+  sidebarMemberAvatarModern: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    marginRight: 14,
-    backgroundColor: '#fff',
+    backgroundColor: '#232323',
     borderWidth: 2,
     borderColor: '#FFA94D',
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    marginRight: 12,
+  },
+  sidebarMemberInfo: {
+    flex: 1,
+  },
+  sidebarMemberNameModern: {
+    fontSize: 15,
+    color: '#fff',
+    fontWeight: '600',
     marginBottom: 2,
+  },
+  sidebarMemberStatusModern: {
+    fontSize: 13,
+    color: '#4CAF50',
   },
 });
