@@ -924,7 +924,7 @@ export default function CommunityChat() {
             <View style={{ width: '100%' }}>
               {/* Barre de réponse */}
               {replyingTo && (
-                <BlurView intensity={80} tint="dark" style={styles.replyBar}>
+                <BlurView intensity={80} tint="dark" style={styles.replyBarComposer}>
                   <View style={styles.replyBarContent}>
                     <View style={styles.replyBarLeft}>
                       <View style={styles.replyBarIndicator} />
@@ -1946,6 +1946,12 @@ const styles = StyleSheet.create({
   replyBarMessage: {
     fontSize: 13,
     color: '#ccc',
+  },
+  replyBarComposer: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 169, 77, 0.2)',
   },
   swipeReplyIcon: {
     position: 'absolute',
