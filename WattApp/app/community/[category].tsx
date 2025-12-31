@@ -1,7 +1,7 @@
 import { collectionGroup, getDocs, where, query as fsQuery } from 'firebase/firestore';
 export const unstable_settings = { layout: null };
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, KeyboardAvoidingView, Platform, Image, Animated, StatusBar, Pressable, Vibration } from 'react-native';
+import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, KeyboardAvoidingView, Platform, Image, Animated, StatusBar, Pressable, Vibration, Modal, Alert, Linking, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -9,6 +9,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, setDoc, doc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
+import * as ImagePicker from 'expo-image-picker';
+import { Audio } from 'expo-av';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const CATEGORY_LABELS: Record<string, string> = {
   "Roman d'amour": "Roman d'amour",
@@ -35,6 +38,26 @@ export default function CommunityChat() {
   const [messages, setMessages] = useState<any[]>([]);
   const scrollY = useRef(new Animated.Value(0)).current;
   const [composerFocused, setComposerFocused] = useState(false);
+  const [showMediaOptions, setShowMediaOptions] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const recordingInterval = useRef<any>(null);
+  const recordingAnimation = useRef(new Animated.Value(0)).current;
+  const [audioMetering, setAudioMetering] = useState<number[]>(Array(35).fill(0));
+  const meteringHistory = useRef<number[]>(Array(35).fill(0));
+  const fullMeteringData = useRef<number[]>([]);
+  
+  // États pour la lecture audio avec Animated
+  const [currentSound, setCurrentSound] = useState<Audio.Sound | null>(null);
+  const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
+  const [audioPosition, setAudioPosition] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioProgress = useRef(new Animated.Value(0)).current;
+  const [listenedAudios, setListenedAudios] = useState<Set<string>>(new Set());
 
   const { category } = useLocalSearchParams();
   const router = useRouter();
@@ -99,15 +122,380 @@ export default function CommunityChat() {
     
     Vibration.vibrate(10);
     
+    // Détecter les liens dans le message
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const urls = input.match(urlRegex);
+    
     await addDoc(collection(db, 'communityChats', String(category), 'messages'), {
       text: input.trim(),
       user: user.displayName || user.email || 'Utilisateur',
       photoURL: user.photoURL || '',
       createdAt: serverTimestamp(),
       uid: user.uid,
+      type: 'text',
+      links: urls || [],
     });
     setInput('');
   };
+  
+  // Sélectionner une image depuis la galerie
+  const pickImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (permissionResult.granted === false) {
+        Alert.alert('Permission requise', 'Vous devez autoriser l\'accès à vos photos');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setSelectedImage(result.assets[0].uri);
+        setShowMediaOptions(false);
+        await uploadAndSendImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Erreur sélection image:', error);
+      Alert.alert('Erreur', 'Impossible de sélectionner l\'image');
+    }
+  };
+  
+  // Prendre une photo
+  const takePhoto = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+      
+      if (permissionResult.granted === false) {
+        Alert.alert('Permission requise', 'Vous devez autoriser l\'accès à la caméra');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setSelectedImage(result.assets[0].uri);
+        setShowMediaOptions(false);
+        await uploadAndSendImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Erreur prise photo:', error);
+      Alert.alert('Erreur', 'Impossible de prendre la photo');
+    }
+  };
+  
+  // Upload et envoi d'image
+  const uploadAndSendImage = async (uri: string) => {
+    const auth = getAuth(app);
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    setUploading(true);
+    Vibration.vibrate(10);
+    
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      const storage = getStorage(app);
+      const filename = `chat-images/${category}/${Date.now()}-${user.uid}.jpg`;
+      const storageRef = ref(storage, filename);
+      
+      await uploadBytes(storageRef, blob);
+      const downloadURL = await getDownloadURL(storageRef);
+      
+      await addDoc(collection(db, 'communityChats', String(category), 'messages'), {
+        text: '',
+        user: user.displayName || user.email || 'Utilisateur',
+        photoURL: user.photoURL || '',
+        createdAt: serverTimestamp(),
+        uid: user.uid,
+        type: 'image',
+        imageUrl: downloadURL,
+      });
+      
+      setSelectedImage(null);
+    } catch (error) {
+      console.error('Erreur upload image:', error);
+      Alert.alert('Erreur', 'Impossible d\'envoyer l\'image');
+    } finally {
+      setUploading(false);
+    }
+  };
+  
+  // Démarrer l'enregistrement audio
+  const startRecording = async () => {
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      
+      if (permission.status !== 'granted') {
+        Alert.alert('Permission requise', 'Vous devez autoriser l\'accès au microphone');
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording: newRecording } = await Audio.Recording.createAsync(
+        {
+          ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+          android: {
+            ...Audio.RecordingOptionsPresets.HIGH_QUALITY.android,
+            extension: '.m4a',
+            outputFormat: Audio.AndroidOutputFormat.MPEG_4,
+            audioEncoder: Audio.AndroidAudioEncoder.AAC,
+          },
+          ios: {
+            ...Audio.RecordingOptionsPresets.HIGH_QUALITY.ios,
+            extension: '.m4a',
+            outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
+            audioQuality: Audio.IOSAudioQuality.HIGH,
+          },
+          web: {
+            mimeType: 'audio/webm',
+            bitsPerSecond: 128000,
+          },
+        },
+        undefined,
+        100 // Intervalle de mise à jour en ms
+      );
+      
+      // Capturer les niveaux audio en temps réel
+      newRecording.setOnRecordingStatusUpdate((status) => {
+        if (status.isRecording && status.metering !== undefined) {
+          // Normaliser le niveau de metering (généralement entre -160 et 0)
+          // On convertit en valeur entre 0 et 1
+          const normalizedLevel = Math.max(0, Math.min(1, (status.metering + 60) / 60));
+          
+          // Décaler l'historique et ajouter la nouvelle valeur
+          meteringHistory.current = [...meteringHistory.current.slice(1), normalizedLevel];
+          setAudioMetering([...meteringHistory.current]);
+        }
+      });
+      
+      setRecording(newRecording);
+      setIsRecording(true);
+      setRecordingDuration(0);
+      setShowMediaOptions(false);
+      meteringHistory.current = Array(35).fill(0);
+      setAudioMetering(Array(35).fill(0));
+      Vibration.vibrate(20);
+      
+      // Démarrer le compteur
+      recordingInterval.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+    } catch (error) {
+      console.error('Erreur démarrage enregistrement:', error);
+      Alert.alert('Erreur', 'Impossible de démarrer l\'enregistrement');
+    }
+  };
+  
+  // Arrêter et envoyer l'enregistrement
+  const stopRecording = async () => {
+    if (!recording) return;
+    
+    try {
+      setIsRecording(false);
+      clearInterval(recordingInterval.current);
+      meteringHistory.current = Array(35).fill(0);
+      setAudioMetering(Array(35).fill(0));
+      Vibration.vibrate(20);
+      
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      
+      if (uri && recordingDuration > 1) {
+        await uploadAndSendAudio(uri);
+      }
+      
+      setRecording(null);
+      setRecordingDuration(0);
+    } catch (error) {
+      console.error('Erreur arrêt enregistrement:', error);
+      Alert.alert('Erreur', 'Impossible d\'arrêter l\'enregistrement');
+    }
+  };
+  
+  // Annuler l'enregistrement
+  const cancelRecording = async () => {
+    if (!recording) return;
+    
+    try {
+      setIsRecording(false);
+      clearInterval(recordingInterval.current);
+      meteringHistory.current = Array(35).fill(0);
+      setAudioMetering(Array(35).fill(0));
+      await recording.stopAndUnloadAsync();
+      setRecording(null);
+      setRecordingDuration(0);
+      Vibration.vibrate(10);
+    } catch (error) {
+      console.error('Erreur annulation:', error);
+    }
+  };
+  
+  // Upload et envoi d'audio
+  const uploadAndSendAudio = async (uri: string) => {
+    const auth = getAuth(app);
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    setUploading(true);
+    
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      const storage = getStorage(app);
+      const filename = `chat-audio/${category}/${Date.now()}-${user.uid}.m4a`;
+      const storageRef = ref(storage, filename);
+      
+      await uploadBytes(storageRef, blob);
+      const downloadURL = await getDownloadURL(storageRef);
+      
+      await addDoc(collection(db, 'communityChats', String(category), 'messages'), {
+        text: '',
+        user: user.displayName || user.email || 'Utilisateur',
+        photoURL: user.photoURL || '',
+        createdAt: serverTimestamp(),
+        uid: user.uid,
+        type: 'audio',
+        audioUrl: downloadURL,
+        audioDuration: recordingDuration,
+      });
+    } catch (error) {
+      console.error('Erreur upload audio:', error);
+      Alert.alert('Erreur', 'Impossible d\'envoyer le message vocal');
+    } finally {
+      setUploading(false);
+    }
+  };
+  
+  // Formater la durée
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  // Fonction pour jouer/mettre en pause un audio
+  const toggleAudioPlayback = async (messageId: string, audioUrl: string, duration: number) => {
+    try {
+      // Si c'est le même message et qu'il est en train de jouer, pause
+      if (playingMessageId === messageId && isPlaying && currentSound) {
+        const status = await currentSound.getStatusAsync();
+        if (status.isLoaded) {
+          await currentSound.pauseAsync();
+          setIsPlaying(false);
+        }
+        return;
+      }
+      
+      // Si c'est le même message mais en pause, reprendre
+      if (playingMessageId === messageId && !isPlaying && currentSound) {
+        const status = await currentSound.getStatusAsync();
+        if (status.isLoaded) {
+          await currentSound.playAsync();
+          setIsPlaying(true);
+        }
+        return;
+      }
+      
+      // Arrêter l'audio précédent s'il existe
+      if (currentSound) {
+        try {
+          const status = await currentSound.getStatusAsync();
+          if (status.isLoaded) {
+            await currentSound.stopAsync();
+            await currentSound.unloadAsync();
+          }
+        } catch (err) {
+          console.log('Erreur nettoyage son précédent:', err);
+        }
+        setCurrentSound(null);
+        audioProgress.setValue(0);
+      }
+      
+      // Configurer le mode audio
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+      });
+      
+      // Créer et jouer le nouveau son
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: audioUrl },
+        { shouldPlay: true, progressUpdateIntervalMillis: 50 },
+        (status) => {
+          if (status.isLoaded) {
+            if (status.isPlaying) {
+              const position = Math.floor((status.positionMillis || 0) / 1000);
+              const progress = (status.positionMillis || 0) / ((status.durationMillis || duration * 1000));
+              
+              setAudioPosition(position);
+              
+              // Animation fluide de la progression
+              Animated.timing(audioProgress, {
+                toValue: progress,
+                duration: 50,
+                useNativeDriver: false,
+              }).start();
+            }
+            if (status.didJustFinish) {
+              setIsPlaying(false);
+              setPlayingMessageId(null);
+              setAudioPosition(0);
+              audioProgress.setValue(0);
+              
+              // Marquer comme écouté
+              setListenedAudios(prev => new Set(prev).add(messageId));
+            }
+          }
+        }
+      );
+      
+      setCurrentSound(sound);
+      setPlayingMessageId(messageId);
+      setAudioDuration(duration);
+      setAudioPosition(0);
+      setIsPlaying(true);
+      audioProgress.setValue(0);
+    } catch (error) {
+      console.error('Erreur lecture audio:', error);
+      Alert.alert('Erreur', 'Impossible de lire le message vocal');
+      
+      // Réinitialiser l'état en cas d'erreur
+      setIsPlaying(false);
+      setPlayingMessageId(null);
+      setCurrentSound(null);
+    }
+  };
+  
+  // Nettoyer l'audio quand on quitte la page
+  useEffect(() => {
+    return () => {
+      if (currentSound) {
+        currentSound.getStatusAsync().then(status => {
+          if (status.isLoaded) {
+            currentSound.unloadAsync().catch(err => console.log('Erreur cleanup:', err));
+          }
+        }).catch(err => console.log('Erreur status:', err));
+      }
+    };
+  }, [currentSound]);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#181818' }}>
@@ -214,11 +602,130 @@ export default function CommunityChat() {
                     style={[
                       styles.messageBubbleModern,
                       isMe ? styles.messageBubbleMe : styles.messageBubbleOther,
+                      (item.type === 'image' || item.type === 'audio') && styles.mediaBubble,
                     ]}
                   >
-                    <Text style={[styles.messageTextModern, isMe && styles.messageTextMe]}>
-                      {item.text}
-                    </Text>
+                    {/* Message image */}
+                    {item.type === 'image' && item.imageUrl && (
+                      <TouchableOpacity onPress={() => Linking.openURL(item.imageUrl)}>
+                        <Image 
+                          source={{ uri: item.imageUrl }} 
+                          style={styles.messageImage}
+                          resizeMode="cover"
+                        />
+                      </TouchableOpacity>
+                    )}
+                    
+                    {/* Message audio */}
+                    {item.type === 'audio' && item.audioUrl && (
+                      <TouchableOpacity 
+                        style={styles.audioMessageContainer}
+                        onPress={() => toggleAudioPlayback(item.id, item.audioUrl, item.audioDuration || 0)}
+                        activeOpacity={0.7}
+                      >
+                        {/* Bouton play/pause */}
+                        <Animated.View style={[
+                          styles.audioPlayButton,
+                          playingMessageId === item.id && isPlaying && !listenedAudios.has(item.id) && styles.audioPlayButtonActive,
+                          listenedAudios.has(item.id) && styles.audioPlayButtonListened,
+                          playingMessageId === item.id && isPlaying && {
+                            transform: [{
+                              scale: audioProgress.interpolate({
+                                inputRange: [0, 0.5, 1],
+                                outputRange: [1, 1.05, 1],
+                              })
+                            }]
+                          }
+                        ]}>
+                          <Ionicons 
+                            name={playingMessageId === item.id && isPlaying ? "pause" : "play"} 
+                            size={24} 
+                            color={
+                              listenedAudios.has(item.id) 
+                                ? "#666" 
+                                : (isMe ? "#181818" : "#FFA94D")
+                            } 
+                          />
+                        </Animated.View>
+                        
+                        {/* Barre de progression et forme d'onde */}
+                        <View style={styles.audioWaveformContainer}>
+                          <View style={styles.audioWaveform}>
+                            {[...Array(25)].map((_, i) => {
+                              const isCurrentlyPlaying = playingMessageId === item.id;
+                              const isListened = listenedAudios.has(item.id);
+                              const barProgress = i / 25;
+                              
+                              // Hauteur variée pour effet de forme d'onde
+                              const heights = [14, 22, 18, 26, 16, 24, 20, 28, 18, 22, 16, 24, 20, 26, 18, 22, 16, 20, 24, 18, 26, 20, 22, 18, 16];
+                              const barHeight = heights[i];
+                              
+                              return (
+                                <Animated.View 
+                                  key={i} 
+                                  style={[
+                                    styles.audioBar,
+                                    { 
+                                      height: barHeight,
+                                      backgroundColor: isListened ? "#555" : (isMe ? "#181818" : "#FFA94D"),
+                                      opacity: isCurrentlyPlaying 
+                                        ? audioProgress.interpolate({
+                                            inputRange: [barProgress - 0.04, barProgress, barProgress + 0.04],
+                                            outputRange: [0.3, 1, 0.3],
+                                            extrapolate: 'clamp',
+                                          })
+                                        : (isListened ? 0.4 : 0.3),
+                                    }
+                                  ]} 
+                                />
+                              );
+                            })}
+                          </View>
+                          
+                          {/* Durée ou position actuelle */}
+                          <Text style={[
+                            styles.audioTime, 
+                            isMe && styles.audioTimeMe,
+                            listenedAudios.has(item.id) && styles.audioTimeListened
+                          ]}>
+                            {playingMessageId === item.id && audioPosition > 0
+                              ? `${formatDuration(audioPosition)} / ${formatDuration(item.audioDuration || 0)}`
+                              : formatDuration(item.audioDuration || 0)
+                            }
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    )}
+                    
+                    {/* Message texte avec liens */}
+                    {(item.type === 'text' || !item.type) && item.text && (
+                      <>
+                        <Text style={[styles.messageTextModern, isMe && styles.messageTextMe]}>
+                          {item.text}
+                        </Text>
+                        
+                        {/* Prévisualisation des liens */}
+                        {item.links && item.links.length > 0 && (
+                          <View style={styles.linkPreviewContainer}>
+                            {item.links.slice(0, 1).map((link: string, idx: number) => (
+                              <TouchableOpacity 
+                                key={idx}
+                                style={styles.linkPreview}
+                                onPress={() => Linking.openURL(link)}
+                              >
+                                <Ionicons name="link" size={16} color={isMe ? "#181818" : "#FFA94D"} />
+                                <Text 
+                                  style={[styles.linkText, isMe && styles.linkTextMe]}
+                                  numberOfLines={1}
+                                >
+                                  {link}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        )}
+                      </>
+                    )}
                   </View>
                   
                   {item.createdAt?.seconds && (
@@ -242,35 +749,55 @@ export default function CommunityChat() {
         />
       </View>
 
+      {/* Indicateur d'upload */}
+      {uploading && (
+        <View style={styles.uploadingOverlay}>
+          <BlurView intensity={80} tint="dark" style={styles.uploadingBlur}>
+            <ActivityIndicator size="large" color="#FFA94D" />
+            <Text style={styles.uploadingText}>Envoi en cours...</Text>
+          </BlurView>
+        </View>
+      )}
+
       {/* Composer moderne avec BlurView */}
       <BlurView intensity={95} tint="dark" style={styles.composerBlur}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
-          <View style={[styles.composerModern, composerFocused && styles.composerFocused]}>
-            <TouchableOpacity style={styles.attachButton}>
-              <Ionicons name="add-circle" size={28} color="#FFA94D" />
-            </TouchableOpacity>
-            
-            <View style={styles.inputWrapper}>
-              <TextInput
-                value={input}
-                onChangeText={setInput}
-                placeholder="Écris ton message..."
-                placeholderTextColor="#666"
-                style={styles.inputModern}
-                onSubmitEditing={sendMessage}
-                onFocus={() => setComposerFocused(true)}
-                onBlur={() => setComposerFocused(false)}
-                returnKeyType="send"
-                multiline
-                maxLength={1000}
-              />
-            </View>
-            
-            {input.trim() ? (
-              <TouchableOpacity onPress={sendMessage} style={styles.sendButtonContainer}>
+          {/* UI d'enregistrement audio */}
+          {isRecording ? (
+            <View style={styles.recordingContainer}>
+              <TouchableOpacity onPress={cancelRecording} style={styles.cancelRecordButton}>
+                <Ionicons name="close-circle" size={32} color="#FF4444" />
+              </TouchableOpacity>
+              
+              <View style={styles.recordingWaveform}>
+                {audioMetering.map((level, i) => {
+                  // Calculer la hauteur basée sur le niveau audio réel
+                  const minHeight = 4;
+                  const maxHeight = 32;
+                  const barHeight = minHeight + (level * (maxHeight - minHeight));
+                  
+                  return (
+                    <View 
+                      key={i} 
+                      style={[
+                        styles.recordingBar,
+                        { 
+                          height: barHeight,
+                          backgroundColor: "#FFA94D",
+                          opacity: 0.4 + (level * 0.6), // Opacité variable selon le niveau
+                        }
+                      ]} 
+                    />
+                  );
+                })}
+              </View>
+              
+              <Text style={styles.recordingTimer}>{formatDuration(recordingDuration)}</Text>
+              
+              <TouchableOpacity onPress={stopRecording} style={styles.sendRecordButton}>
                 <LinearGradient
                   colors={['#FFA94D', '#FF8C42']}
                   style={styles.sendButton}
@@ -280,14 +807,130 @@ export default function CommunityChat() {
                   <Ionicons name="send" size={20} color="#181818" style={{ marginLeft: 2 }} />
                 </LinearGradient>
               </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={styles.voiceButton}>
-                <Ionicons name="mic" size={24} color="#FFA94D" />
+            </View>
+          ) : (
+            <View style={[styles.composerModern, composerFocused && styles.composerFocused]}>
+              <TouchableOpacity 
+                style={styles.attachButton}
+                onPress={() => setShowMediaOptions(true)}
+              >
+                <Ionicons name="add-circle" size={28} color="#FFA94D" />
               </TouchableOpacity>
-            )}
-          </View>
+              
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  value={input}
+                  onChangeText={setInput}
+                  placeholder="Écris ton message..."
+                  placeholderTextColor="#666"
+                  style={styles.inputModern}
+                  onSubmitEditing={sendMessage}
+                  onFocus={() => setComposerFocused(true)}
+                  onBlur={() => setComposerFocused(false)}
+                  returnKeyType="send"
+                  multiline
+                  maxLength={1000}
+                />
+              </View>
+              
+              {input.trim() ? (
+                <TouchableOpacity onPress={sendMessage} style={styles.sendButtonContainer}>
+                  <LinearGradient
+                    colors={['#FFA94D', '#FF8C42']}
+                    style={styles.sendButton}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <Ionicons name="send" size={20} color="#181818" style={{ marginLeft: 2 }} />
+                  </LinearGradient>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.voiceButton}
+                  onPress={startRecording}
+                >
+                  <Ionicons name="mic" size={24} color="#FFA94D" />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
         </KeyboardAvoidingView>
       </BlurView>
+
+      {/* Modal des options média */}
+      <Modal
+        visible={showMediaOptions}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowMediaOptions(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMediaOptions(false)}
+        >
+          <BlurView intensity={80} tint="dark" style={styles.modalBlur}>
+            <View style={styles.mediaOptionsContainer}>
+              <View style={styles.mediaOptionsHeader}>
+                <Text style={styles.mediaOptionsTitle}>Envoyer un média</Text>
+                <TouchableOpacity onPress={() => setShowMediaOptions(false)}>
+                  <Ionicons name="close" size={24} color="#FFA94D" />
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.mediaOptionsGrid}>
+                <TouchableOpacity 
+                  style={styles.mediaOption}
+                  onPress={() => {
+                    setShowMediaOptions(false);
+                    pickImage();
+                  }}
+                >
+                  <LinearGradient
+                    colors={['rgba(255, 169, 77, 0.2)', 'rgba(255, 140, 66, 0.1)']}
+                    style={styles.mediaOptionGradient}
+                  >
+                    <Ionicons name="images" size={32} color="#FFA94D" />
+                  </LinearGradient>
+                  <Text style={styles.mediaOptionText}>Galerie</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.mediaOption}
+                  onPress={() => {
+                    setShowMediaOptions(false);
+                    takePhoto();
+                  }}
+                >
+                  <LinearGradient
+                    colors={['rgba(255, 169, 77, 0.2)', 'rgba(255, 140, 66, 0.1)']}
+                    style={styles.mediaOptionGradient}
+                  >
+                    <Ionicons name="camera" size={32} color="#FFA94D" />
+                  </LinearGradient>
+                  <Text style={styles.mediaOptionText}>Appareil photo</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.mediaOption}
+                  onPress={() => {
+                    setShowMediaOptions(false);
+                    startRecording();
+                  }}
+                >
+                  <LinearGradient
+                    colors={['rgba(255, 169, 77, 0.2)', 'rgba(255, 140, 66, 0.1)']}
+                    style={styles.mediaOptionGradient}
+                  >
+                    <Ionicons name="mic" size={32} color="#FFA94D" />
+                  </LinearGradient>
+                  <Text style={styles.mediaOptionText}>Message vocal</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </BlurView>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Overlay moderne pour non-membres */}
       {!isMember && (
@@ -689,6 +1332,219 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 169, 77, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  
+  // Media message styles
+  mediaBubble: {
+    padding: 4,
+    maxWidth: 280,
+  },
+  messageImage: {
+    width: 240,
+    height: 180,
+    borderRadius: 12,
+    backgroundColor: '#2a2a2a',
+  },
+  audioMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    minWidth: 220,
+    gap: 12,
+  },
+  audioPlayButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 169, 77, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  audioPlayButtonActive: {
+    backgroundColor: 'rgba(255, 169, 77, 0.3)',
+    borderColor: 'rgba(255, 169, 77, 0.5)',
+  },
+  audioPlayButtonListened: {
+    backgroundColor: 'rgba(85, 85, 85, 0.2)',
+    borderColor: 'transparent',
+  },
+  audioWaveformContainer: {
+    flex: 1,
+    gap: 6,
+  },
+  audioWaveform: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: 32,
+    gap: 2,
+  },
+  audioBar: {
+    width: 3,
+    borderRadius: 2,
+  },
+  audioTime: {
+    color: '#999',
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  audioTimeMe: {
+    color: '#666',
+  },
+  audioTimeListened: {
+    color: '#555',
+  },
+  audioDuration: {
+    color: '#999',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  audioDurationMe: {
+    color: '#666',
+  },
+  linkPreviewContainer: {
+    marginTop: 8,
+    gap: 8,
+  },
+  linkPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 8,
+    backgroundColor: 'rgba(255, 169, 77, 0.1)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 169, 77, 0.2)',
+  },
+  linkText: {
+    flex: 1,
+    color: '#FFA94D',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  linkTextMe: {
+    color: '#181818',
+  },
+  
+  // Recording UI
+  recordingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#232323',
+    borderTopWidth: 1,
+    borderColor: 'rgba(255, 169, 77, 0.2)',
+    gap: 12,
+  },
+  cancelRecordButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recordingWaveform: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: 44,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(255, 169, 77, 0.1)',
+    borderRadius: 22,
+    gap: 2,
+  },
+  recordingBar: {
+    width: 3,
+    borderRadius: 2,
+  },
+  recordingTimer: {
+    color: '#FFA94D',
+    fontSize: 14,
+    fontWeight: 'bold',
+    minWidth: 50,
+    textAlign: 'center',
+  },
+  sendRecordButton: {
+    borderRadius: 22,
+    overflow: 'hidden',
+  },
+  
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalBlur: {
+    paddingBottom: 40,
+  },
+  mediaOptionsContainer: {
+    backgroundColor: '#232323',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: 'rgba(255, 169, 77, 0.2)',
+  },
+  mediaOptionsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  mediaOptionsTitle: {
+    color: '#FFA94D',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  mediaOptionsGrid: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  mediaOption: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 12,
+  },
+  mediaOptionGradient: {
+    width: 72,
+    height: 72,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 169, 77, 0.3)',
+  },
+  mediaOptionText: {
+    color: '#999',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  
+  // Upload overlay
+  uploadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  uploadingBlur: {
+    padding: 32,
+    borderRadius: 20,
+    alignItems: 'center',
+    gap: 16,
+  },
+  uploadingText: {
+    color: '#FFA94D',
+    fontSize: 16,
+    fontWeight: '600',
   },
   
   // Join overlay
