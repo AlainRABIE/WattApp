@@ -19,11 +19,13 @@ import { getAuth } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 import { db } from '../../constants/firebaseConfig';
 import * as ImagePicker from 'expo-image-picker';
+import { useTheme } from '../../hooks/useTheme';
 
 const WattpadEditor: React.FC = () => {
   const router = useRouter();
   const { projectId } = useLocalSearchParams();
   const autoSaveTimer = useRef<any>(null);
+  const { theme } = useTheme();
 
   // États principaux
   const [chapterTitle, setChapterTitle] = useState('');
@@ -34,6 +36,7 @@ const WattpadEditor: React.FC = () => {
   const [currentChapter, setCurrentChapter] = useState(1);
   const [chapters, setChapters] = useState<any[]>([]);
   const [totalChapters, setTotalChapters] = useState(1);
+  const [isPublishing, setIsPublishing] = useState(false);
   
   // États IA
   const [showAIModal, setShowAIModal] = useState(false);
@@ -83,6 +86,7 @@ const WattpadEditor: React.FC = () => {
 
       if (projectDoc.exists()) {
         const data = projectDoc.data();
+        
         const loadedChapters = data.chapters || [{ 
           number: 1, 
           title: '', 
@@ -131,7 +135,6 @@ const WattpadEditor: React.FC = () => {
         chapters: updatedChapters,
         totalChapters: updatedChapters.length,
         updatedAt: serverTimestamp(),
-        userId: auth.currentUser.uid,
       };
 
       if (projectId && projectId !== 'new') {
@@ -153,17 +156,108 @@ const WattpadEditor: React.FC = () => {
     }
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
+    if (chapters.length === 0 || !chapters.some(ch => ch.content && ch.content.trim())) {
+      Alert.alert('Erreur', 'Veuillez écrire au moins un chapitre');
+      return;
+    }
+
+    // Charger les infos du livre pour vérification
+    const auth = getAuth();
+    if (!auth.currentUser) return;
+
+    const projectRef = doc(db, 'users', auth.currentUser.uid, 'books', projectId as string);
+    const projectDoc = await getDoc(projectRef);
+    
+    if (!projectDoc.exists()) {
+      Alert.alert('Erreur', 'Livre introuvable');
+      return;
+    }
+
+    const bookData = projectDoc.data();
+    const bookTitle = bookData.bookTitle || '';
+    const bookDescription = bookData.bookDescription || '';
+    const coverImage = bookData.coverImage || null;
+    const hashtags = bookData.hashtags || [];
+
+    if (!bookTitle.trim()) {
+      Alert.alert('Erreur', 'Veuillez ajouter un titre à votre livre');
+      return;
+    }
+
+    if (!coverImage) {
+      Alert.alert('Erreur', 'Veuillez ajouter une image de couverture');
+      return;
+    }
+
     Alert.alert(
-      'Publier',
-      'Voulez-vous publier ce chapitre ?',
+      'Publier le livre',
+      'Voulez-vous publier votre livre ? Il sera visible par tous les utilisateurs.',
       [
         { text: 'Annuler', style: 'cancel' },
         { 
           text: 'Publier', 
           onPress: async () => {
-            await saveProject();
-            Alert.alert('Succès', 'Votre chapitre a été publié !');
+            try {
+              setIsPublishing(true);
+
+              // Sauvegarder d'abord
+              await saveProject();
+
+              // Publier dans la collection publique des livres
+              const publishData = {
+                bookTitle,
+                bookDescription,
+                coverImage,
+                hashtags,
+                chapters: chapters.filter(ch => ch.content && ch.content.trim()),
+                totalChapters: chapters.length,
+                authorId: auth.currentUser.uid,
+                authorName: auth.currentUser.displayName || 'Auteur anonyme',
+                publishedAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+                status: 'published',
+                views: 0,
+                likes: 0,
+                comments: 0,
+              };
+
+              if (projectId && projectId !== 'new') {
+                // Mettre à jour dans la collection privée
+                const privateRef = doc(db, 'users', auth.currentUser.uid, 'books', projectId as string);
+                await setDoc(privateRef, { status: 'published', publishedAt: serverTimestamp() }, { merge: true });
+
+                // Publier dans la collection publique
+                const publicRef = doc(db, 'books', projectId as string);
+                await setDoc(publicRef, publishData);
+              } else {
+                // Créer un nouveau livre publié
+                const newBookRef = await addDoc(collection(db, 'books'), publishData);
+                
+                // Sauvegarder aussi dans la collection privée
+                const privateRef = doc(db, 'users', auth.currentUser.uid, 'books', newBookRef.id);
+                await setDoc(privateRef, {
+                  ...publishData,
+                  createdAt: serverTimestamp(),
+                });
+              }
+
+              Alert.alert(
+                'Succès ! 🎉',
+                'Votre livre a été publié avec succès !',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => router.back()
+                  }
+                ]
+              );
+            } catch (error) {
+              console.error('Erreur publication:', error);
+              Alert.alert('Erreur', 'Impossible de publier le livre');
+            } finally {
+              setIsPublishing(false);
+            }
           }
         }
       ]
@@ -178,7 +272,9 @@ const WattpadEditor: React.FC = () => {
     });
 
     if (!result.canceled) {
-      Alert.alert('Image sélectionnée', 'Fonctionnalité à venir');
+      // Insérer l'image dans le contenu
+      setContent(content + `\n[Image: ${result.assets[0].uri}]\n`);
+      Alert.alert('Succès', 'Image ajoutée au chapitre');
     }
   };
 
@@ -280,12 +376,14 @@ const WattpadEditor: React.FC = () => {
     }
   };
 
+  const styles = createStyles(theme);
+
   return (
     <KeyboardAvoidingView 
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="light-content" backgroundColor="#1a1a1a" />
+      <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
       
       {/* Header Wattpad Dark */}
       <View style={styles.header}>
@@ -293,7 +391,7 @@ const WattpadEditor: React.FC = () => {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -301,14 +399,19 @@ const WattpadEditor: React.FC = () => {
           onPress={() => setShowChapterMenu(!showChapterMenu)}
         >
           <Text style={styles.chapterText}>Chapitre {currentChapter}</Text>
-          <Ionicons name="chevron-down" size={16} color="#FFF" />
+          <Ionicons name="chevron-down" size={18} color={theme.colors.text} />
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={styles.publishButton}
+          style={[styles.publishButton, isPublishing && styles.publishButtonDisabled]}
           onPress={handlePublish}
+          disabled={isPublishing}
         >
-          <Text style={styles.publishText}>Publier</Text>
+          {isPublishing ? (
+            <ActivityIndicator color="#FFF" size="small" />
+          ) : (
+            <Text style={styles.publishText}>Publier</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -324,14 +427,14 @@ const WattpadEditor: React.FC = () => {
             style={styles.mediaButton}
             onPress={handleImagePicker}
           >
-            <Ionicons name="image-outline" size={32} color="#666" />
+            <Ionicons name="image-outline" size={36} color={theme.colors.primary} />
           </TouchableOpacity>
           
           <TouchableOpacity 
             style={styles.mediaButton}
             onPress={handleVideoPicker}
           >
-            <Ionicons name="videocam-outline" size={32} color="#666" />
+            <Ionicons name="videocam-outline" size={36} color={theme.colors.primary} />
           </TouchableOpacity>
         </View>
 
@@ -339,7 +442,7 @@ const WattpadEditor: React.FC = () => {
         <TextInput
           style={styles.chapterTitleInput}
           placeholder="Titre du Chapitre"
-          placeholderTextColor="#4a4a4a"
+          placeholderTextColor={theme.colors.textSecondary}
           value={chapterTitle}
           onChangeText={setChapterTitle}
           textAlign="center"
@@ -352,7 +455,7 @@ const WattpadEditor: React.FC = () => {
         <TextInput
           style={styles.contentInput}
           placeholder="Commence à écrire ton histoire"
-          placeholderTextColor="#4a4a4a"
+          placeholderTextColor={theme.colors.textSecondary}
           value={content}
           onChangeText={setContent}
           multiline
@@ -361,7 +464,7 @@ const WattpadEditor: React.FC = () => {
 
         {/* Bouton Ajouter un sondage */}
         <TouchableOpacity style={styles.pollButton}>
-          <MaterialCommunityIcons name="poll" size={20} color="#666" />
+          <MaterialCommunityIcons name="poll" size={22} color={theme.colors.accent} />
           <Text style={styles.pollButtonText}>Ajouter un sondage</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -372,8 +475,8 @@ const WattpadEditor: React.FC = () => {
           style={styles.toolbarButton}
           onPress={() => setShowAIModal(true)}
         >
-          <MaterialCommunityIcons name="robot" size={24} color="#FF6800" />
-          <Text style={styles.toolbarButtonText}>IA</Text>
+          <MaterialCommunityIcons name="robot-outline" size={26} color="#FFF" />
+          <Text style={styles.toolbarButtonText}>Assistant IA</Text>
         </TouchableOpacity>
         
         <View style={styles.statsContainer}>
@@ -392,20 +495,20 @@ const WattpadEditor: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.aiModal}>
             <View style={styles.aiModalHeader}>
-              <Text style={styles.aiModalTitle}>Assistant IA</Text>
+              <Text style={styles.aiModalTitle}>Assistant IA ✨</Text>
               <TouchableOpacity onPress={() => setShowAIModal(false)}>
-                <Ionicons name="close" size={24} color="#FFF" />
+                <Ionicons name="close-circle" size={28} color={theme.colors.primary} />
               </TouchableOpacity>
             </View>
 
             <Text style={styles.aiModalSubtitle}>
-              Demandez à l'IA de vous aider à écrire
+              Demandez à l'IA de continuer votre histoire ou d'ajouter des éléments
             </Text>
 
             <TextInput
               style={styles.aiInput}
               placeholder="Ex: Écris une scène d'action dans une forêt..."
-              placeholderTextColor="#666"
+              placeholderTextColor={theme.colors.textSecondary}
               value={aiPrompt}
               onChangeText={setAiPrompt}
               multiline
@@ -421,8 +524,8 @@ const WattpadEditor: React.FC = () => {
                 <ActivityIndicator color="#FFF" />
               ) : (
                 <>
-                  <MaterialCommunityIcons name="robot" size={20} color="#FFF" />
-                  <Text style={styles.aiGenerateButtonText}>Générer</Text>
+                  <MaterialCommunityIcons name="auto-fix" size={22} color="#FFF" />
+                  <Text style={styles.aiGenerateButtonText}>Générer avec l'IA</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -466,9 +569,9 @@ const WattpadEditor: React.FC = () => {
         >
           <View style={styles.chapterModal}>
             <View style={styles.chapterModalHeader}>
-              <Text style={styles.chapterModalTitle}>Chapitres</Text>
+              <Text style={styles.chapterModalTitle}>Mes Chapitres 📚</Text>
               <TouchableOpacity onPress={() => setShowChapterMenu(false)}>
-                <Ionicons name="close" size={24} color="#FFF" />
+                <Ionicons name="close-circle" size={28} color={theme.colors.primary} />
               </TouchableOpacity>
             </View>
 
@@ -505,7 +608,7 @@ const WattpadEditor: React.FC = () => {
                       </View>
                     </View>
                     {currentChapter === num && (
-                      <Ionicons name="checkmark-circle" size={20} color="#FF6800" />
+                      <Ionicons name="checkmark-circle" size={24} color={theme.colors.primary} />
                     )}
                   </TouchableOpacity>
                 );
@@ -516,8 +619,8 @@ const WattpadEditor: React.FC = () => {
               style={styles.newChapterButton}
               onPress={createNewChapter}
             >
-              <Ionicons name="add-circle" size={24} color="#FF6800" />
-              <Text style={styles.newChapterButtonText}>Nouveau chapitre</Text>
+              <Ionicons name="add-circle" size={28} color={theme.colors.primary} />
+              <Text style={styles.newChapterButtonText}>Créer un nouveau chapitre</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -532,7 +635,7 @@ const WattpadEditor: React.FC = () => {
       >
         <View style={styles.confirmModalOverlay}>
           <View style={styles.confirmModal}>
-            <Ionicons name="add-circle-outline" size={48} color="#FF6800" style={{ marginBottom: 16 }} />
+            <MaterialCommunityIcons name="book-plus" size={56} color={theme.colors.primary} style={{ marginBottom: 20 }} />
             <Text style={styles.confirmModalTitle}>Nouveau Chapitre</Text>
             <Text style={styles.confirmModalText}>
               Créer le chapitre {totalChapters + 1} ?
@@ -558,20 +661,25 @@ const WattpadEditor: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: theme.colors.background,
   },
   header: {
-    height: 56,
-    backgroundColor: '#1a1a1a',
+    height: 65,
+    backgroundColor: theme.colors.background,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2a2a2a',
+    paddingHorizontal: 20,
+    borderBottomWidth: 2,
+    borderBottomColor: theme.colors.primary,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   backButton: {
     width: 40,
@@ -584,123 +692,162 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 8,
+    backgroundColor: `${theme.colors.primary}15`,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary,
   },
   chapterText: {
-    color: '#FFF',
+    color: theme.colors.text,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   publishButton: {
-    paddingHorizontal: 16,
-    height: 40,
-    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 20,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  publishButtonDisabled: {
+    opacity: 0.6,
   },
   publishText: {
-    color: '#888',
-    fontSize: 15,
-    fontWeight: '500',
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.8,
   },
   editorContainer: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: theme.colors.background,
   },
   editorContent: {
-    padding: 20,
-    paddingBottom: 120,
+    padding: 24,
+    paddingBottom: 140,
   },
   mediaButtons: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 20,
+    gap: 16,
     marginBottom: 40,
   },
   mediaButton: {
-    width: 160,
-    height: 80,
-    backgroundColor: '#252525',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#333',
+    width: 155,
+    height: 90,
+    backgroundColor: `${theme.colors.primary}08`,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: `${theme.colors.primary}30`,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
   },
   chapterTitleInput: {
-    fontSize: 18,
-    color: '#4a4a4a',
+    fontSize: 20,
+    color: theme.colors.primary,
     textAlign: 'center',
-    marginBottom: 20,
-    paddingVertical: 10,
+    marginBottom: 24,
+    paddingVertical: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   separator: {
-    height: 1,
-    backgroundColor: '#2a2a2a',
-    marginBottom: 30,
+    height: 2,
+    backgroundColor: theme.colors.primary,
+    marginBottom: 32,
+    borderRadius: 2,
+    opacity: 0.3,
   },
   contentInput: {
-    fontSize: 16,
-    color: '#FFF',
-    lineHeight: 24,
+    fontSize: 17,
+    color: theme.colors.text,
+    lineHeight: 28,
     minHeight: 400,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
   },
   pollButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#252525',
-    borderRadius: 8,
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    backgroundColor: `${theme.colors.accent}12`,
+    borderRadius: 16,
     alignSelf: 'flex-start',
-    marginTop: 20,
+    marginTop: 24,
+    borderWidth: 1.5,
+    borderColor: `${theme.colors.accent}30`,
   },
   pollButtonText: {
-    color: '#666',
+    color: theme.colors.accent,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   floatingToolbar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 70,
-    backgroundColor: '#1a1a1a',
-    borderTopWidth: 1,
-    borderTopColor: '#2a2a2a',
+    height: 75,
+    backgroundColor: theme.colors.background,
+    borderTopWidth: 2,
+    borderTopColor: theme.colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   toolbarButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#252525',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#FF6800',
+    gap: 10,
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 6,
   },
   toolbarButtonText: {
-    color: '#FF6800',
-    fontSize: 14,
+    color: '#FFF',
+    fontSize: 15,
     fontWeight: '700',
+    letterSpacing: 0.5,
   },
   statsContainer: {
     alignItems: 'flex-end',
   },
   statsText: {
-    fontSize: 14,
-    color: '#888',
-    fontWeight: '500',
+    fontSize: 15,
+    color: theme.colors.text,
+    fontWeight: '600',
   },
   savingText: {
     fontSize: 12,
-    color: '#666',
-    marginTop: 2,
+    color: theme.colors.primary,
+    marginTop: 4,
+    fontWeight: '500',
   },
   modalOverlay: {
     flex: 1,
@@ -708,11 +855,13 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   aiModal: {
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
+    backgroundColor: theme.colors.background,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: 28,
     maxHeight: '80%',
+    borderTopWidth: 3,
+    borderTopColor: theme.colors.primary,
   },
   aiModalHeader: {
     flexDirection: 'row',
@@ -721,36 +870,42 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   aiModalTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#FFF',
+    color: theme.colors.text,
+    letterSpacing: 0.5,
   },
   aiModalSubtitle: {
-    fontSize: 14,
-    color: '#888',
-    marginBottom: 20,
+    fontSize: 15,
+    color: theme.colors.textSecondary,
+    marginBottom: 24,
   },
   aiInput: {
-    backgroundColor: '#252525',
-    borderRadius: 12,
-    padding: 16,
-    color: '#FFF',
+    backgroundColor: `${theme.colors.primary}08`,
+    borderRadius: 16,
+    padding: 18,
+    color: theme.colors.text,
     fontSize: 16,
-    minHeight: 120,
+    minHeight: 130,
     textAlignVertical: 'top',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#333',
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: `${theme.colors.primary}30`,
   },
   aiGenerateButton: {
-    backgroundColor: '#FF6800',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 16,
+    padding: 18,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 24,
+    gap: 10,
+    marginBottom: 28,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 6,
   },
   aiGenerateButtonDisabled: {
     opacity: 0.6,
@@ -765,29 +920,31 @@ const styles = StyleSheet.create({
   },
   aiSuggestionsTitle: {
     fontSize: 14,
-    color: '#888',
+    color: theme.colors.textSecondary,
     marginBottom: 8,
   },
   aiSuggestionChip: {
-    backgroundColor: '#252525',
+    backgroundColor: `${theme.colors.accent}15`,
     borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
     alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: '#333',
+    borderWidth: 1.5,
+    borderColor: `${theme.colors.accent}40`,
   },
   aiSuggestionText: {
-    color: '#FFF',
+    color: theme.colors.text,
     fontSize: 14,
   },
   chapterModal: {
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: theme.colors.background,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     padding: 0,
     maxHeight: '70%',
     marginTop: 'auto',
+    borderTopWidth: 3,
+    borderTopColor: theme.colors.primary,
   },
   chapterModalHeader: {
     flexDirection: 'row',
@@ -795,12 +952,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#2a2a2a',
+    borderBottomColor: theme.colors.border,
   },
   chapterModalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#FFF',
+    color: theme.colors.text,
+    letterSpacing: 0.5,
   },
   chaptersList: {
     maxHeight: 400,
@@ -809,12 +967,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    padding: 18,
     borderBottomWidth: 1,
-    borderBottomColor: '#2a2a2a',
+    borderBottomColor: `${theme.colors.primary}20`,
   },
   chapterItemActive: {
-    backgroundColor: '#252525',
+    backgroundColor: `${theme.colors.primary}15`,
+    borderLeftWidth: 4,
+    borderLeftColor: theme.colors.primary,
   },
   chapterItemLeft: {
     flexDirection: 'row',
@@ -823,39 +983,42 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   chapterItemNumber: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#666',
-    width: 30,
+    color: theme.colors.textSecondary,
+    width: 35,
   },
   chapterItemNumberActive: {
-    color: '#FF6800',
+    color: theme.colors.primary,
   },
   chapterItemTitle: {
     fontSize: 16,
-    color: '#FFF',
-    marginBottom: 4,
+    color: theme.colors.text,
+    marginBottom: 6,
   },
   chapterItemTitleActive: {
-    fontWeight: '600',
+    fontWeight: '700',
+    color: theme.colors.primary,
   },
   chapterItemMeta: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 13,
+    color: theme.colors.textSecondary,
   },
   newChapterButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#2a2a2a',
+    gap: 10,
+    padding: 22,
+    borderTopWidth: 2,
+    borderTopColor: `${theme.colors.primary}30`,
+    backgroundColor: `${theme.colors.primary}08`,
   },
   newChapterButtonText: {
-    color: '#FF6800',
+    color: theme.colors.primary,
     fontSize: 16,
     fontWeight: '700',
+    letterSpacing: 0.5,
   },
   confirmModalOverlay: {
     flex: 1,
@@ -865,26 +1028,27 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   confirmModal: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 20,
-    padding: 30,
+    backgroundColor: theme.colors.background,
+    borderRadius: 24,
+    padding: 32,
     width: '90%',
     maxWidth: 400,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
   },
   confirmModalTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#FFF',
-    marginBottom: 12,
+    color: theme.colors.text,
+    marginBottom: 14,
+    letterSpacing: 0.5,
   },
   confirmModalText: {
-    fontSize: 16,
-    color: '#888',
+    fontSize: 17,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 28,
   },
   confirmModalButtons: {
     flexDirection: 'row',
@@ -893,27 +1057,35 @@ const styles = StyleSheet.create({
   },
   confirmModalButtonCancel: {
     flex: 1,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: '#252525',
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: `${theme.colors.primary}15`,
     alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: `${theme.colors.primary}30`,
   },
   confirmModalButtonCancelText: {
-    color: '#FFF',
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
   confirmModalButtonConfirm: {
     flex: 1,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: '#FF6800',
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: theme.colors.primary,
     alignItems: 'center',
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 4,
   },
   confirmModalButtonConfirmText: {
     color: '#FFF',
     fontSize: 16,
     fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });
 

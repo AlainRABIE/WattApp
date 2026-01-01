@@ -40,7 +40,7 @@ const WritingDashboard: React.FC = () => {
           <TouchableOpacity
             style={styles.mainCard}
             activeOpacity={0.9}
-            onPress={() => router.push('/write/wattpad-editor?projectId=new')}
+            onPress={() => router.push('/write/book-setup?projectId=new')}
           >
             <LinearGradient
               colors={['#667eea', '#764ba2']}
