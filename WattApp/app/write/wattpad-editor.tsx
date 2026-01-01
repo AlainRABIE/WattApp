@@ -44,6 +44,7 @@ const WattpadEditor: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showChapterMenu, setShowChapterMenu] = useState(false);
   const [showNewChapterModal, setShowNewChapterModal] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Charger le projet
   useEffect(() => {
@@ -264,31 +265,6 @@ const WattpadEditor: React.FC = () => {
     );
   };
 
-  const handleImagePicker = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      // Insérer l'image dans le contenu
-      setContent(content + `\n[Image: ${result.assets[0].uri}]\n`);
-      Alert.alert('Succès', 'Image ajoutée au chapitre');
-    }
-  };
-
-  const handleVideoPicker = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-      allowsEditing: true,
-    });
-
-    if (!result.canceled) {
-      Alert.alert('Vidéo sélectionnée', 'Fonctionnalité à venir');
-    }
-  };
-
   const switchChapter = async (chapterNumber: number) => {
     // Sauvegarder le chapitre actuel avant de changer
     await saveProject();
@@ -313,6 +289,18 @@ const WattpadEditor: React.FC = () => {
   };
 
   const confirmNewChapter = async () => {
+    // Vérifier que tous les chapitres précédents ont du contenu
+    const emptyChapters = chapters.filter(ch => !ch.content || !ch.content.trim());
+    
+    if (emptyChapters.length > 0 || (!content.trim() && currentChapter === totalChapters)) {
+      setShowNewChapterModal(false);
+      Alert.alert(
+        'Chapitre vide',
+        `Veuillez écrire le contenu du chapitre ${emptyChapters.length > 0 ? emptyChapters[0].number : currentChapter} avant de créer un nouveau chapitre.`
+      );
+      return;
+    }
+
     const newChapterNumber = totalChapters + 1;
     setTotalChapters(newChapterNumber);
     await switchChapter(newChapterNumber);
@@ -403,6 +391,13 @@ const WattpadEditor: React.FC = () => {
         </TouchableOpacity>
 
         <TouchableOpacity 
+          style={styles.previewButton}
+          onPress={() => setShowPreview(true)}
+        >
+          <Ionicons name="eye-outline" size={22} color={theme.colors.text} />
+        </TouchableOpacity>
+
+        <TouchableOpacity 
           style={[styles.publishButton, isPublishing && styles.publishButtonDisabled]}
           onPress={handlePublish}
           disabled={isPublishing}
@@ -421,23 +416,6 @@ const WattpadEditor: React.FC = () => {
         contentContainerStyle={styles.editorContent}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Boutons Image et Vidéo */}
-        <View style={styles.mediaButtons}>
-          <TouchableOpacity 
-            style={styles.mediaButton}
-            onPress={handleImagePicker}
-          >
-            <Ionicons name="image-outline" size={36} color={theme.colors.primary} />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.mediaButton}
-            onPress={handleVideoPicker}
-          >
-            <Ionicons name="videocam-outline" size={36} color={theme.colors.primary} />
-          </TouchableOpacity>
-        </View>
-
         {/* Titre du Chapitre */}
         <TextInput
           style={styles.chapterTitleInput}
@@ -657,6 +635,52 @@ const WattpadEditor: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Modal Aperçu */}
+      <Modal
+        visible={showPreview}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPreview(false)}
+      >
+        <View style={styles.previewModalOverlay}>
+          <View style={styles.previewModal}>
+            {/* Header Aperçu */}
+            <View style={styles.previewHeader}>
+              <Text style={styles.previewHeaderTitle}>Aperçu du Chapitre</Text>
+              <TouchableOpacity onPress={() => setShowPreview(false)}>
+                <Ionicons name="close-circle" size={32} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Contenu Aperçu */}
+            <ScrollView 
+              style={styles.previewContent}
+              contentContainerStyle={styles.previewScrollContent}
+            >
+              {chapterTitle ? (
+                <Text style={styles.previewChapterTitle}>{chapterTitle}</Text>
+              ) : (
+                <Text style={styles.previewChapterTitle}>Chapitre {currentChapter}</Text>
+              )}
+              
+              <View style={styles.previewDivider} />
+              
+              {content.trim() ? (
+                <Text style={styles.previewText}>{content}</Text>
+              ) : (
+                <Text style={styles.previewPlaceholder}>
+                  Aucun contenu pour le moment.\nCommencez à écrire pour voir l'aperçu.
+                </Text>
+              )}
+
+              <View style={styles.previewFooter}>
+                <Text style={styles.previewFooterText}>{wordCount} mots</Text>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -667,55 +691,69 @@ const createStyles = (theme: any) => StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   header: {
-    height: 65,
-    backgroundColor: theme.colors.background,
+    height: 70,
+    backgroundColor: theme.colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    borderBottomWidth: 2,
-    borderBottomColor: theme.colors.primary,
-    shadowColor: theme.colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    paddingHorizontal: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: `${theme.colors.border}40`,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     justifyContent: 'center',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    borderRadius: 12,
+    backgroundColor: `${theme.colors.primary}08`,
   },
   chapterSelector: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: `${theme.colors.primary}15`,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: theme.colors.primary,
+    gap: 10,
+    backgroundColor: theme.colors.background,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginHorizontal: 16,
   },
   chapterText: {
     color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  previewButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+    backgroundColor: `${theme.colors.primary}08`,
+    marginRight: 12,
   },
   publishButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
     backgroundColor: theme.colors.primary,
-    borderRadius: 20,
+    borderRadius: 14,
     shadowColor: theme.colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 5,
+    minWidth: 90,
+    alignItems: 'center',
   },
   publishButtonDisabled: {
     opacity: 0.6,
@@ -731,51 +769,34 @@ const createStyles = (theme: any) => StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   editorContent: {
-    padding: 24,
+    padding: 32,
     paddingBottom: 140,
   },
-  mediaButtons: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-    marginBottom: 40,
-  },
-  mediaButton: {
-    width: 155,
-    height: 90,
-    backgroundColor: `${theme.colors.primary}08`,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: `${theme.colors.primary}30`,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: theme.colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 3,
-  },
   chapterTitleInput: {
-    fontSize: 20,
-    color: theme.colors.primary,
+    fontSize: 26,
+    color: theme.colors.text,
     textAlign: 'center',
-    marginBottom: 24,
-    paddingVertical: 12,
-    fontWeight: '600',
-    letterSpacing: 0.5,
+    marginBottom: 32,
+    paddingVertical: 16,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    backgroundColor: `${theme.colors.surface}60`,
+    borderRadius: 16,
+    paddingHorizontal: 24,
   },
   separator: {
-    height: 2,
-    backgroundColor: theme.colors.primary,
-    marginBottom: 32,
+    height: 1,
+    backgroundColor: theme.colors.border,
+    marginBottom: 40,
+    marginHorizontal: 40,
     borderRadius: 2,
-    opacity: 0.3,
+    opacity: 0.5,
   },
   contentInput: {
     fontSize: 17,
     color: theme.colors.text,
-    lineHeight: 28,
-    minHeight: 400,
+    lineHeight: 30,
+    minHeight: 500,
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
   },
   pollButton: {
@@ -801,18 +822,18 @@ const createStyles = (theme: any) => StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 75,
-    backgroundColor: theme.colors.background,
-    borderTopWidth: 2,
-    borderTopColor: theme.colors.primary,
+    height: 80,
+    backgroundColor: theme.colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: `${theme.colors.border}40`,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    shadowColor: theme.colors.primary,
+    paddingHorizontal: 28,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
     elevation: 8,
   },
   toolbarButton: {
@@ -820,31 +841,35 @@ const createStyles = (theme: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     backgroundColor: theme.colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 16,
     shadowColor: theme.colors.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6,
-    shadowRadius: 12,
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
     elevation: 6,
   },
   toolbarButtonText: {
     color: '#FFF',
     fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   statsContainer: {
     alignItems: 'flex-end',
+    backgroundColor: `${theme.colors.background}80`,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
   },
   statsText: {
-    fontSize: 15,
+    fontSize: 16,
     color: theme.colors.text,
     fontWeight: '600',
   },
   savingText: {
-    fontSize: 12,
+    fontSize: 11,
     color: theme.colors.primary,
     marginTop: 4,
     fontWeight: '500',
@@ -855,42 +880,46 @@ const createStyles = (theme: any) => StyleSheet.create({
     justifyContent: 'flex-end',
   },
   aiModal: {
-    backgroundColor: theme.colors.background,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    padding: 28,
+    backgroundColor: theme.colors.surface,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 32,
     maxHeight: '80%',
-    borderTopWidth: 3,
-    borderTopColor: theme.colors.primary,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
   },
   aiModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   aiModalTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
     color: theme.colors.text,
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   aiModalSubtitle: {
     fontSize: 15,
     color: theme.colors.textSecondary,
-    marginBottom: 24,
+    marginBottom: 28,
+    lineHeight: 22,
   },
   aiInput: {
-    backgroundColor: `${theme.colors.primary}08`,
+    backgroundColor: theme.colors.background,
     borderRadius: 16,
-    padding: 18,
+    padding: 20,
     color: theme.colors.text,
     fontSize: 16,
-    minHeight: 130,
+    minHeight: 140,
     textAlignVertical: 'top',
-    marginBottom: 20,
-    borderWidth: 2,
-    borderColor: `${theme.colors.primary}30`,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   aiGenerateButton: {
     backgroundColor: theme.colors.primary,
@@ -937,28 +966,31 @@ const createStyles = (theme: any) => StyleSheet.create({
     fontSize: 14,
   },
   chapterModal: {
-    backgroundColor: theme.colors.background,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    backgroundColor: theme.colors.surface,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     padding: 0,
     maxHeight: '70%',
     marginTop: 'auto',
-    borderTopWidth: 3,
-    borderTopColor: theme.colors.primary,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
   },
   chapterModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: `${theme.colors.border}30`,
   },
   chapterModalTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
     color: theme.colors.text,
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   chaptersList: {
     maxHeight: 400,
@@ -967,12 +999,12 @@ const createStyles = (theme: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 18,
+    padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: `${theme.colors.primary}20`,
+    borderBottomColor: `${theme.colors.border}15`,
   },
   chapterItemActive: {
-    backgroundColor: `${theme.colors.primary}15`,
+    backgroundColor: `${theme.colors.primary}10`,
     borderLeftWidth: 4,
     borderLeftColor: theme.colors.primary,
   },
@@ -1086,6 +1118,86 @@ const createStyles = (theme: any) => StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.5,
+  },
+  previewModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewModal: {
+    width: '92%',
+    height: '88%',
+    backgroundColor: theme.colors.background,
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  previewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: `${theme.colors.border}30`,
+    backgroundColor: theme.colors.surface,
+  },
+  previewHeaderTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+  },
+  previewContent: {
+    flex: 1,
+  },
+  previewScrollContent: {
+    padding: 32,
+    paddingBottom: 60,
+  },
+  previewChapterTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    textAlign: 'center',
+    marginBottom: 24,
+    letterSpacing: 0.5,
+  },
+  previewDivider: {
+    height: 1,
+    backgroundColor: theme.colors.border,
+    marginBottom: 32,
+    marginHorizontal: 20,
+    opacity: 0.4,
+  },
+  previewText: {
+    fontSize: 18,
+    color: theme.colors.text,
+    lineHeight: 32,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+    textAlign: 'justify',
+  },
+  previewPlaceholder: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    lineHeight: 28,
+  },
+  previewFooter: {
+    marginTop: 48,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: `${theme.colors.border}30`,
+    alignItems: 'center',
+  },
+  previewFooterText: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    fontWeight: '600',
   },
 });
 
