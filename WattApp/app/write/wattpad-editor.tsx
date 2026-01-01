@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -53,7 +53,7 @@ const WattpadEditor: React.FC = () => {
     }
   }, [projectId]);
 
-  // Auto-save
+  // Auto-save avec délai plus long pour éviter freeze
   useEffect(() => {
     if (autoSaveTimer.current) {
       clearTimeout(autoSaveTimer.current);
@@ -62,7 +62,7 @@ const WattpadEditor: React.FC = () => {
       if (chapterTitle || content) {
         saveProject();
       }
-    }, 2000);
+    }, 5000); // Augmenté à 5 secondes
 
     return () => {
       if (autoSaveTimer.current) {
@@ -71,13 +71,16 @@ const WattpadEditor: React.FC = () => {
     };
   }, [chapterTitle, content]);
 
-  // Calculer le nombre de mots
-  useEffect(() => {
-    const words = content.trim().split(/\s+/).filter(w => w.length > 0).length;
-    setWordCount(words);
+  // Calculer le nombre de mots avec useMemo pour optimisation
+  const calculatedWordCount = useMemo(() => {
+    return content.trim().split(/\s+/).filter(w => w.length > 0).length;
   }, [content]);
 
-  const loadProject = async () => {
+  useEffect(() => {
+    setWordCount(calculatedWordCount);
+  }, [calculatedWordCount]);
+
+  const loadProject = useCallback(async () => {
     try {
       const auth = getAuth();
       if (!auth.currentUser) return;
@@ -107,9 +110,9 @@ const WattpadEditor: React.FC = () => {
     } catch (error) {
       console.error('Erreur chargement:', error);
     }
-  };
+  }, [projectId, currentChapter]);
 
-  const saveProject = async () => {
+  const saveProject = useCallback(async () => {
     try {
       setIsSaving(true);
       const auth = getAuth();
@@ -155,7 +158,7 @@ const WattpadEditor: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [chapters, currentChapter, chapterTitle, content, wordCount, projectId]);
 
   const handlePublish = async () => {
     if (chapters.length === 0 || !chapters.some(ch => ch.content && ch.content.trim())) {
@@ -364,6 +367,15 @@ const WattpadEditor: React.FC = () => {
     }
   };
 
+  // Handlers optimisés avec useCallback pour éviter re-renders
+  const handleChapterTitleChange = useCallback((text: string) => {
+    setChapterTitle(text);
+  }, []);
+
+  const handleContentChange = useCallback((text: string) => {
+    setContent(text);
+  }, []);
+
   const styles = createStyles(theme);
 
   return (
@@ -422,8 +434,9 @@ const WattpadEditor: React.FC = () => {
           placeholder="Titre du Chapitre"
           placeholderTextColor={theme.colors.textSecondary}
           value={chapterTitle}
-          onChangeText={setChapterTitle}
+          onChangeText={handleChapterTitleChange}
           textAlign="center"
+          maxLength={100}
         />
 
         {/* Séparateur */}
@@ -435,9 +448,10 @@ const WattpadEditor: React.FC = () => {
           placeholder="Commence à écrire ton histoire"
           placeholderTextColor={theme.colors.textSecondary}
           value={content}
-          onChangeText={setContent}
+          onChangeText={handleContentChange}
           multiline
           textAlignVertical="top"
+          scrollEnabled={false}
         />
 
         {/* Bouton Ajouter un sondage */}
