@@ -25,6 +25,7 @@ const WattpadEditor: React.FC = () => {
   const router = useRouter();
   const { projectId } = useLocalSearchParams();
   const autoSaveTimer = useRef<any>(null);
+  const contentInputRef = useRef<TextInput>(null);
   const { theme } = useTheme();
 
   // États principaux
@@ -37,6 +38,10 @@ const WattpadEditor: React.FC = () => {
   const [chapters, setChapters] = useState<any[]>([]);
   const [totalChapters, setTotalChapters] = useState(1);
   const [isPublishing, setIsPublishing] = useState(false);
+  
+  // États pour le formatage
+  const [selection, setSelection] = useState({ start: 0, end: 0 });
+  const [showFormatToolbar, setShowFormatToolbar] = useState(false);
   
   // États IA
   const [showAIModal, setShowAIModal] = useState(false);
@@ -268,11 +273,19 @@ const WattpadEditor: React.FC = () => {
     );
   };
 
-  const switchChapter = async (chapterNumber: number) => {
-    // Sauvegarder le chapitre actuel avant de changer
-    await saveProject();
+  const switchChapter = useCallback(async (chapterNumber: number) => {
+    if (chapterNumber === currentChapter) {
+      setShowChapterMenu(false);
+      return;
+    }
+
+    // Fermer le menu immédiatement pour feedback UI
+    setShowChapterMenu(false);
     
-    // Charger le nouveau chapitre
+    // Sauvegarder en arrière-plan (ne pas attendre)
+    saveProject().catch(err => console.error('Erreur sauvegarde:', err));
+    
+    // Charger le nouveau chapitre immédiatement
     const chapter = chapters.find(ch => ch.number === chapterNumber);
     if (chapter) {
       setChapterTitle(chapter.title || '');
@@ -284,26 +297,13 @@ const WattpadEditor: React.FC = () => {
       setContent('');
       setCurrentChapter(chapterNumber);
     }
-    setShowChapterMenu(false);
-  };
+  }, [currentChapter, chapters, saveProject]);
 
   const createNewChapter = () => {
     setShowNewChapterModal(true);
   };
 
   const confirmNewChapter = async () => {
-    // Vérifier que tous les chapitres précédents ont du contenu
-    const emptyChapters = chapters.filter(ch => !ch.content || !ch.content.trim());
-    
-    if (emptyChapters.length > 0 || (!content.trim() && currentChapter === totalChapters)) {
-      setShowNewChapterModal(false);
-      Alert.alert(
-        'Chapitre vide',
-        `Veuillez écrire le contenu du chapitre ${emptyChapters.length > 0 ? emptyChapters[0].number : currentChapter} avant de créer un nouveau chapitre.`
-      );
-      return;
-    }
-
     const newChapterNumber = totalChapters + 1;
     setTotalChapters(newChapterNumber);
     await switchChapter(newChapterNumber);
@@ -376,6 +376,52 @@ const WattpadEditor: React.FC = () => {
     setContent(text);
   }, []);
 
+  const handleSelectionChange = useCallback((event: any) => {
+    setSelection(event.nativeEvent.selection);
+  }, []);
+
+  // Fonctions de formatage
+  const applyFormat = useCallback((format: string) => {
+    const { start, end } = selection;
+    if (start === end) {
+      Alert.alert('Info', 'Veuillez sélectionner du texte à formater');
+      return;
+    }
+
+    const selectedText = content.substring(start, end);
+    let formattedText = '';
+
+    switch (format) {
+      case 'bold':
+        formattedText = `**${selectedText}**`;
+        break;
+      case 'italic':
+        formattedText = `*${selectedText}*`;
+        break;
+      case 'underline':
+        formattedText = `__${selectedText}__`;
+        break;
+      case 'center':
+        formattedText = `<center>${selectedText}</center>`;
+        break;
+      case 'quote':
+        formattedText = `> ${selectedText}`;
+        break;
+      default:
+        formattedText = selectedText;
+    }
+
+    const newContent = content.substring(0, start) + formattedText + content.substring(end);
+    setContent(newContent);
+    
+    // Repositionner le curseur après le texte formaté
+    setTimeout(() => {
+      contentInputRef.current?.setNativeProps({
+        selection: { start: start + formattedText.length, end: start + formattedText.length }
+      });
+    }, 10);
+  }, [content, selection]);
+
   const styles = createStyles(theme);
 
   return (
@@ -444,14 +490,17 @@ const WattpadEditor: React.FC = () => {
 
         {/* Zone d'écriture */}
         <TextInput
+          ref={contentInputRef}
           style={styles.contentInput}
           placeholder="Commence à écrire ton histoire"
           placeholderTextColor={theme.colors.textSecondary}
           value={content}
           onChangeText={handleContentChange}
+          onSelectionChange={handleSelectionChange}
           multiline
           textAlignVertical="top"
           scrollEnabled={false}
+          onFocus={() => setShowFormatToolbar(true)}
         />
 
         {/* Bouton Ajouter un sondage */}
@@ -463,18 +512,78 @@ const WattpadEditor: React.FC = () => {
 
       {/* Barre d'outils flottante */}
       <View style={styles.floatingToolbar}>
-        <TouchableOpacity 
-          style={styles.toolbarButton}
-          onPress={() => setShowAIModal(true)}
-        >
-          <MaterialCommunityIcons name="robot-outline" size={26} color="#FFF" />
-          <Text style={styles.toolbarButtonText}>Assistant IA</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.statsContainer}>
-          <Text style={styles.statsText}>{wordCount} mots</Text>
-          {isSaving && <Text style={styles.savingText}>Sauvegarde...</Text>}
-        </View>
+        {showFormatToolbar ? (
+          <>
+            {/* Barre de formatage */}
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.formatToolbarScroll}
+              contentContainerStyle={styles.formatToolbarContent}
+            >
+              <TouchableOpacity 
+                style={styles.formatButton}
+                onPress={() => applyFormat('bold')}
+              >
+                <MaterialCommunityIcons name="format-bold" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.formatButton}
+                onPress={() => applyFormat('italic')}
+              >
+                <MaterialCommunityIcons name="format-italic" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.formatButton}
+                onPress={() => applyFormat('underline')}
+              >
+                <MaterialCommunityIcons name="format-underline" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+
+              <View style={styles.formatDivider} />
+
+              <TouchableOpacity 
+                style={styles.formatButton}
+                onPress={() => applyFormat('center')}
+              >
+                <MaterialCommunityIcons name="format-align-center" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.formatButton}
+                onPress={() => applyFormat('quote')}
+              >
+                <MaterialCommunityIcons name="format-quote-close" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+
+              <View style={styles.formatDivider} />
+
+              <TouchableOpacity 
+                style={styles.formatButton}
+                onPress={() => setShowFormatToolbar(false)}
+              >
+                <Ionicons name="close-circle" size={24} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            </ScrollView>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity 
+              style={styles.toolbarButton}
+              onPress={() => setShowAIModal(true)}
+            >
+              <MaterialCommunityIcons name="robot-outline" size={26} color="#FFF" />
+              <Text style={styles.toolbarButtonText}>Assistant IA</Text>
+            </TouchableOpacity>
+            
+            <View style={styles.statsContainer}>
+              <Text style={styles.statsText}>{wordCount} mots</Text>
+              {isSaving && <Text style={styles.savingText}>Sauvegarde...</Text>}
+            </View>
+          </>
+        )}
       </View>
 
       {/* Modal IA */}
@@ -887,6 +996,32 @@ const createStyles = (theme: any) => StyleSheet.create({
     color: theme.colors.primary,
     marginTop: 4,
     fontWeight: '500',
+  },
+  formatToolbarScroll: {
+    flex: 1,
+  },
+  formatToolbarContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 8,
+  },
+  formatButton: {
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+    backgroundColor: `${theme.colors.surface}`,
+    borderWidth: 1,
+    borderColor: `${theme.colors.border}50`,
+  },
+  formatDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: theme.colors.border,
+    marginHorizontal: 4,
+    opacity: 0.3,
   },
   modalOverlay: {
     flex: 1,
