@@ -32,12 +32,15 @@ const WattpadEditor: React.FC = () => {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [wordCount, setWordCount] = useState(0);
   const [currentChapter, setCurrentChapter] = useState(1);
+  const [chapters, setChapters] = useState<any[]>([]);
+  const [totalChapters, setTotalChapters] = useState(1);
   
   // États IA
   const [showAIModal, setShowAIModal] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [showChapterMenu, setShowChapterMenu] = useState(false);
+  const [showNewChapterModal, setShowNewChapterModal] = useState(false);
 
   // Charger le projet
   useEffect(() => {
@@ -80,9 +83,21 @@ const WattpadEditor: React.FC = () => {
 
       if (projectDoc.exists()) {
         const data = projectDoc.data();
-        setChapterTitle(data.chapterTitle || '');
-        setContent(data.content || '');
-        setCurrentChapter(data.currentChapter || 1);
+        const loadedChapters = data.chapters || [{ 
+          number: 1, 
+          title: '', 
+          content: '',
+          wordCount: 0 
+        }];
+        
+        setChapters(loadedChapters);
+        setTotalChapters(loadedChapters.length);
+        
+        // Charger le chapitre actuel
+        const currentChapterData = loadedChapters.find((ch: any) => ch.number === currentChapter) || loadedChapters[0];
+        setChapterTitle(currentChapterData.title || '');
+        setContent(currentChapterData.content || '');
+        setCurrentChapter(currentChapterData.number || 1);
       }
     } catch (error) {
       console.error('Erreur chargement:', error);
@@ -95,11 +110,26 @@ const WattpadEditor: React.FC = () => {
       const auth = getAuth();
       if (!auth.currentUser) return;
 
+      // Mettre à jour le chapitre actuel dans la liste
+      const updatedChapters = chapters.map(ch => 
+        ch.number === currentChapter 
+          ? { ...ch, title: chapterTitle, content, wordCount }
+          : ch
+      );
+      
+      // Si le chapitre n'existe pas encore, l'ajouter
+      if (!updatedChapters.find(ch => ch.number === currentChapter)) {
+        updatedChapters.push({
+          number: currentChapter,
+          title: chapterTitle,
+          content,
+          wordCount
+        });
+      }
+
       const projectData = {
-        chapterTitle: chapterTitle || 'Titre du Chapitre',
-        content,
-        wordCount,
-        currentChapter,
+        chapters: updatedChapters,
+        totalChapters: updatedChapters.length,
         updatedAt: serverTimestamp(),
         userId: auth.currentUser.uid,
       };
@@ -114,6 +144,7 @@ const WattpadEditor: React.FC = () => {
         });
       }
 
+      setChapters(updatedChapters);
       setLastSaved(new Date());
     } catch (error) {
       console.error('Erreur sauvegarde:', error);
@@ -160,6 +191,67 @@ const WattpadEditor: React.FC = () => {
     if (!result.canceled) {
       Alert.alert('Vidéo sélectionnée', 'Fonctionnalité à venir');
     }
+  };
+
+  const switchChapter = async (chapterNumber: number) => {
+    // Sauvegarder le chapitre actuel avant de changer
+    await saveProject();
+    
+    // Charger le nouveau chapitre
+    const chapter = chapters.find(ch => ch.number === chapterNumber);
+    if (chapter) {
+      setChapterTitle(chapter.title || '');
+      setContent(chapter.content || '');
+      setCurrentChapter(chapterNumber);
+    } else {
+      // Nouveau chapitre vide
+      setChapterTitle('');
+      setContent('');
+      setCurrentChapter(chapterNumber);
+    }
+    setShowChapterMenu(false);
+  };
+
+  const createNewChapter = () => {
+    setShowNewChapterModal(true);
+  };
+
+  const confirmNewChapter = async () => {
+    const newChapterNumber = totalChapters + 1;
+    setTotalChapters(newChapterNumber);
+    await switchChapter(newChapterNumber);
+    setShowNewChapterModal(false);
+    Alert.alert('Nouveau chapitre', `Chapitre ${newChapterNumber} créé !`);
+  };
+
+  const deleteChapter = async (chapterNumber: number) => {
+    if (chapters.length <= 1) {
+      Alert.alert('Erreur', 'Vous devez avoir au moins un chapitre');
+      return;
+    }
+
+    Alert.alert(
+      'Supprimer le chapitre',
+      `Voulez-vous vraiment supprimer le chapitre ${chapterNumber} ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            const updatedChapters = chapters.filter(ch => ch.number !== chapterNumber);
+            setChapters(updatedChapters);
+            setTotalChapters(updatedChapters.length);
+            
+            if (currentChapter === chapterNumber) {
+              await switchChapter(1);
+            }
+            
+            await saveProject();
+          }
+        }
+      ]
+    );
   };
 
   const generateWithAI = async () => {
@@ -354,6 +446,109 @@ const WattpadEditor: React.FC = () => {
                 onPress={() => setAiPrompt('Décris une scène d\'action')}
               >
                 <Text style={styles.aiSuggestionText}>Scène d'action</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Menu Chapitres */}
+      <Modal
+        visible={showChapterMenu}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowChapterMenu(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowChapterMenu(false)}
+        >
+          <View style={styles.chapterModal}>
+            <View style={styles.chapterModalHeader}>
+              <Text style={styles.chapterModalTitle}>Chapitres</Text>
+              <TouchableOpacity onPress={() => setShowChapterMenu(false)}>
+                <Ionicons name="close" size={24} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.chaptersList}>
+              {Array.from({ length: totalChapters }, (_, i) => i + 1).map((num) => {
+                const chapter = chapters.find(ch => ch.number === num);
+                return (
+                  <TouchableOpacity
+                    key={num}
+                    style={[
+                      styles.chapterItem,
+                      currentChapter === num && styles.chapterItemActive
+                    ]}
+                    onPress={() => switchChapter(num)}
+                    onLongPress={() => deleteChapter(num)}
+                  >
+                    <View style={styles.chapterItemLeft}>
+                      <Text style={[
+                        styles.chapterItemNumber,
+                        currentChapter === num && styles.chapterItemNumberActive
+                      ]}>
+                        {num}
+                      </Text>
+                      <View>
+                        <Text style={[
+                          styles.chapterItemTitle,
+                          currentChapter === num && styles.chapterItemTitleActive
+                        ]}>
+                          {chapter?.title || `Chapitre ${num}`}
+                        </Text>
+                        <Text style={styles.chapterItemMeta}>
+                          {chapter?.wordCount || 0} mots
+                        </Text>
+                      </View>
+                    </View>
+                    {currentChapter === num && (
+                      <Ionicons name="checkmark-circle" size={20} color="#FF6800" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.newChapterButton}
+              onPress={createNewChapter}
+            >
+              <Ionicons name="add-circle" size={24} color="#FF6800" />
+              <Text style={styles.newChapterButtonText}>Nouveau chapitre</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Modal Confirmation Nouveau Chapitre */}
+      <Modal
+        visible={showNewChapterModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowNewChapterModal(false)}
+      >
+        <View style={styles.confirmModalOverlay}>
+          <View style={styles.confirmModal}>
+            <Ionicons name="add-circle-outline" size={48} color="#FF6800" style={{ marginBottom: 16 }} />
+            <Text style={styles.confirmModalTitle}>Nouveau Chapitre</Text>
+            <Text style={styles.confirmModalText}>
+              Créer le chapitre {totalChapters + 1} ?
+            </Text>
+            <View style={styles.confirmModalButtons}>
+              <TouchableOpacity
+                style={styles.confirmModalButtonCancel}
+                onPress={() => setShowNewChapterModal(false)}
+              >
+                <Text style={styles.confirmModalButtonCancelText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmModalButtonConfirm}
+                onPress={confirmNewChapter}
+              >
+                <Text style={styles.confirmModalButtonConfirmText}>Créer</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -585,6 +780,140 @@ const styles = StyleSheet.create({
   aiSuggestionText: {
     color: '#FFF',
     fontSize: 14,
+  },
+  chapterModal: {
+    backgroundColor: '#1a1a1a',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 0,
+    maxHeight: '70%',
+    marginTop: 'auto',
+  },
+  chapterModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+  },
+  chapterModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  chaptersList: {
+    maxHeight: 400,
+  },
+  chapterItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+  },
+  chapterItemActive: {
+    backgroundColor: '#252525',
+  },
+  chapterItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    flex: 1,
+  },
+  chapterItemNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#666',
+    width: 30,
+  },
+  chapterItemNumberActive: {
+    color: '#FF6800',
+  },
+  chapterItemTitle: {
+    fontSize: 16,
+    color: '#FFF',
+    marginBottom: 4,
+  },
+  chapterItemTitleActive: {
+    fontWeight: '600',
+  },
+  chapterItemMeta: {
+    fontSize: 12,
+    color: '#666',
+  },
+  newChapterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#2a2a2a',
+  },
+  newChapterButtonText: {
+    color: '#FF6800',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  confirmModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  confirmModal: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 20,
+    padding: 30,
+    width: '90%',
+    maxWidth: 400,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+  confirmModalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#FFF',
+    marginBottom: 12,
+  },
+  confirmModalText: {
+    fontSize: 16,
+    color: '#888',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  confirmModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  confirmModalButtonCancel: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#252525',
+    alignItems: 'center',
+  },
+  confirmModalButtonCancelText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  confirmModalButtonConfirm: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#FF6800',
+    alignItems: 'center',
+  },
+  confirmModalButtonConfirmText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
 
