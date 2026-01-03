@@ -645,8 +645,13 @@ Variables d'état:
 
   // (supprimé: redéclaration inutile)
 
-  // Les livres lus et créés sont alimentés par la base de données uniquement
-  const readBooks = books.filter((b: BookType) => b.status === 'published' || b.status === 'imported');
+  // Mes livres : tous les livres dans la bibliothèque
+  const myBooks = books;
+  
+  // Livres lus : uniquement les livres qui ont été commencés (avec pagesRead > 0)
+  const readBooks = books.filter((b: BookType) => b.pagesRead && b.pagesRead > 0);
+  
+  // Créations : livres créés par l'utilisateur (ne devrait pas être dans books normalement)
   const createdBooks = books.filter((b: BookType) => b.status !== 'published' && b.status !== 'imported');
 
   // Pour pouvoir rappeler loadBooks depuis un callback
@@ -1217,18 +1222,18 @@ Variables d'état:
             </View>
           ) : (
             <>
-              {/* Section: Livres lus - Carousel horizontal */}
+              {/* Section: Mes livres - Carousel horizontal */}
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>� Livres lus</Text>
-                  <Text style={styles.sectionCount}>{readBooks.length}</Text>
+                  <Text style={styles.sectionTitle}>📚 Mes livres</Text>
+                  <Text style={styles.sectionCount}>{myBooks.length}</Text>
                 </View>
                 <ScrollView 
                   horizontal 
                   showsHorizontalScrollIndicator={false} 
                   contentContainerStyle={styles.horizontalList}
                 >
-                  {readBooks.map((book: BookType) => {
+                  {myBooks.map((book: BookType) => {
                     // Pourcentage d'avancement : pagesRead / totalPages
                     let percent = 0;
                     if (book.pagesRead && book.totalPages && book.totalPages > 0) {
@@ -1305,17 +1310,121 @@ Variables d'état:
                             <Text style={styles.horizontalBookAuthor} numberOfLines={1}>par {book.auteur || book.author || 'Auteur inconnu'}</Text>
                           </View>
                         </TouchableOpacity>
-                        {/* Affichage du pourcentage d'avancement */}
-                        <View style={{ alignItems: 'center', marginTop: 6 }}>
-                          <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 13 }}>
-                            {percent}% lu
-                          </Text>
-                        </View>
+                        {/* Affichage du pourcentage d'avancement si le livre a été lu */}
+                        {percent > 0 && (
+                          <View style={{ alignItems: 'center', marginTop: 6 }}>
+                            <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 13 }}>
+                              {percent}% lu
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     );
                   })}
                 </ScrollView>
               </View>
+
+              {/* Section: Livres lus - Carousel horizontal */}
+              {readBooks.length > 0 && (
+                <View style={styles.section}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>📖 Livres lus</Text>
+                    <Text style={styles.sectionCount}>{readBooks.length}</Text>
+                  </View>
+                  <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={false} 
+                    contentContainerStyle={styles.horizontalList}
+                  >
+                    {readBooks.map((book: BookType) => {
+                      // Pourcentage d'avancement : pagesRead / totalPages
+                      let percent = 0;
+                      if (book.pagesRead && book.totalPages && book.totalPages > 0) {
+                        percent = Math.floor((book.pagesRead / book.totalPages) * 100);
+                      }
+
+                      const isDownloaded = downloadedBooks.has(book.id);
+                      const isDownloading = downloadingBooks.has(book.id);
+                      const downloadProgressValue = downloadProgress[book.id] || 0;
+
+                      return (
+                        <View key={book.id} style={styles.horizontalCard}>
+                          <TouchableOpacity
+                            onPress={() => handleOpenBook(book)}
+                            onLongPress={(event) => openContextMenu(book, event)}
+                          >
+                            <View style={styles.horizontalCover}>
+                              {book.type === 'pdf' ? (
+                                // Si le PDF a une miniature, l'afficher, sinon afficher l'indicateur PDF
+                                (book.coverImageUrl || book.couverture || book.coverImage) ? (
+                                  <View style={styles.pdfCoverContainer}>
+                                    <Image
+                                      source={{ uri: book.coverImageUrl || book.couverture || book.coverImage }}
+                                      style={styles.horizontalCover}
+                                    />
+                                    <View style={styles.pdfBadge}>
+                                      <Text style={styles.pdfBadgeText}>PDF</Text>
+                                    </View>
+                                  </View>
+                                ) : (
+                                  <View style={styles.pdfIndicator}>
+                                    <Ionicons name="document-text" size={40} color="#FF6B6B" />
+                                    <Text style={styles.pdfLabel}>PDF</Text>
+                                  </View>
+                                )
+                              ) : (
+                                <Image
+                                  source={{ uri: book.coverImageUrl || book.couverture || book.coverImage || 'https://via.placeholder.com/120x180.png?text=Cover' }}
+                                  style={styles.horizontalCover}
+                                />
+                              )}
+                              
+                              {/* Indicateur de téléchargement */}
+                              <View style={styles.downloadIndicator}>
+                                {isDownloaded && (
+                                  <View style={styles.downloadedBadge}>
+                                    <Ionicons name="cloud-done" size={18} color="#fff" />
+                                  </View>
+                                )}
+                                {isDownloading && (
+                                  <View style={styles.downloadingBadge}>
+                                    <Ionicons name="cloud-download" size={14} color="#fff" />
+                                    <Text style={styles.downloadProgressText}>{downloadProgressValue}%</Text>
+                                  </View>
+                                )}
+                                {!isDownloaded && !isDownloading && downloadedBooks.size < MAX_DOWNLOADS && book.type !== 'pdf' && (
+                                  <TouchableOpacity 
+                                    style={styles.downloadAvailableBadge}
+                                    onPress={() => handleDownloadBook(book)}
+                                    activeOpacity={0.7}
+                                  >
+                                    <Ionicons name="cloud-download-outline" size={16} color="#fff" />
+                                  </TouchableOpacity>
+                                )}
+                              </View>
+                            </View>
+                            <View style={styles.horizontalCardContent}>
+                              <View style={styles.titleRow}>
+                                <Text style={styles.horizontalBookTitle} numberOfLines={2}>{book.titre || book.title || 'Titre inconnu'}</Text>
+                                {book.type === 'pdf' && (
+                                  <Ionicons name="document-text-outline" size={16} color="#FF6B6B" style={styles.typeIcon} />
+                                )}
+                              </View>
+                              <Text style={styles.horizontalBookAuthor} numberOfLines={1}>par {book.auteur || book.author || 'Auteur inconnu'}</Text>
+                            </View>
+                          </TouchableOpacity>
+                          {/* Affichage du pourcentage d'avancement */}
+                          <View style={{ alignItems: 'center', marginTop: 6 }}>
+                            <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 13 }}>
+                              {percent}% lu
+                            </Text>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
 
               {/* Section: Mes brouillons - Carousel horizontal */}
               <View style={styles.section}>

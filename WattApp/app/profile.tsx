@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Linking, Modal } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Linking, Modal, Share, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -27,6 +27,7 @@ const Profile: React.FC = () => {
   const [bannerURL, setBannerURL] = useState<string | null>(null);
   const [works, setWorks] = useState<any[]>([]);
   const [recentReads, setRecentReads] = useState<any[]>([]);
+  const [libraryBooks, setLibraryBooks] = useState<any[]>([]);
   const [uploading, setUploading] = useState<boolean>(false);
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [showThemeSelector, setShowThemeSelector] = useState(false);
@@ -34,6 +35,8 @@ const Profile: React.FC = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0, bookTitle: '' });
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'grid' | 'playlists' | 'bookmarks'>('grid');
 
   useEffect(() => {
     const load = async () => await loadProfile();
@@ -97,6 +100,31 @@ const Profile: React.FC = () => {
         const snapPlaylists = await getDocs(qPlaylists);
         setPlaylists(snapPlaylists.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (e) {}
+
+      // Livres de la bibliothèque
+      try {
+        const qLibrary = query(collection(db, 'library'), where('uid', '==', user.uid));
+        const snapLibrary = await getDocs(qLibrary);
+        const libraryItems = snapLibrary.docs.map(d => d.data());
+        
+        // Récupérer les détails des livres
+        const bookPromises = libraryItems.map(async (item: any) => {
+          if (item.bookId) {
+            try {
+              const bookSnap = await getDocs(query(collection(db, 'books'), where('__name__', '==', item.bookId)));
+              if (!bookSnap.empty) {
+                return { id: item.bookId, ...bookSnap.docs[0].data() };
+              }
+            } catch (e) {}
+          }
+          return null;
+        });
+        
+        const books = (await Promise.all(bookPromises)).filter(b => b !== null);
+        setLibraryBooks(books);
+      } catch (e) {
+        console.warn('Library load error', e);
+      }
     } catch (err) {
       console.warn('Profile load error', err);
     }
@@ -196,6 +224,68 @@ const Profile: React.FC = () => {
       Alert.alert('Succès', `Playlist maintenant ${statusText} !`);
     } catch (error) {
       Alert.alert('Erreur', 'Impossible de modifier la visibilité.');
+    }
+  };
+
+  const handleShareProfile = async (type: string) => {
+    try {
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const profileUrl = `https://wattapp.com/profile/${user.uid}`;
+      const message = `Découvrez mon profil ${displayName || 'sur WattApp'} ! ${profileUrl}`;
+
+      if (type === 'copy') {
+        // Utiliser Share pour afficher l'URL que l'utilisateur peut copier
+        await Share.share({
+          message: profileUrl,
+          title: 'Lien du profil',
+        });
+        setShowShareModal(false);
+      } else if (type === 'general') {
+        const result = await Share.share({
+          message: message,
+          url: profileUrl,
+          title: `Profil de ${displayName || 'WattApp'}`,
+        });
+        
+        if (result.action === Share.sharedAction) {
+          setShowShareModal(false);
+        }
+      } else if (type === 'instagram') {
+        // Instagram Stories partage
+        const instagramUrl = `instagram://story-camera`;
+        const canOpen = await Linking.canOpenURL(instagramUrl);
+        if (canOpen) {
+          await Linking.openURL(instagramUrl);
+          setShowShareModal(false);
+        } else {
+          Alert.alert('Instagram non disponible', 'Instagram n\'est pas installé sur cet appareil');
+        }
+      } else if (type === 'whatsapp') {
+        const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(message)}`;
+        const canOpen = await Linking.canOpenURL(whatsappUrl);
+        if (canOpen) {
+          await Linking.openURL(whatsappUrl);
+          setShowShareModal(false);
+        } else {
+          Alert.alert('WhatsApp non disponible', 'WhatsApp n\'est pas installé sur cet appareil');
+        }
+      } else if (type === 'twitter') {
+        const twitterUrl = `twitter://post?message=${encodeURIComponent(message)}`;
+        const twitterWebUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(message)}`;
+        const canOpen = await Linking.canOpenURL(twitterUrl);
+        if (canOpen) {
+          await Linking.openURL(twitterUrl);
+        } else {
+          await Linking.openURL(twitterWebUrl);
+        }
+        setShowShareModal(false);
+      }
+    } catch (error) {
+      console.error('Erreur partage:', error);
+      Alert.alert('Erreur', 'Impossible de partager le profil');
     }
   };
 
@@ -389,7 +479,24 @@ const Profile: React.FC = () => {
           <TouchableOpacity style={styles.primaryButtonSingle} onPress={() => router.push('/EditProfile')}>
             <Text style={styles.primaryText}>Éditer le profil</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryButtonSmall} onPress={() => router.push('/write')}>
+          <TouchableOpacity style={styles.secondaryButtonSmall} onPress={async () => {
+            try {
+              const auth = getAuth(app);
+              const user = auth.currentUser;
+              if (!user) return;
+
+              const profileUrl = `https://wattapp.com/profile/${user.uid}`;
+              const message = `Découvrez mon profil ${displayName || 'sur WattApp'} !\n${profileUrl}`;
+
+              await Share.share({
+                message: message,
+                url: profileUrl,
+                title: `Profil de ${displayName || 'WattApp'}`,
+              });
+            } catch (error) {
+              console.error('Erreur partage:', error);
+            }
+          }}>
             <Text style={styles.secondaryText}>Partager</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.themeButtonSmall} onPress={() => router.push('/settings')}>
@@ -397,111 +504,160 @@ const Profile: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Œuvres - Grille Instagram Style */}
+        {/* Sections avec onglets */}
         <View style={styles.section}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginBottom: 2, paddingHorizontal: 0, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.1)' }}>
-            <TouchableOpacity style={{ flex: 1, alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#FFFFFF' }}>
-              <Ionicons name="grid-outline" size={24} color="#FFFFFF" />
+            <TouchableOpacity 
+              style={{ flex: 1, alignItems: 'center', paddingVertical: 14, borderBottomWidth: activeTab === 'grid' ? 1 : 0, borderBottomColor: '#FFFFFF' }}
+              onPress={() => setActiveTab('grid')}
+            >
+              <Ionicons name="grid-outline" size={24} color={activeTab === 'grid' ? '#FFFFFF' : '#555'} />
             </TouchableOpacity>
-            <TouchableOpacity style={{ flex: 1, alignItems: 'center', paddingVertical: 14 }}>
-              <Ionicons name="list-outline" size={24} color="#555" />
+            <TouchableOpacity 
+              style={{ flex: 1, alignItems: 'center', paddingVertical: 14, borderBottomWidth: activeTab === 'playlists' ? 1 : 0, borderBottomColor: '#FFFFFF' }}
+              onPress={() => setActiveTab('playlists')}
+            >
+              <Ionicons name="musical-notes-outline" size={24} color={activeTab === 'playlists' ? '#FFFFFF' : '#555'} />
             </TouchableOpacity>
-            <TouchableOpacity style={{ flex: 1, alignItems: 'center', paddingVertical: 14 }}>
-              <Ionicons name="bookmark-outline" size={24} color="#555" />
+            <TouchableOpacity 
+              style={{ flex: 1, alignItems: 'center', paddingVertical: 14, borderBottomWidth: activeTab === 'bookmarks' ? 1 : 0, borderBottomColor: '#FFFFFF' }}
+              onPress={() => setActiveTab('bookmarks')}
+            >
+              <Ionicons name="bookmark-outline" size={24} color={activeTab === 'bookmarks' ? '#FFFFFF' : '#555'} />
             </TouchableOpacity>
           </View>
-          {(works && works.length) === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="image-outline" size={80} color="#222" />
-              <Text style={styles.emptyStateText}>Aucune publication</Text>
-              <Text style={{ color: '#555', fontSize: 13, marginBottom: 24 }}>Partagez vos photos et vidéos</Text>
-            </View>
-          ) : (
-            <View style={styles.gridContainer}>
-              {works.map((item, index) => (
-                <TouchableOpacity 
-                  key={String(item.id)} 
-                  style={styles.gridItem}
-                  onPress={() => router.push(`../book/${item.id}`)}
-                >
-                  {(item.coverImageUrl || item.coverImage) ? (
-                    <Image source={{ uri: item.coverImageUrl || item.coverImage }} style={styles.gridImage} />
-                  ) : (
-                    <View style={[styles.gridImage, styles.gridPlaceholder]}>
-                      <Ionicons name="book" size={32} color="#333" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
 
-        {/* Continuez à lire */}
-        <View style={[styles.section, { marginTop: 10 }]}>
-          <Text style={styles.sectionTitle}>Continuez à lire</Text>
-          {(recentReads && recentReads.length) === 0 ? (
-            <Text style={styles.placeholder}>Aucune lecture récente.</Text>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {recentReads.map(r => (
-                <View key={String(r.id)} style={styles.workCard}>
-                  <Image source={{ uri: r.coverImageUrl || r.couverture || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80' }} style={styles.workCover} />
-                  <Text style={styles.workTitle} numberOfLines={2}>{r.titre || 'Titre'}</Text>
+          {/* Contenu selon l'onglet actif */}
+          {activeTab === 'grid' && (
+            <>
+              {(works && works.length) === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="book-outline" size={80} color="#222" />
+                  <Text style={styles.emptyStateText}>Aucune œuvre</Text>
+                  <Text style={{ color: '#555', fontSize: 13, marginBottom: 24 }}>Créez votre première œuvre</Text>
                 </View>
-              ))}
-            </ScrollView>
+              ) : (
+                <View style={styles.gridContainer}>
+                  {works.map((item, index) => (
+                    <TouchableOpacity 
+                      key={String(item.id)} 
+                      style={styles.gridItem}
+                      onPress={() => router.push(`../book/${item.id}`)}
+                    >
+                      {(item.coverImageUrl || item.coverImage) ? (
+                        <Image source={{ uri: item.coverImageUrl || item.coverImage }} style={styles.gridImage} />
+                      ) : (
+                        <View style={[styles.gridImage, styles.gridPlaceholder]}>
+                          <Ionicons name="book" size={32} color="#333" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </>
           )}
-        </View>
 
-        {/* Section Playlists */}
-        <View style={[styles.section, { marginTop: 15 }]}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Mes playlists</Text>
-            <TouchableOpacity style={styles.addPlaylistBtn} onPress={() => Alert.alert('Ajout playlist', 'Ajout de playlist non implémenté ici.')}>
-              <Text style={styles.addPlaylistText}>+ Ajouter</Text>
-            </TouchableOpacity>
-          </View>
-          {playlists.length === 0 ? (
-            <View style={styles.emptyPlaylistContainer}>
-              <Text style={styles.placeholder}>Aucune playlist ajoutée.</Text>
-              <Text style={styles.placeholderSubtext}>
-                Ajoutez vos playlists Spotify, Apple Music, YouTube Music ou Deezer pour les écouter pendant la lecture.
-              </Text>
-            </View>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.playlistsContainer}>
-              {playlists.map((playlist) => (
-                <View key={playlist.id} style={styles.playlistCard}>
-                  <TouchableOpacity
-                    style={styles.playlistMain}
-                    onPress={() => openPlaylist(playlist)}
-                    onLongPress={() => deletePlaylist(playlist.id)}
-                  >
-                    <View style={styles.playlistHeader}>
+          {activeTab === 'playlists' && (
+            <>
+              {playlists.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="musical-notes-outline" size={80} color="#222" />
+                  <Text style={styles.emptyStateText}>Aucune playlist</Text>
+                  <Text style={{ color: '#555', fontSize: 13, marginBottom: 24 }}>Ajoutez vos playlists favorites</Text>
+                </View>
+              ) : (
+                <View style={{ paddingHorizontal: 20, paddingVertical: 16 }}>
+                  {playlists.map((playlist) => (
+                    <TouchableOpacity
+                      key={playlist.id}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: '#1A1A1A',
+                        borderRadius: 12,
+                        padding: 12,
+                        marginBottom: 12,
+                        borderWidth: 1,
+                        borderColor: '#2A2A2A',
+                      }}
+                      onPress={() => openPlaylist(playlist)}
+                      onLongPress={() => deletePlaylist(playlist.id)}
+                    >
+                      <View style={{
+                        width: 60,
+                        height: 60,
+                        borderRadius: 8,
+                        backgroundColor: getPlatformColor(playlist.platform),
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        marginRight: 12,
+                      }}>
+                        {renderPlatformIcon(playlist.platform, playlist.icon)}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '700', marginBottom: 4 }} numberOfLines={1}>
+                          {playlist.name}
+                        </Text>
+                        <Text style={{ color: '#888', fontSize: 13 }}>
+                          {playlist.platform.toUpperCase()} • {playlist.isPrivate ? 'Privée' : 'Publique'}
+                        </Text>
+                      </View>
                       <TouchableOpacity
-                        style={styles.lockButton}
-                        onPress={() => togglePlaylistVisibility(playlist.id, playlist.isPrivate)}
+                        style={{
+                          backgroundColor: 'rgba(255, 169, 77, 0.2)',
+                          borderRadius: 18,
+                          width: 36,
+                          height: 36,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderWidth: 1,
+                          borderColor: '#FFA94D',
+                        }}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          togglePlaylistVisibility(playlist.id, playlist.isPrivate);
+                        }}
                       >
-                        <Text style={styles.lockIcon}>
+                        <Text style={{ fontSize: 14 }}>
                           {playlist.isPrivate ? '🔒' : '🌐'}
                         </Text>
                       </TouchableOpacity>
-                    </View>
-                    <View style={styles.playlistIconContainer}>
-                      {renderPlatformIcon(playlist.platform, playlist.icon)}
-                      <View style={[styles.platformBadge, { backgroundColor: getPlatformColor(playlist.platform) }]}>
-                        <Text style={styles.platformText}>{playlist.platform.toUpperCase()}</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.playlistName} numberOfLines={2}>{playlist.name}</Text>
-                    <Text style={styles.playlistPlatform}>
-                      {playlist.isPrivate ? 'Privée' : 'Publique'} • Appuyez pour ouvrir
-                    </Text>
-                  </TouchableOpacity>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-              ))}
-            </ScrollView>
+              )}
+            </>
+          )}
+
+          {activeTab === 'bookmarks' && (
+            <>
+              {(libraryBooks && libraryBooks.length) === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="bookmark-outline" size={80} color="#222" />
+                  <Text style={styles.emptyStateText}>Aucun livre enregistré</Text>
+                  <Text style={{ color: '#555', fontSize: 13, marginBottom: 24 }}>Enregistrez vos livres préférés dans votre bibliothèque</Text>
+                </View>
+              ) : (
+                <View style={styles.gridContainer}>
+                  {libraryBooks.map((item, index) => (
+                    <TouchableOpacity 
+                      key={String(item.id)} 
+                      style={styles.gridItem}
+                      onPress={() => router.push(`../book/${item.id}`)}
+                    >
+                      {(item.coverImageUrl || item.coverImage) ? (
+                        <Image source={{ uri: item.coverImageUrl || item.coverImage }} style={styles.gridImage} />
+                      ) : (
+                        <View style={[styles.gridImage, styles.gridPlaceholder]}>
+                          <Ionicons name="book" size={32} color="#333" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </>
           )}
         </View>
 
@@ -539,6 +695,150 @@ const Profile: React.FC = () => {
           visible={showThemeSelector}
           onClose={() => setShowThemeSelector(false)}
         />
+
+        {/* Modal de Partage du Profil */}
+        <Modal
+          visible={showShareModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowShareModal(false)}
+        >
+          <View style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            justifyContent: 'flex-end',
+          }}>
+            <View style={{
+              backgroundColor: '#1A1A1A',
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              paddingTop: 20,
+              paddingBottom: 40,
+              paddingHorizontal: 20,
+            }}>
+              {/* Handle bar */}
+              <View style={{
+                width: 40,
+                height: 4,
+                backgroundColor: '#444',
+                borderRadius: 2,
+                alignSelf: 'center',
+                marginBottom: 20,
+              }} />
+
+              <Text style={{
+                color: '#FFFFFF',
+                fontSize: 20,
+                fontWeight: '700',
+                marginBottom: 20,
+                textAlign: 'center',
+              }}>Partager le profil</Text>
+
+              {/* Options de partage */}
+              <View style={{ gap: 12 }}>
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#2A2A2A',
+                    padding: 16,
+                    borderRadius: 12,
+                  }}
+                  onPress={() => handleShareProfile('copy')}
+                >
+                  <Ionicons name="link-outline" size={24} color="#FFA94D" />
+                  <Text style={{ color: '#FFFFFF', fontSize: 16, marginLeft: 16, fontWeight: '600' }}>
+                    Copier le lien du profil
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#2A2A2A',
+                    padding: 16,
+                    borderRadius: 12,
+                  }}
+                  onPress={() => handleShareProfile('instagram')}
+                >
+                  <Ionicons name="logo-instagram" size={24} color="#E1306C" />
+                  <Text style={{ color: '#FFFFFF', fontSize: 16, marginLeft: 16, fontWeight: '600' }}>
+                    Partager sur Instagram
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#2A2A2A',
+                    padding: 16,
+                    borderRadius: 12,
+                  }}
+                  onPress={() => handleShareProfile('twitter')}
+                >
+                  <Ionicons name="logo-twitter" size={24} color="#1DA1F2" />
+                  <Text style={{ color: '#FFFFFF', fontSize: 16, marginLeft: 16, fontWeight: '600' }}>
+                    Partager sur Twitter
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#2A2A2A',
+                    padding: 16,
+                    borderRadius: 12,
+                  }}
+                  onPress={() => handleShareProfile('whatsapp')}
+                >
+                  <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
+                  <Text style={{ color: '#FFFFFF', fontSize: 16, marginLeft: 16, fontWeight: '600' }}>
+                    Partager sur WhatsApp
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#2A2A2A',
+                    padding: 16,
+                    borderRadius: 12,
+                  }}
+                  onPress={() => handleShareProfile('general')}
+                >
+                  <Ionicons name="share-social-outline" size={24} color="#FFA94D" />
+                  <Text style={{ color: '#FFFFFF', fontSize: 16, marginLeft: 16, fontWeight: '600' }}>
+                    Plus d'options
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Bouton Annuler */}
+              <TouchableOpacity
+                style={{
+                  backgroundColor: 'transparent',
+                  borderWidth: 1,
+                  borderColor: '#444',
+                  padding: 14,
+                  borderRadius: 12,
+                  marginTop: 16,
+                }}
+                onPress={() => setShowShareModal(false)}
+              >
+                <Text style={{
+                  color: '#FFFFFF',
+                  fontSize: 16,
+                  fontWeight: '600',
+                  textAlign: 'center',
+                }}>Annuler</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
 
         {/* Modal Import Livres Open Source */}
         {showImportModal && (
