@@ -200,19 +200,28 @@ const Profile: React.FC = () => {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#181818' }}>
+    <View style={{ flex: 1, backgroundColor: '#000000' }}>
       {/* Header avec engrenage en haut à droite */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 48, paddingBottom: 12, backgroundColor: '#181818' }}>
-        <View />
-        <Text style={{ color: '#FFA94D', fontSize: 20, fontWeight: 'bold' }}>Mon profil</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity onPress={() => router.push('/dashboard')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ marginRight: 8 }}>
-            <Ionicons name="stats-chart-outline" size={28} color="#4FC3F7" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/settings')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name="settings" size={28} color="#FFA94D" />
-          </TouchableOpacity>
-        </View>
+      <View style={{ 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        justifyContent: 'space-between', 
+        paddingHorizontal: 20, 
+        paddingTop: 50, 
+        paddingBottom: 12, 
+        backgroundColor: 'transparent',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 10,
+      }}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/settings')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="settings-outline" size={28} color="#FFFFFF" />
+        </TouchableOpacity>
       </View>
       <ScrollView contentContainerStyle={styles.container}>
         {/* Banner avec bouton de modification */}
@@ -270,13 +279,11 @@ const Profile: React.FC = () => {
               setUploading(false);
             }
           }}>
-            <View style={styles.bannerEditIcon}>
-              <Image source={{ uri: 'https://img.icons8.com/ios-filled/50/FFA94D/camera.png' }} style={{ width: 22, height: 22, tintColor: '#FFA94D' }} />
-            </View>
+            <Ionicons name="camera" size={24} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 
-        {/* Avatar overlapping banner */}
+        {/* Avatar overlapping banner - Style Instagram */}
         <View style={styles.metaRow}>
           <TouchableOpacity onPress={async () => {
             try {
@@ -334,25 +341,22 @@ const Profile: React.FC = () => {
               );
             })()}
           </TouchableOpacity>
-          {uploading ? <ActivityIndicator style={{ marginLeft: 12 }} color="#FFA94D" /> : null}
           <View style={styles.metaText}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={styles.nameLarge}>{displayName || 'Utilisateur'}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
-                {isPrivate ? (
-                  <>
-                    <Ionicons name="lock-closed" size={16} color="#FFA94D" style={{ marginRight: 4 }} />
-                    <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 12 }}>Compte privé</Text>
-                  </>
-                ) : (
-                  <>
-                    <Ionicons name="earth" size={16} color="#4FC3F7" style={{ marginRight: 4 }} />
-                    <Text style={{ color: '#4FC3F7', fontWeight: 'bold', fontSize: 12 }}>Compte public</Text>
-                  </>
-                )}
-              </View>
-            </View>
+            <Text style={styles.nameLarge}>{displayName || 'Utilisateur'}</Text>
             <Text style={styles.email}>{email}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, justifyContent: 'center' }}>
+              {isPrivate ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="lock-closed" size={14} color="#888" style={{ marginRight: 4 }} />
+                  <Text style={{ color: '#888', fontSize: 12 }}>Privé</Text>
+                </View>
+              ) : (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="earth" size={14} color="#888" style={{ marginRight: 4 }} />
+                  <Text style={{ color: '#888', fontSize: 12 }}>Public</Text>
+                </View>
+              )}
+            </View>
           </View>
         </View>
 
@@ -379,39 +383,57 @@ const Profile: React.FC = () => {
               <Text style={styles.statLabel}>Amis</Text>
             </View>
           </View>
-
-          <View style={styles.actionColumnSingle}>
-            <TouchableOpacity style={styles.primaryButtonSingle} onPress={() => router.push('/EditProfile')}>
-              <Text style={styles.primaryText}>Éditer le profil</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.secondaryButtonSmall} onPress={() => router.push('/write')}>
-              <Text style={styles.secondaryText}>Commencer à écrire</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.themeButtonSmall} onPress={() => setShowThemeSelector(true)}>
-              <Ionicons name="color-palette" size={16} color="#FFA94D" style={{ marginRight: 8 }} />
-              <Text style={styles.themeButtonText}>Thèmes</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.themeButtonSmall} onPress={() => router.push('/settings')}>
-              <Ionicons name="settings" size={16} color="#FFA94D" style={{ marginRight: 8 }} />
-              <Text style={styles.themeButtonText}>Réglages</Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
-        {/* Œuvres */}
+        <View style={styles.actionColumnSingle}>
+          <TouchableOpacity style={styles.primaryButtonSingle} onPress={() => router.push('/EditProfile')}>
+            <Text style={styles.primaryText}>Éditer le profil</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryButtonSmall} onPress={() => router.push('/write')}>
+            <Text style={styles.secondaryText}>Partager</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.themeButtonSmall} onPress={() => router.push('/settings')}>
+            <Ionicons name="person-add-outline" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Œuvres - Grille Instagram Style */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mes œuvres</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginBottom: 2, paddingHorizontal: 0, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.1)' }}>
+            <TouchableOpacity style={{ flex: 1, alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#FFFFFF' }}>
+              <Ionicons name="grid-outline" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+            <TouchableOpacity style={{ flex: 1, alignItems: 'center', paddingVertical: 14 }}>
+              <Ionicons name="list-outline" size={24} color="#555" />
+            </TouchableOpacity>
+            <TouchableOpacity style={{ flex: 1, alignItems: 'center', paddingVertical: 14 }}>
+              <Ionicons name="bookmark-outline" size={24} color="#555" />
+            </TouchableOpacity>
+          </View>
           {(works && works.length) === 0 ? (
-            <Text style={styles.placeholder}>Tu n'as pas encore d'œuvres publiées.</Text>
+            <View style={styles.emptyState}>
+              <Ionicons name="image-outline" size={80} color="#222" />
+              <Text style={styles.emptyStateText}>Aucune publication</Text>
+              <Text style={{ color: '#555', fontSize: 13, marginBottom: 24 }}>Partagez vos photos et vidéos</Text>
+            </View>
           ) : (
-            <FlatList
-              horizontal
-              data={works}
-              keyExtractor={(i) => String(i.id)}
-              renderItem={renderWork}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingVertical: 8 }}
-            />
+            <View style={styles.gridContainer}>
+              {works.map((item, index) => (
+                <TouchableOpacity 
+                  key={String(item.id)} 
+                  style={styles.gridItem}
+                  onPress={() => router.push(`../book/${item.id}`)}
+                >
+                  {(item.coverImageUrl || item.coverImage) ? (
+                    <Image source={{ uri: item.coverImageUrl || item.coverImage }} style={styles.gridImage} />
+                  ) : (
+                    <View style={[styles.gridImage, styles.gridPlaceholder]}>
+                      <Ionicons name="book" size={32} color="#333" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
           )}
         </View>
 
@@ -483,79 +505,21 @@ const Profile: React.FC = () => {
           )}
         </View>
 
-        {/* Bouton Import Livres Open Source */}
-        <TouchableOpacity
-          style={{
-            backgroundColor: '#4CAF50',
-            padding: 14,
-            borderRadius: 8,
-            alignItems: 'center',
-            marginHorizontal: 24,
-            marginTop: 24,
-            marginBottom: 12,
-            flexDirection: 'row',
-            justifyContent: 'center',
-          }}
-          onPress={() => setShowImportModal(true)}
-        >
-          <Ionicons name="book-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Importer des livres gratuits (Test)</Text>
-        </TouchableOpacity>
-
-        {/* Bouton pour migrer la photo de profil */}
-        <TouchableOpacity
-          style={{
-            backgroundColor: '#8B5CF6',
-            padding: 12,
-            borderRadius: 8,
-            alignItems: 'center',
-            marginHorizontal: 24,
-            marginBottom: 12,
-            flexDirection: 'row',
-            justifyContent: 'center',
-          }}
-          onPress={async () => {
-            try {
-              Alert.alert('Migration', 'Migration de votre photo de profil en cours...');
-              const ProfileMigrationService = (await import('../services/ProfileMigrationService')).default;
-              const newURL = await ProfileMigrationService.migrateCurrentUserPhoto();
-              if (newURL) {
-                Alert.alert('✅ Succès', 'Photo de profil migrée vers Firebase Storage!');
-                // Recharger la page pour voir la nouvelle photo
-                const auth = getAuth(app);
-                const user = auth.currentUser;
-                if (user) {
-                  const q = query(collection(db, 'users'), where('uid', '==', user.uid));
-                  const snap = await getDocs(q);
-                  if (!snap.empty) {
-                    const data = snap.docs[0].data();
-                    if (data?.photoURL) {
-                      setPhotoURL(data.photoURL);
-                    }
-                  }
-                }
-              } else {
-                Alert.alert('Info', 'Aucune migration nécessaire.');
-              }
-            } catch (error) {
-              console.error('Erreur migration:', error);
-              Alert.alert('Erreur', 'Impossible de migrer la photo de profil.');
-            }
-          }}
-        >
-          <Ionicons name="cloud-upload-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Migrer photo vers Storage</Text>
-        </TouchableOpacity>
-
         {/* Bouton de déconnexion */}
         <TouchableOpacity
           style={{
             backgroundColor: '#FFA94D',
-            padding: 12,
-            borderRadius: 8,
+            padding: 16,
+            borderRadius: 16,
             alignItems: 'center',
             marginHorizontal: 24,
-            marginBottom: 24,
+            marginTop: 32,
+            marginBottom: 32,
+            shadowColor: '#FFA94D',
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.4,
+            shadowRadius: 12,
+            elevation: 8,
           }}
           onPress={async () => {
             try {
@@ -567,7 +531,8 @@ const Profile: React.FC = () => {
             }
           }}
         >
-          <Text style={{ color: '#181818', fontWeight: 'bold', fontSize: 16 }}>Se déconnecter</Text>
+          <Ionicons name="log-out-outline" size={20} color="#0F0F0F" style={{ marginRight: 10 }} />
+          <Text style={{ color: '#0F0F0F', fontWeight: '800', fontSize: 16 }}>Se déconnecter</Text>
         </TouchableOpacity>
         <View style={{ height: 80 }} />
         <ThemeSelector
@@ -890,220 +855,415 @@ const Profile: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     padding: 0,
-    backgroundColor: '#181818',
+    backgroundColor: '#000000',
     minHeight: '100%',
-    alignItems: 'center',
   },
   bannerContainer: {
     width: '100%',
-    height: 140,
+    height: 280,
     position: 'relative',
-    marginBottom: -40,
+    marginBottom: -80,
   },
   banner: {
     width: '100%',
-    height: 140,
+    height: 280,
     resizeMode: 'cover',
   },
   bannerEditBtn: {
     position: 'absolute',
-    right: 18,
-    bottom: 12,
-    backgroundColor: 'rgba(24,24,24,0.85)',
-    borderRadius: 18,
-    padding: 6,
+    right: 20,
+    bottom: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 50,
+    padding: 12,
     zIndex: 2,
-    borderWidth: 1,
-    borderColor: '#FFA94D',
+    backdropFilter: 'blur(10px)',
   },
   bannerEditIcon: {
-    width: 22,
-    height: 22,
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
   metaRow: {
     width: '100%',
     paddingHorizontal: 20,
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
-    marginTop: -30,
+    marginTop: -70,
+    marginBottom: 20,
   },
   avatarLarge: {
-    width: 86,
-    height: 86,
-    borderRadius: 43,
-    borderWidth: 3,
-    borderColor: '#181818',
-    marginRight: 12,
-    backgroundColor: '#232323',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 4,
+    borderColor: '#000000',
+    marginBottom: 16,
+    backgroundColor: '#1A1A1A',
   },
-  metaText: { flex: 1 },
-  nameLarge: { color: '#FFA94D', fontSize: 20, fontWeight: '700' },
-  email: { color: '#fff', fontSize: 13, marginTop: 4 },
+  metaText: { 
+    width: '100%',
+    alignItems: 'center',
+  },
+  nameLarge: { 
+    color: '#FFFFFF', 
+    fontSize: 24, 
+    fontWeight: '700',
+    marginBottom: 2,
+    textAlign: 'center',
+  },
+  email: { 
+    color: '#888', 
+    fontSize: 14,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
   bio: { color: '#fff', paddingHorizontal: 20, marginTop: 12, lineHeight: 20 },
   bioBubble: {
-    backgroundColor: 'rgba(40, 40, 40, 0.85)',
-    borderRadius: 18,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    marginTop: 12,
-    marginBottom: 2,
-    alignSelf: 'stretch',
-    minHeight: 38,
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginTop: 4,
+    marginBottom: 20,
+    marginHorizontal: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   bioBubbleText: {
-    color: '#FFA94D',
-    fontSize: 15,
+    color: '#E0E0E0',
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: 'center',
-    fontStyle: 'italic',
   },
-  rowBetween: { width: '100%', paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
-  statsRowSmall: { flexDirection: 'row', alignItems: 'center' },
-  statBoxSmall: { alignItems: 'center', marginRight: 18 },
-  statNumber: { color: '#FFA94D', fontSize: 18, fontWeight: '700' },
-  statLabel: { color: '#fff', fontSize: 12 },
+  rowBetween: { 
+    width: '100%', 
+    paddingHorizontal: 20, 
+    marginBottom: 20,
+  },
+  statsRowSmall: { 
+    flexDirection: 'row', 
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    padding: 0,
+    paddingVertical: 16,
+    justifyContent: 'space-around',
+    borderWidth: 0,
+    borderTopWidth: 0.5,
+    borderBottomWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  statBoxSmall: { 
+    alignItems: 'center',
+    flex: 1,
+  },
+  statNumber: { 
+    color: '#FFFFFF', 
+    fontSize: 20, 
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  statLabel: { 
+    color: '#888', 
+    fontSize: 13,
+    fontWeight: '400',
+  },
   actionColumn: { flexDirection: 'column' },
-  actionColumnSingle: { flexDirection: 'column', alignItems: 'flex-end' },
-  primaryButton: { backgroundColor: '#FFA94D', padding: 10, borderRadius: 8, alignItems: 'center', marginBottom: 8, minWidth: 100 },
-  primaryText: { color: '#181818', fontWeight: '700' },
-  primaryButtonSingle: { backgroundColor: '#FFA94D', padding: 12, borderRadius: 8, alignItems: 'center', minWidth: 160 },
-  secondaryButton: { borderColor: '#FFA94D', borderWidth: 1, padding: 8, borderRadius: 8, alignItems: 'center', minWidth: 100 },
-  secondaryText: { color: '#FFA94D' },
-  secondaryButtonSmall: { borderColor: '#FFA94D', borderWidth: 1, padding: 10, borderRadius: 8, alignItems: 'center', minWidth: 160, marginTop: 8 },
+  actionColumnSingle: { 
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 20,
+    marginBottom: 8,
+    justifyContent: 'center',
+  },
+  primaryButton: { 
+    backgroundColor: '#FFFFFF', 
+    padding: 10, 
+    borderRadius: 8, 
+    alignItems: 'center', 
+    marginBottom: 8, 
+    minWidth: 100 
+  },
+  primaryText: { 
+    color: '#000000', 
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  primaryButtonSingle: { 
+    backgroundColor: '#FFFFFF', 
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flex: 1,
+    minWidth: 0,
+  },
+  secondaryButton: { 
+    borderColor: 'rgba(255, 255, 255, 0.3)', 
+    borderWidth: 1, 
+    padding: 8, 
+    borderRadius: 8, 
+    alignItems: 'center', 
+    minWidth: 100 
+  },
+  secondaryText: { 
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  secondaryButtonSmall: { 
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flex: 1,
+    minWidth: 0,
+  },
   tabsRow: { width: '100%', flexDirection: 'row', paddingHorizontal: 10, marginTop: 18 },
   tabButton: { flex: 1, paddingVertical: 10, alignItems: 'center' },
   tabActive: { borderBottomWidth: 2, borderBottomColor: '#FFA94D' },
   tabText: { color: '#fff' },
   tabTextActive: { color: '#FFA94D', fontWeight: '700' },
-  section: { width: '100%', marginTop: 12, paddingHorizontal: 20 },
-  sectionTitle: { color: '#FFA94D', fontWeight: 'bold', marginBottom: 8 },
-  placeholder: { color: '#888', fontStyle: 'italic' },
-  workCard: { width: 120, marginRight: 12, alignItems: 'center' },
-  workCover: { width: 100, height: 150, borderRadius: 8, backgroundColor: '#232323' },
-  workTitle: { color: '#fff', fontSize: 13, marginTop: 6, textAlign: 'center' },
+  section: { 
+    width: '100%', 
+    marginTop: 32, 
+    paddingHorizontal: 0,
+  },
+  sectionTitle: { 
+    color: '#FFFFFF', 
+    fontWeight: '800',
+    fontSize: 18,
+    marginBottom: 16,
+    letterSpacing: 0.5,
+    paddingHorizontal: 20,
+  },
+  placeholder: { 
+    color: '#555', 
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 24,
+  },
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 0,
+    gap: 2,
+  },
+  gridItem: {
+    width: '33.33%',
+    aspectRatio: 1,
+    padding: 1,
+  },
+  gridImage: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#0A0A0A',
+  },
+  gridPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gridOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    padding: 8,
+  },
+  gridTitle: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 80,
+    paddingHorizontal: 40,
+  },
+  emptyStateText: {
+    color: '#666',
+    fontSize: 18,
+    marginTop: 20,
+    marginBottom: 8,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  emptyStateButton: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  emptyStateButtonText: {
+    color: '#000',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  workCard: { 
+    width: 130, 
+    marginRight: 16,
+  },
+  workCover: { 
+    width: 130, 
+    height: 195, 
+    borderRadius: 8, 
+    backgroundColor: '#1A1A1A',
+  },
+  workTitle: { 
+    color: '#E0E0E0', 
+    fontSize: 13, 
+    marginTop: 10, 
+    textAlign: 'left',
+    fontWeight: '600',
+    lineHeight: 18,
+  },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   addPlaylistBtn: {
     backgroundColor: '#FFA94D',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#FFA94D',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   addPlaylistText: {
-    color: '#181818',
-    fontWeight: '600',
-    fontSize: 12,
+    color: '#0F0F0F',
+    fontWeight: '700',
+    fontSize: 13,
   },
   emptyPlaylistContainer: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 32,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
   },
   placeholderSubtext: {
     color: '#666',
-    fontSize: 12,
+    fontSize: 13,
     textAlign: 'center',
     marginTop: 8,
-    fontStyle: 'italic',
+    paddingHorizontal: 20,
+    lineHeight: 19,
   },
   playlistsContainer: {
     paddingVertical: 8,
   },
   playlistCard: {
-    width: 160,
-    marginRight: 15,
+    width: 180,
+    marginRight: 16,
   },
   playlistMain: {
-    backgroundColor: '#232323',
-    borderRadius: 12,
-    padding: 15,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 16,
+    padding: 18,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#2A2A2A',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
   },
   playlistIconContainer: {
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
     position: 'relative',
   },
   playlistIcon: {
-    fontSize: 30,
+    fontSize: 36,
     marginBottom: 8,
   },
   playlistIconImage: {
-    width: 32,
-    height: 32,
+    width: 40,
+    height: 40,
     marginBottom: 8,
     alignSelf: 'center',
   },
   platformBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
     position: 'absolute',
-    bottom: -5,
-    right: -15,
+    bottom: -8,
+    right: -20,
   },
   platformText: {
     color: '#fff',
     fontSize: 9,
-    fontWeight: 'bold',
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   playlistName: {
-    color: '#FFA94D',
-    fontSize: 14,
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 5,
+    marginBottom: 6,
+    lineHeight: 20,
   },
   playlistPlatform: {
     color: '#888',
-    fontSize: 10,
+    fontSize: 11,
     textAlign: 'center',
   },
   playlistHeader: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 10,
+    right: 10,
     zIndex: 1,
   },
   lockButton: {
-    backgroundColor: 'rgba(24, 24, 24, 0.8)',
-    borderRadius: 15,
-    width: 30,
-    height: 30,
+    backgroundColor: 'rgba(255, 169, 77, 0.2)',
+    borderRadius: 18,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#FFA94D',
   },
   lockIcon: {
-    fontSize: 14,
+    fontSize: 16,
   },
   themeButtonSmall: {
-    borderColor: '#FFA94D',
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     borderWidth: 1,
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 160,
-    marginTop: 8,
     flexDirection: 'row',
+    flex: 1,
+    minWidth: 0,
   },
   themeButtonText: {
-    color: '#FFA94D',
-    fontSize: 14,
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '600',
   },
 });

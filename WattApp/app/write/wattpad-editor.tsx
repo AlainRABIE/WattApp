@@ -380,7 +380,6 @@ const WattpadEditor: React.FC = () => {
     setSelection(event.nativeEvent.selection);
   }, []);
 
-  // Fonctions de formatage
   const applyFormat = useCallback((format: string) => {
     const { start, end } = selection;
     if (start === end) {
