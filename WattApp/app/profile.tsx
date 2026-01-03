@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Linking, Modal, Share, Platform } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Linking, Modal, Share, Platform, Dimensions, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -37,6 +37,9 @@ const Profile: React.FC = () => {
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0, bookTitle: '' });
   const [showShareModal, setShowShareModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'grid' | 'playlists' | 'bookmarks'>('grid');
+  const scrollViewRef = useRef<any>(null);
+  const { width: screenWidth } = Dimensions.get('window');
+  const scrollX = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const load = async () => await loadProfile();
@@ -103,25 +106,33 @@ const Profile: React.FC = () => {
 
       // Livres de la bibliothèque
       try {
-        const qLibrary = query(collection(db, 'library'), where('uid', '==', user.uid));
+        const qLibrary = query(collection(db, 'users', user.uid, 'library'));
         const snapLibrary = await getDocs(qLibrary);
-        const libraryItems = snapLibrary.docs.map(d => d.data());
         
-        // Récupérer les détails des livres
-        const bookPromises = libraryItems.map(async (item: any) => {
-          if (item.bookId) {
-            try {
-              const bookSnap = await getDocs(query(collection(db, 'books'), where('__name__', '==', item.bookId)));
-              if (!bookSnap.empty) {
-                return { id: item.bookId, ...bookSnap.docs[0].data() };
-              }
-            } catch (e) {}
+        // Charger les livres avec ownerUid (livres de la bibliothèque - ancien système)
+        const qBooks = query(collection(db, 'books'), where('ownerUid', '==', user.uid));
+        const snapBooks = await getDocs(qBooks);
+        
+        // Combiner les livres de la bibliothèque (nouveau système + ancien système)
+        const libraryBooksNew: any[] = snapLibrary.docs.map((d: any) => ({ 
+          id: d.data().bookId || d.id, 
+          ...(d.data() as any) 
+        }));
+        
+        const oldBooks: any[] = snapBooks.docs.map((d: any) => ({ 
+          id: d.id, 
+          ...(d.data() as any) 
+        }));
+        
+        // Fusionner en évitant les doublons
+        const allLibraryBooks = [...libraryBooksNew];
+        oldBooks.forEach(book => {
+          if (!allLibraryBooks.find(b => b.id === book.id)) {
+            allLibraryBooks.push(book);
           }
-          return null;
         });
         
-        const books = (await Promise.all(bookPromises)).filter(b => b !== null);
-        setLibraryBooks(books);
+        setLibraryBooks(allLibraryBooks);
       } catch (e) {
         console.warn('Library load error', e);
       }
@@ -506,30 +517,74 @@ const Profile: React.FC = () => {
 
         {/* Sections avec onglets */}
         <View style={styles.section}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginBottom: 2, paddingHorizontal: 0, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.1)' }}>
-            <TouchableOpacity 
-              style={{ flex: 1, alignItems: 'center', paddingVertical: 14, borderBottomWidth: activeTab === 'grid' ? 1 : 0, borderBottomColor: '#FFFFFF' }}
-              onPress={() => setActiveTab('grid')}
-            >
-              <Ionicons name="grid-outline" size={24} color={activeTab === 'grid' ? '#FFFFFF' : '#555'} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={{ flex: 1, alignItems: 'center', paddingVertical: 14, borderBottomWidth: activeTab === 'playlists' ? 1 : 0, borderBottomColor: '#FFFFFF' }}
-              onPress={() => setActiveTab('playlists')}
-            >
-              <Ionicons name="musical-notes-outline" size={24} color={activeTab === 'playlists' ? '#FFFFFF' : '#555'} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={{ flex: 1, alignItems: 'center', paddingVertical: 14, borderBottomWidth: activeTab === 'bookmarks' ? 1 : 0, borderBottomColor: '#FFFFFF' }}
-              onPress={() => setActiveTab('bookmarks')}
-            >
-              <Ionicons name="bookmark-outline" size={24} color={activeTab === 'bookmarks' ? '#FFFFFF' : '#555'} />
-            </TouchableOpacity>
+          <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.1)' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 0 }}>
+              <TouchableOpacity 
+                style={{ flex: 1, alignItems: 'center', paddingVertical: 14 }}
+                onPress={() => {
+                  setActiveTab('grid');
+                  scrollViewRef.current?.scrollTo({ x: 0, animated: true });
+                }}
+              >
+                <Ionicons name="grid-outline" size={24} color={activeTab === 'grid' ? '#FFFFFF' : '#555'} />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={{ flex: 1, alignItems: 'center', paddingVertical: 14 }}
+                onPress={() => {
+                  setActiveTab('playlists');
+                  scrollViewRef.current?.scrollTo({ x: screenWidth, animated: true });
+                }}
+              >
+                <Ionicons name="musical-notes-outline" size={24} color={activeTab === 'playlists' ? '#FFFFFF' : '#555'} />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={{ flex: 1, alignItems: 'center', paddingVertical: 14 }}
+                onPress={() => {
+                  setActiveTab('bookmarks');
+                  scrollViewRef.current?.scrollTo({ x: screenWidth * 2, animated: true });
+                }}
+              >
+                <Ionicons name="bookmark-outline" size={24} color={activeTab === 'bookmarks' ? '#FFFFFF' : '#555'} />
+              </TouchableOpacity>
+            </View>
+            {/* Barre animée */}
+            <Animated.View
+              style={{
+                height: 1,
+                backgroundColor: '#FFFFFF',
+                width: `${100 / 3}%`,
+                transform: [{
+                  translateX: scrollX.interpolate({
+                    inputRange: [0, screenWidth, screenWidth * 2],
+                    outputRange: [0, screenWidth / 3, (screenWidth / 3) * 2],
+                    extrapolate: 'clamp'
+                  })
+                }]
+              }}
+            />
           </View>
 
-          {/* Contenu selon l'onglet actif */}
-          {activeTab === 'grid' && (
-            <>
+          {/* ScrollView horizontal avec swipe */}
+          <Animated.ScrollView
+            ref={scrollViewRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+              { useNativeDriver: true }
+            )}
+            onMomentumScrollEnd={(e) => {
+              const offsetX = e.nativeEvent.contentOffset.x;
+              const page = Math.round(offsetX / screenWidth);
+              if (page === 0) setActiveTab('grid');
+              else if (page === 1) setActiveTab('playlists');
+              else if (page === 2) setActiveTab('bookmarks');
+            }}
+            scrollEventThrottle={16}
+          >
+            {/* Page 1: Grid */}
+            <View style={{ width: screenWidth }}>
               {(works && works.length) === 0 ? (
                 <View style={styles.emptyState}>
                   <Ionicons name="book-outline" size={80} color="#222" />
@@ -555,11 +610,10 @@ const Profile: React.FC = () => {
                   ))}
                 </View>
               )}
-            </>
-          )}
+            </View>
 
-          {activeTab === 'playlists' && (
-            <>
+            {/* Page 2: Playlists */}
+            <View style={{ width: screenWidth }}>
               {playlists.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Ionicons name="musical-notes-outline" size={80} color="#222" />
@@ -627,11 +681,10 @@ const Profile: React.FC = () => {
                   ))}
                 </View>
               )}
-            </>
-          )}
+            </View>
 
-          {activeTab === 'bookmarks' && (
-            <>
+            {/* Page 3: Bookmarks */}
+            <View style={{ width: screenWidth }}>
               {(libraryBooks && libraryBooks.length) === 0 ? (
                 <View style={styles.emptyState}>
                   <Ionicons name="bookmark-outline" size={80} color="#222" />
@@ -639,26 +692,47 @@ const Profile: React.FC = () => {
                   <Text style={{ color: '#555', fontSize: 13, marginBottom: 24 }}>Enregistrez vos livres préférés dans votre bibliothèque</Text>
                 </View>
               ) : (
-                <View style={styles.gridContainer}>
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false} 
+                  contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 16, paddingRight: 40 }}
+                >
                   {libraryBooks.map((item, index) => (
-                    <TouchableOpacity 
-                      key={String(item.id)} 
-                      style={styles.gridItem}
-                      onPress={() => router.push(`../book/${item.id}`)}
-                    >
-                      {(item.coverImageUrl || item.coverImage) ? (
-                        <Image source={{ uri: item.coverImageUrl || item.coverImage }} style={styles.gridImage} />
-                      ) : (
-                        <View style={[styles.gridImage, styles.gridPlaceholder]}>
-                          <Ionicons name="book" size={32} color="#333" />
+                    <View key={String(item.id)} style={{
+                      width: 140,
+                      marginRight: 16,
+                      backgroundColor: '#232323',
+                      borderRadius: 12,
+                      padding: 12,
+                      borderWidth: 1,
+                      borderColor: '#333',
+                    }}>
+                      <TouchableOpacity onPress={() => router.push(`../book/${item.id}`)}>
+                        {(item.coverImageUrl || item.coverImage) ? (
+                          <Image 
+                            source={{ uri: item.coverImageUrl || item.coverImage }} 
+                            style={{ width: '100%', height: 160, borderRadius: 8, backgroundColor: '#181818', marginBottom: 8 }}
+                          />
+                        ) : (
+                          <View style={{ width: '100%', height: 160, borderRadius: 8, backgroundColor: '#181818', marginBottom: 8, justifyContent: 'center', alignItems: 'center' }}>
+                            <Ionicons name="book" size={48} color="#333" />
+                          </View>
+                        )}
+                        <View style={{ alignItems: 'center' }}>
+                          <Text style={{ color: '#FFA94D', fontSize: 14, fontWeight: '600', textAlign: 'center', marginBottom: 4 }} numberOfLines={2}>
+                            {item.title || item.titre || 'Sans titre'}
+                          </Text>
+                          <Text style={{ color: '#ccc', fontSize: 12, textAlign: 'center' }} numberOfLines={1}>
+                            par {item.author || item.auteur || 'Auteur inconnu'}
+                          </Text>
                         </View>
-                      )}
-                    </TouchableOpacity>
+                      </TouchableOpacity>
+                    </View>
                   ))}
-                </View>
+                </ScrollView>
               )}
-            </>
-          )}
+            </View>
+          </Animated.ScrollView>
         </View>
 
         {/* Bouton de déconnexion */}
@@ -1359,8 +1433,8 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   gridItem: {
-    width: '33.33%',
-    aspectRatio: 1,
+    width: '25%',
+    aspectRatio: 0.7,
     padding: 1,
   },
   gridImage: {
