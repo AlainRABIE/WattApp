@@ -2,25 +2,25 @@ import { getAuth } from 'firebase/auth';
 import { db } from '../../constants/firebaseConfig';
 import { collectionGroup, getDocs, where, query as fsQuery, onSnapshot, collection, getCountFromServer } from 'firebase/firestore';
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Image, ActivityIndicator, Animated, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 
 const CATEGORIES = [
-  { name: "Roman d'amour", icon: "heart", color: ["#FF6B9D", "#FFA94D"] as const },
-  { name: "Fanfiction", icon: "sparkles", color: ["#6DD5FA", "#2980B9"] as const },
-  { name: "Fiction générale", icon: "book", color: ["#F7971E", "#FFD200"] as const },
-  { name: "Roman pour adolescents", icon: "school", color: ["#F857A6", "#FF5858"] as const },
-  { name: "Aléatoire", icon: "shuffle", color: ["#43CEA2", "#185A9D"] as const },
-  { name: "Action", icon: "flash", color: ["#FF5858", "#FBCA1F"] as const },
-  { name: "Aventure", icon: "compass", color: ["#36D1C4", "#1E5799"] as const },
-  { name: "Nouvelles", icon: "newspaper", color: ["#B06AB3", "#4568DC"] as const },
-  { name: "Fantasy", icon: "planet", color: ["#F7971E", "#FFD200"] as const },
-  { name: "Non-Fiction", icon: "reader", color: ["#43CEA2", "#185A9D"] as const },
-  { name: "Fantastique", icon: "rocket", color: ["#F857A6", "#FF5858"] as const },
-  { name: "Mystère", icon: "eye", color: ["#6DD5FA", "#2980B9"] as const },
+  { name: "Roman d'amour", icon: "heart-circle", emoji: "💕", color: ["#FF6B9D", "#FFA94D"] as const, description: "Histoires romantiques" },
+  { name: "Fanfiction", icon: "star-half", emoji: "✨", color: ["#6DD5FA", "#2980B9"] as const, description: "Univers alternatifs" },
+  { name: "Fiction générale", icon: "book", emoji: "📚", color: ["#F7971E", "#FFD200"] as const, description: "Tous les genres" },
+  { name: "Roman pour adolescents", icon: "school", emoji: "🎓", color: ["#F857A6", "#FF5858"] as const, description: "Jeune adulte" },
+  { name: "Aléatoire", icon: "shuffle", emoji: "🎲", color: ["#43CEA2", "#185A9D"] as const, description: "Discussions libres" },
+  { name: "Action", icon: "flash", emoji: "⚡", color: ["#FF5858", "#FBCA1F"] as const, description: "Aventure intense" },
+  { name: "Aventure", icon: "compass", emoji: "🧭", color: ["#36D1C4", "#1E5799"] as const, description: "Explorez le monde" },
+  { name: "Nouvelles", icon: "newspaper", emoji: "📰", color: ["#B06AB3", "#4568DC"] as const, description: "Courtes histoires" },
+  { name: "Fantasy", icon: "planet", emoji: "🔮", color: ["#F7971E", "#FFD200"] as const, description: "Magie & dragons" },
+  { name: "Non-Fiction", icon: "reader", emoji: "📖", color: ["#43CEA2", "#185A9D"] as const, description: "Histoires vraies" },
+  { name: "Fantastique", icon: "rocket", emoji: "🚀", color: ["#F857A6", "#FF5858"] as const, description: "Science-fiction" },
+  { name: "Mystère", icon: "eye", emoji: "🕵️", color: ["#6DD5FA", "#2980B9"] as const, description: "Énigmes & suspense" },
 ];
 
 const CARD_WIDTH = 160;
@@ -34,6 +34,17 @@ export default function CommunityIndex() {
   const [popularGroups, setPopularGroups] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const router = useRouter();
+  const scrollY = React.useRef(new Animated.Value(0)).current;
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+
+  // Animation d'entrée
+  React.useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   // Fonction pour formater le nombre de membres
   const formatMemberCount = (count: number): string => {
@@ -105,159 +116,307 @@ export default function CommunityIndex() {
   }, []);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-      {/* Header avec gradient */}
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      
+      {/* Background gradient animé */}
       <LinearGradient
-        colors={['#181818', '#2a2a2a']}
-        style={styles.headerGradient}
-      >
-        <Text style={styles.header}>🌍 Communauté</Text>
-        <Text style={styles.headerSubtitle}>Découvrez et rejoignez des groupes</Text>
-      </LinearGradient>
-
-      {/* Section: Groupes populaires */}
-      <View style={styles.sectionContainer}>
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleRow}>
-            <Ionicons name="flame" size={24} color="#FFA94D" />
-            <Text style={styles.sectionTitle}>Groupes populaires</Text>
-          </View>
-          <TouchableOpacity onPress={() => router.push('/community/my-groups')}>
-            <Text style={styles.seeAllText}>Tout voir</Text>
-          </TouchableOpacity>
-        </View>
-        
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FFA94D" />
-          </View>
-        ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
-            {popularGroups.length > 0 ? (
-              popularGroups.map((group, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={styles.popularCard}
-                  activeOpacity={0.9}
-                  onPress={() => router.push({ pathname: `/community/[category]`, params: { category: group.name } })}
-                >
-                  <Image
-                    source={{ uri: group.cover }}
-                    style={styles.popularCardImage}
-                  />
-                  <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.9)']}
-                    style={styles.popularCardGradient}
-                  >
-                    <View style={styles.popularCardContent}>
-                      <Text style={styles.popularCardTitle} numberOfLines={2}>{group.name}</Text>
-                      <View style={styles.membersBadge}>
-                        <Ionicons name="people" size={12} color="#FFA94D" />
-                        <Text style={styles.membersText}>{group.members} membres</Text>
-                      </View>
-                    </View>
-                  </LinearGradient>
-                </TouchableOpacity>
-              ))
-            ) : (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>Aucun groupe disponible</Text>
-              </View>
-            )}
-          </ScrollView>
+        colors={['#0F0F0F', '#181818', '#1a1a1a']}
+        style={StyleSheet.absoluteFillObject}
+      />
+      
+      <Animated.ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={{ paddingBottom: 40 }} 
+        showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
         )}
-      </View>
+        scrollEventThrottle={16}
+      >
+        {/* Header Hero Section */}
+        <Animated.View style={[styles.heroContainer, { opacity: fadeAnim }]}>
+          <LinearGradient
+            colors={['rgba(255, 169, 77, 0.15)', 'transparent']}
+            style={styles.heroGradient}
+          >
+            <View style={styles.heroContent}>
+              <View style={styles.heroIconContainer}>
+                <LinearGradient
+                  colors={['#FFA94D', '#FF8C42']}
+                  style={styles.heroIconGradient}
+                >
+                  <MaterialCommunityIcons name="account-group" size={32} color="#181818" />
+                </LinearGradient>
+              </View>
+              <Text style={styles.heroTitle}>Communauté</Text>
+              <Text style={styles.heroSubtitle}>Connectez-vous avec des passionnés d'écriture</Text>
+              
+              {/* Stats Row */}
+              <View style={styles.statsRow}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statNumber}>{popularGroups.length > 0 ? popularGroups.reduce((sum, g) => sum + g.memberCount, 0) : '0'}</Text>
+                  <Text style={styles.statLabel}>Membres</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statNumber}>{CATEGORIES.length}</Text>
+                  <Text style={styles.statLabel}>Catégories</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statNumber}>{myGroups.length}</Text>
+                  <Text style={styles.statLabel}>Mes Groupes</Text>
+                </View>
+              </View>
+            </View>
+          </LinearGradient>
+        </Animated.View>
 
-      {/* Section: Mes groupes */}
-      {myGroups.length > 0 && (
-        <View style={styles.sectionContainer}>
+        {/* Section: Groupes populaires */}
+        <Animated.View style={[styles.sectionContainer, { opacity: fadeAnim }]}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
-              <Ionicons name="people-circle" size={24} color="#FFA94D" />
-              <Text style={styles.sectionTitle}>Mes groupes</Text>
+              <View style={styles.sectionIconContainer}>
+                <Ionicons name="flame" size={20} color="#FFA94D" />
+              </View>
+              <Text style={styles.sectionTitle}>Groupes Populaires</Text>
+            </View>
+            <TouchableOpacity onPress={() => router.push('/community/my-groups')} style={styles.seeAllBtn}>
+              <Text style={styles.seeAllText}>Tout voir</Text>
+              <Ionicons name="chevron-forward" size={16} color="#FFA94D" />
+            </TouchableOpacity>
+          </View>
+          
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#FFA94D" />
+              <Text style={styles.loadingText}>Chargement...</Text>
+            </View>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+              {popularGroups.length > 0 ? (
+                popularGroups.map((group, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={styles.popularCard}
+                    activeOpacity={0.85}
+                    onPress={() => router.push({ pathname: `/community/[category]`, params: { category: group.name } })}
+                  >
+                    <Image
+                      source={{ uri: group.cover }}
+                      style={styles.popularCardImage}
+                    />
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.95)']}
+                      style={styles.popularCardGradient}
+                    >
+                      <BlurView intensity={10} tint="dark" style={styles.popularCardBlur}>
+                        <View style={styles.popularCardContent}>
+                          <Text style={styles.popularCardTitle} numberOfLines={2}>{group.name}</Text>
+                          <View style={styles.membersBadge}>
+                            <MaterialCommunityIcons name="account-multiple" size={14} color="#FFA94D" />
+                            <Text style={styles.membersText}>{group.members}</Text>
+                          </View>
+                        </View>
+                      </BlurView>
+                    </LinearGradient>
+                    
+                    {/* Glow effect */}
+                    <View style={styles.cardGlow} />
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <MaterialCommunityIcons name="chat-alert-outline" size={48} color="#333" />
+                  <Text style={styles.emptyText}>Aucun groupe disponible</Text>
+                </View>
+              )}
+            </ScrollView>
+          )}
+        </Animated.View>
+
+        {/* Section: Mes groupes */}
+        {myGroups.length > 0 && (
+          <Animated.View style={[styles.sectionContainer, { opacity: fadeAnim }]}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleRow}>
+                <View style={styles.sectionIconContainer}>
+                  <MaterialCommunityIcons name="account-group" size={20} color="#FFA94D" />
+                </View>
+                <Text style={styles.sectionTitle}>Mes Groupes</Text>
+              </View>
+            </View>
+            
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+              {myGroups.map((item, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={styles.myGroupCard}
+                  activeOpacity={0.85}
+                  onPress={() => router.push({ pathname: `/community/[category]`, params: { category: item.groupId } })}
+                >
+                  <BlurView intensity={20} tint="dark" style={styles.myGroupBlur}>
+                    <LinearGradient
+                      colors={['rgba(255, 169, 77, 0.15)', 'rgba(255, 140, 66, 0.05)']}
+                      style={styles.myGroupGradient}
+                    >
+                      <View style={styles.myGroupIcon}>
+                        <MaterialCommunityIcons name="library" size={28} color="#FFA94D" />
+                      </View>
+                      <Text style={styles.myGroupTitle} numberOfLines={2}>{item.groupId}</Text>
+                      <Ionicons name="chevron-forward" size={16} color="#FFA94D" style={styles.myGroupArrow} />
+                    </LinearGradient>
+                  </BlurView>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Animated.View>
+        )}
+
+        {/* Section: Catégories */}
+        <Animated.View style={[styles.sectionContainer, { opacity: fadeAnim }]}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <View style={styles.sectionIconContainer}>
+                <MaterialCommunityIcons name="view-grid" size={20} color="#FFA94D" />
+              </View>
+              <Text style={styles.sectionTitle}>Explorer</Text>
             </View>
           </View>
           
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
-            {myGroups.map((item, idx) => (
+          <View style={styles.categoriesGrid}>
+            {CATEGORIES.map((cat, idx) => (
               <TouchableOpacity
                 key={idx}
-                style={styles.myGroupCard}
-                activeOpacity={0.9}
-                onPress={() => router.push({ pathname: `/community/[category]`, params: { category: item.groupId } })}
+                style={styles.categoryCard}
+                onPress={() => router.push({ pathname: `/community/[category]`, params: { category: cat.name } })}
+                activeOpacity={0.85}
               >
-                <View style={styles.myGroupIcon}>
-                  <Ionicons name="library" size={28} color="#FFA94D" />
-                </View>
-                <Text style={styles.myGroupTitle} numberOfLines={2}>{item.groupId}</Text>
+                <LinearGradient
+                  colors={[...cat.color, cat.color[1] + 'DD']}
+                  style={styles.categoryGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <BlurView intensity={15} tint="dark" style={styles.categoryBlur}>
+                    <View style={styles.categoryContent}>
+                      <View style={styles.categoryTop}>
+                        <View style={styles.categoryIconCircle}>
+                          <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.6)" />
+                      </View>
+                      <View style={styles.categoryBottom}>
+                        <Text style={styles.categoryTitle} numberOfLines={2}>{cat.name}</Text>
+                        <Text style={styles.categoryDescription} numberOfLines={1}>{cat.description}</Text>
+                      </View>
+                    </View>
+                  </BlurView>
+                  
+                  {/* Shine effect */}
+                  <LinearGradient
+                    colors={['transparent', 'rgba(255,255,255,0.1)', 'transparent']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.categoryShine}
+                  />
+                </LinearGradient>
               </TouchableOpacity>
             ))}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* Section: Catégories */}
-      <View style={styles.sectionContainer}>
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleRow}>
-            <Ionicons name="grid" size={24} color="#FFA94D" />
-            <Text style={styles.sectionTitle}>Catégories</Text>
           </View>
-        </View>
-        
-        <View style={styles.categoriesGrid}>
-          {CATEGORIES.map((cat, idx) => (
-            <TouchableOpacity
-              key={idx}
-              style={styles.categoryCard}
-              onPress={() => router.push({ pathname: `/community/[category]`, params: { category: cat.name } })}
-              activeOpacity={0.85}
-            >
-              <LinearGradient
-                colors={cat.color}
-                style={styles.categoryGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <View style={styles.categoryIconCircle}>
-                  <Ionicons name={cat.icon as any} size={24} color="#fff" />
-                </View>
-                <Text style={styles.categoryTitle} numberOfLines={2}>{cat.name}</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-    </ScrollView>
+        </Animated.View>
+      </Animated.ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#181818',
+    backgroundColor: '#0F0F0F',
   },
-  headerGradient: {
-    paddingTop: 50,
-    paddingBottom: 24,
+  scrollView: {
+    flex: 1,
+  },
+  
+  // Hero Section
+  heroContainer: {
+    paddingTop: 60,
+    paddingBottom: 32,
     paddingHorizontal: 24,
+  },
+  heroGradient: {
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 169, 77, 0.1)',
+  },
+  heroContent: {
+    alignItems: 'center',
+  },
+  heroIconContainer: {
+    marginBottom: 16,
+  },
+  heroIconGradient: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#FFA94D',
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
+  },
+  heroTitle: {
+    color: '#fff',
+    fontSize: 36,
+    fontWeight: '900',
+    letterSpacing: -1,
     marginBottom: 8,
   },
-  header: {
-    color: '#FFA94D',
-    fontSize: 32,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-  headerSubtitle: {
+  heroSubtitle: {
     color: '#999',
     fontSize: 15,
     letterSpacing: 0.3,
+    textAlign: 'center',
+    marginBottom: 24,
   },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 169, 77, 0.05)',
+    borderRadius: 16,
+    padding: 16,
+    width: '100%',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statNumber: {
+    color: '#FFA94D',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  statLabel: {
+    color: '#666',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: 'rgba(255, 169, 77, 0.2)',
+  },
+  
+  // Sections
   sectionContainer: {
     marginBottom: 32,
-    marginTop: 0,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -269,35 +428,50 @@ const styles = StyleSheet.create({
   sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
+  },
+  sectionIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 169, 77, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sectionTitle: {
     color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 20,
-    letterSpacing: 0.2,
+    fontWeight: '800',
+    fontSize: 22,
+    letterSpacing: -0.5,
+  },
+  seeAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 169, 77, 0.1)',
   },
   seeAllText: {
     color: '#FFA94D',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
   },
   horizontalList: {
     paddingHorizontal: 24,
     gap: 16,
   },
-  // Cartes Groupes Populaires
+  
+  // Popular Cards
   popularCard: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    borderRadius: 16,
+    width: 180,
+    height: 240,
+    borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: '#232323',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 169, 77, 0.15)',
   },
   popularCardImage: {
     width: '100%',
@@ -308,9 +482,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: '60%',
+    height: '50%',
+  },
+  popularCardBlur: {
+    flex: 1,
     justifyContent: 'flex-end',
-    padding: 12,
+    padding: 16,
   },
   popularCardContent: {
     gap: 8,
@@ -318,52 +495,80 @@ const styles = StyleSheet.create({
   popularCardTitle: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
-    letterSpacing: 0.3,
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
   membersBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
     backgroundColor: 'rgba(255, 169, 77, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 12,
     alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 169, 77, 0.3)',
   },
   membersText: {
     color: '#FFA94D',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-  // Cartes Mes Groupes
+  cardGlow: {
+    position: 'absolute',
+    bottom: -20,
+    left: -20,
+    right: -20,
+    height: 60,
+    backgroundColor: '#FFA94D',
+    opacity: 0.15,
+    borderRadius: 40,
+    transform: [{ scaleX: 0.8 }],
+  },
+  
+  // My Group Cards
   myGroupCard: {
-    width: 140,
-    height: 140,
-    backgroundColor: '#232323',
-    borderRadius: 16,
+    width: 160,
+    height: 160,
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 169, 77, 0.2)',
+  },
+  myGroupBlur: {
+    flex: 1,
+  },
+  myGroupGradient: {
+    flex: 1,
     padding: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#333',
-    gap: 12,
   },
   myGroupIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255, 169, 77, 0.15)',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255, 169, 77, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 169, 77, 0.3)',
   },
   myGroupTitle: {
     color: '#FFA94D',
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '800',
     textAlign: 'center',
+    letterSpacing: -0.3,
   },
-  // Grille de Catégories
+  myGroupArrow: {
+    marginTop: 8,
+    opacity: 0.6,
+  },
+  
+  // Categories Grid
   categoriesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -372,51 +577,90 @@ const styles = StyleSheet.create({
   },
   categoryCard: {
     width: (SCREEN_WIDTH - 56) / 2,
-    height: 120,
-    borderRadius: 16,
+    height: 140,
+    borderRadius: 20,
     overflow: 'hidden',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   categoryGradient: {
     flex: 1,
+  },
+  categoryBlur: {
+    flex: 1,
     padding: 16,
+  },
+  categoryContent: {
+    flex: 1,
     justifyContent: 'space-between',
   },
+  categoryTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
   categoryIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  categoryEmoji: {
+    fontSize: 28,
+  },
+  categoryBottom: {
+    gap: 4,
   },
   categoryTitle: {
     color: '#fff',
     fontSize: 15,
-    fontWeight: 'bold',
-    letterSpacing: 0.3,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    textShadowRadius: 4,
   },
+  categoryDescription: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  categoryShine: {
+    position: 'absolute',
+    top: 0,
+    left: -100,
+    right: 0,
+    height: '100%',
+    width: 100,
+    opacity: 0.5,
+  },
+  
+  // Loading & Empty States
   loadingContainer: {
-    paddingVertical: 40,
+    paddingVertical: 60,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyContainer: {
-    paddingVertical: 40,
+    paddingVertical: 60,
     paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 12,
   },
   emptyText: {
     color: '#666',
     fontSize: 14,
-    fontStyle: 'italic',
+    fontWeight: '600',
   },
 });
