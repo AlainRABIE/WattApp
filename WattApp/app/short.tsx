@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Dimensions, ActivityIndicator, Animated } from 'react-native';
+import { View, Text, StyleSheet, useWindowDimensions, ActivityIndicator, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { db } from '../constants/firebaseConfig';
@@ -9,9 +10,11 @@ import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import WishlistBasketAnimation from './components/WishlistBasketAnimation';
 import TrashAnimation from './components/TrashAnimation';
 
-const { width } = Dimensions.get('window');
-
 export default function ShortScreen() {
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const isPhone = width < 768;
+  
   // Animation pour le drag
   const pan = useRef(new Animated.ValueXY()).current;
 
@@ -109,7 +112,28 @@ export default function ShortScreen() {
         }}
       >
         <View style={styles.pageBg}>
-          <Animated.View style={[styles.paperRect, { transform: [...pan.getTranslateTransform(), { rotate: tilt }] }]}> 
+          <Animated.View style={[
+            {
+              width: isPhone ? width * 0.92 : width * 0.5,
+              minHeight: isPhone ? 500 : 680,
+              maxHeight: '85%',
+              backgroundColor: '#22232a',
+              borderRadius: isPhone ? 20 : 24,
+              paddingVertical: isPhone ? 32 : 48,
+              paddingHorizontal: isPhone ? 20 : 32,
+              alignItems: 'center',
+              justifyContent: 'center',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.18,
+              shadowRadius: 24,
+              elevation: 12,
+              marginVertical: isPhone ? 20 : 40,
+              marginTop: Math.max(insets.top, 10) + 20,
+              marginBottom: Math.max(insets.bottom, 10) + 80,
+            },
+            { transform: [...pan.getTranslateTransform(), { rotate: tilt }] }
+          ]}> 
             <Text style={styles.pageTitle}>{book.title || 'Sans titre'}</Text>
             <View style={styles.pageContentWrapper}>
               <Text style={styles.pageSynopsis}>{book.synopsis || book.content?.slice(0, 200) || 'Pas de synopsis.'}</Text>
@@ -125,8 +149,7 @@ export default function ShortScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#181818', justifyContent: 'center', alignItems: 'center' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  card: { width: width * 0.9, backgroundColor: '#232323', borderRadius: 18, padding: 20, alignItems: 'center', elevation: 4 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#181818' },
   pageBg: {
     flex: 1,
     backgroundColor: '#181818',
@@ -135,38 +158,21 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  paperRect: {
-    width: width * 0.5, 
-    minHeight: 680, 
-    backgroundColor: '#22232a', 
-    borderRadius: 24,
-    paddingVertical: 48,
-    paddingHorizontal: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    elevation: 12,
-    marginVertical: 40,
-  },
   pageContainer: {
     flex: 1,
     backgroundColor: '#181818',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 20,
     paddingTop: 60,
   },
   pageTitle: {
     color: '#fff',
-    fontSize: 26,
-    fontWeight: '400',
+    fontSize: 22,
+    fontWeight: '600',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
     letterSpacing: 0.5,
-    fontFamily: 'serif',
   },
   pageContentWrapper: {
     flex: 1,
@@ -175,12 +181,10 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   pageSynopsis: {
-    color: '#fff',
-    fontSize: 20,
+    color: '#E0E0E0',
+    fontSize: 16,
     textAlign: 'center',
-    lineHeight: 32,
+    lineHeight: 26,
     fontWeight: '400',
-    fontFamily: 'serif',
   },
-  // ...
 });

@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, TouchableOpacity, StyleSheet, Platform, Image, StatusBar, Animated } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Platform, Image, StatusBar, Animated, Dimensions, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useSegments, usePathname } from 'expo-router';
 import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -17,12 +18,13 @@ const TABS = [
   { id: 'profile', label: 'Profile', icon: 'person-outline', route: '/profile' },
 ];
 
-const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : (StatusBar.currentHeight || 0);
-
 export default function BottomNav() {
   const router = useRouter();
   const segments = useSegments();
   const pathname = usePathname() || '';
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets(); // Support Dynamic Island
+  const isPhone = width < 768;
   const active = segments[segments.length - 1] || '';
 
   const handlePress = (route: string) => {
@@ -109,10 +111,31 @@ export default function BottomNav() {
 
   return (
     <View style={styles.wrapper} pointerEvents="box-none">
-      <View style={styles.container}>
-        <BlurView intensity={40} tint="dark" style={styles.pill}>
+      <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 6) }]}>
+        <BlurView intensity={40} tint="dark" style={[
+          styles.pill,
+          isPhone && styles.pillPhone  // Style spécifique téléphone
+        ]}>
           {TABS.map(tab => {
-            const isActive = active === tab.id || active === tab.route.replace('/', '');
+            // Détection améliorée de la page active
+            let isActive = false;
+            
+            if (tab.id === 'library') {
+              isActive = pathname.startsWith('/library');
+            } else if (tab.id === 'home') {
+              isActive = pathname === '/home/home' || pathname === '/home';
+            } else if (tab.id === 'explore') {
+              isActive = pathname === '/explore' || pathname.startsWith('/explore/');
+            } else if (tab.id === 'community') {
+              isActive = pathname === '/community' || (pathname.startsWith('/community/') && !pathname.includes('messenger'));
+            } else if (tab.id === 'mygroups') {
+              isActive = pathname.includes('messenger') || pathname.startsWith('/chat/');
+            } else if (tab.id === 'short') {
+              isActive = pathname === '/short' || pathname.startsWith('/short/');
+            } else if (tab.id === 'profile') {
+              isActive = pathname === '/profile' || pathname.startsWith('/profile/');
+            }
+            
             return (
               <TouchableOpacity
                 key={tab.id}
@@ -125,8 +148,14 @@ export default function BottomNav() {
                 <Animated.View style={[{ transform: [{ scale: scalesRef.current[tab.id] || new Animated.Value(1) }] }]}> 
                   <View style={styles.iconWrap}>
                     {isActive ? (
-                      <BlurView intensity={60} tint="light" style={styles.activeBubble}>
-                        <View style={styles.bubbleContent}>
+                      <BlurView intensity={60} tint="light" style={[
+                        styles.activeBubble,
+                        isPhone && styles.activeBubblePhone  // Taille réduite pour téléphone
+                      ]}>
+                        <View style={[
+                          styles.bubbleContent,
+                          isPhone && styles.bubbleContentPhone
+                        ]}>
                           <Ionicons name={
                             tab.id === 'mygroups' ? 'chatbubbles-outline' :
                             tab.id === 'profile' ? 'person-outline' :
@@ -134,7 +163,7 @@ export default function BottomNav() {
                             tab.id === 'library' ? 'book-outline' :
                             tab.id === 'short' ? 'flash-outline' :
                             (tab.icon as any)
-                          } size={26} color={'#181818'} />
+                          } size={isPhone ? 22 : 26} color={'#181818'} />
                         </View>
                       </BlurView>
                     ) : (
@@ -145,7 +174,7 @@ export default function BottomNav() {
                         tab.id === 'library' ? 'book-outline' :
                         tab.id === 'short' ? 'flash-outline' :
                         (tab.icon as any)
-                      } size={26} color={'#F5E9DA'} />
+                      } size={isPhone ? 22 : 26} color={'#F5E9DA'} />
                     )}
                   </View>
                 </Animated.View>
@@ -171,14 +200,14 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     backgroundColor: 'transparent',
-    paddingTop: STATUSBAR_HEIGHT + 8,
-    paddingBottom: 6,
+    paddingTop: 8,
+    // paddingBottom géré dynamiquement avec insets.bottom
     width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
   pill: {
-    width: '56%',
+    width: '95%',
     maxWidth: 720,
     backgroundColor: 'rgba(35,35,35,0.6)',
     borderRadius: 999,
@@ -193,6 +222,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 10,
     overflow: 'hidden',
+  },
+  // Style spécifique téléphone
+  pillPhone: {
+    width: '98%',
+    paddingVertical: 4,
+    paddingHorizontal: 6,
   },
   tab: {
     alignItems: 'center',
@@ -219,6 +254,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Bulle plus petite pour téléphone
+  activeBubblePhone: {
+    width: 46,
+    height: 46,
+  },
   bubbleContent: {
     width: 48,
     height: 48,
@@ -226,6 +266,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+  },
+  bubbleContentPhone: {
+    width: 40,
+    height: 40,
   },
   profileImg: {
     width: 40,

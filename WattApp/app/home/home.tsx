@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, StatusBar, ScrollView, Image, useWindowDimensions, Platform, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -11,6 +12,7 @@ import ProfileMigrationService from '../../services/ProfileMigrationService';
 
 const Home: React.FC = () => {
 	const router = useRouter();
+	const insets = useSafeAreaInsets(); // Support Dynamic Island
 	// helper to open explore
 	const openExplore = () => (router as any).push('/explore');
 
@@ -32,9 +34,9 @@ const Home: React.FC = () => {
 	// treat as tablet when the longest side is >= 768
 	const isTablet = Math.max(width, height) >= 768;
 
-	// Avatar placement: compute top offset so the avatar stays fixed below the status bar
+	// Avatar placement: compute top offset with Dynamic Island support
 	const avatarSize = 48; // size of the fixed profile circle
-	const topOffset = Platform.OS === 'ios' ? 44 : (StatusBar.currentHeight ?? 0) + 8;
+	const topOffset = Math.max(insets.top, 10) + 8;
 	const contentPaddingTop = topOffset + avatarSize + 12; // keep content from being hidden under avatar
 
 	const renderBookItem = (item: any) => {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Linking, Modal, Share, Platform, Dimensions, Animated } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Linking, Modal, Share, Platform, useWindowDimensions, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -9,12 +9,16 @@ import app, { db } from '../constants/firebaseConfig';
 import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemeSelector } from './components/ThemeSelector';
 import { useTheme } from '../hooks/useTheme';
 import { OpenSourceBooksService } from '../services/OpenSourceBooksService';
 
 const Profile: React.FC = () => {
   const router = useRouter();
+  const insets = useSafeAreaInsets(); // Support Dynamic Island
+  const { width: screenWidth } = useWindowDimensions();
+  const isPhone = screenWidth < 768;
   const openSourceBooksService = OpenSourceBooksService.getInstance();
   const [displayName, setDisplayName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
@@ -38,7 +42,6 @@ const Profile: React.FC = () => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'grid' | 'playlists' | 'bookmarks'>('grid');
   const scrollViewRef = useRef<any>(null);
-  const { width: screenWidth } = Dimensions.get('window');
   const scrollX = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -308,7 +311,7 @@ const Profile: React.FC = () => {
         alignItems: 'center', 
         justifyContent: 'space-between', 
         paddingHorizontal: 20, 
-        paddingTop: 50, 
+        paddingTop: Math.max(insets.top, 10) + 10, // Support Dynamic Island
         paddingBottom: 12, 
         backgroundColor: 'transparent',
         position: 'absolute',
@@ -699,11 +702,11 @@ const Profile: React.FC = () => {
                 >
                   {libraryBooks.map((item, index) => (
                     <View key={String(item.id)} style={{
-                      width: 140,
-                      marginRight: 16,
+                      width: isPhone ? 120 : 140,
+                      marginRight: isPhone ? 12 : 16,
                       backgroundColor: '#232323',
-                      borderRadius: 12,
-                      padding: 12,
+                      borderRadius: isPhone ? 10 : 12,
+                      padding: isPhone ? 10 : 12,
                       borderWidth: 1,
                       borderColor: '#333',
                     }}>
@@ -711,18 +714,18 @@ const Profile: React.FC = () => {
                         {(item.coverImageUrl || item.coverImage) ? (
                           <Image 
                             source={{ uri: item.coverImageUrl || item.coverImage }} 
-                            style={{ width: '100%', height: 160, borderRadius: 8, backgroundColor: '#181818', marginBottom: 8 }}
+                            style={{ width: '100%', height: isPhone ? 140 : 160, borderRadius: 8, backgroundColor: '#181818', marginBottom: 8 }}
                           />
                         ) : (
-                          <View style={{ width: '100%', height: 160, borderRadius: 8, backgroundColor: '#181818', marginBottom: 8, justifyContent: 'center', alignItems: 'center' }}>
-                            <Ionicons name="book" size={48} color="#333" />
+                          <View style={{ width: '100%', height: isPhone ? 140 : 160, borderRadius: 8, backgroundColor: '#181818', marginBottom: 8, justifyContent: 'center', alignItems: 'center' }}>
+                            <Ionicons name="book" size={isPhone ? 40 : 48} color="#333" />
                           </View>
                         )}
                         <View style={{ alignItems: 'center' }}>
-                          <Text style={{ color: '#FFA94D', fontSize: 14, fontWeight: '600', textAlign: 'center', marginBottom: 4 }} numberOfLines={2}>
+                          <Text style={{ color: '#FFA94D', fontSize: isPhone ? 13 : 14, fontWeight: '600', textAlign: 'center', marginBottom: 4 }} numberOfLines={2}>
                             {item.title || item.titre || 'Sans titre'}
                           </Text>
-                          <Text style={{ color: '#ccc', fontSize: 12, textAlign: 'center' }} numberOfLines={1}>
+                          <Text style={{ color: '#ccc', fontSize: isPhone ? 11 : 12, textAlign: 'center' }} numberOfLines={1}>
                             par {item.author || item.auteur || 'Auteur inconnu'}
                           </Text>
                         </View>
@@ -1234,22 +1237,22 @@ const styles = StyleSheet.create({
   },
   bannerContainer: {
     width: '100%',
-    height: 280,
+    height: 120,
     position: 'relative',
-    marginBottom: -80,
+    marginBottom: -40,
   },
   banner: {
     width: '100%',
-    height: 280,
+    height: 120,
     resizeMode: 'cover',
   },
   bannerEditBtn: {
     position: 'absolute',
-    right: 20,
-    bottom: 20,
+    right: 12,
+    bottom: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 50,
-    padding: 12,
+    padding: 8,
     zIndex: 2,
     backdropFilter: 'blur(10px)',
   },
@@ -1261,19 +1264,19 @@ const styles = StyleSheet.create({
   },
   metaRow: {
     width: '100%',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     flexDirection: 'column',
     alignItems: 'center',
-    marginTop: -70,
-    marginBottom: 20,
+    marginTop: -50,
+    marginBottom: 16,
   },
   avatarLarge: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    borderWidth: 4,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
     borderColor: '#000000',
-    marginBottom: 16,
+    marginBottom: 8,
     backgroundColor: '#1A1A1A',
   },
   metaText: { 
@@ -1282,46 +1285,46 @@ const styles = StyleSheet.create({
   },
   nameLarge: { 
     color: '#FFFFFF', 
-    fontSize: 24, 
+    fontSize: 17, 
     fontWeight: '700',
     marginBottom: 2,
     textAlign: 'center',
   },
   email: { 
     color: '#888', 
-    fontSize: 14,
-    marginBottom: 4,
+    fontSize: 12,
+    marginBottom: 2,
     textAlign: 'center',
   },
   bio: { color: '#fff', paddingHorizontal: 20, marginTop: 12, lineHeight: 20 },
   bioBubble: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     marginTop: 4,
-    marginBottom: 20,
-    marginHorizontal: 20,
+    marginBottom: 10,
+    marginHorizontal: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   bioBubbleText: {
     color: '#E0E0E0',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 12,
+    lineHeight: 16,
     textAlign: 'center',
   },
   rowBetween: { 
     width: '100%', 
-    paddingHorizontal: 20, 
-    marginBottom: 20,
+    paddingHorizontal: 12, 
+    marginBottom: 10,
   },
   statsRowSmall: { 
     flexDirection: 'row', 
     backgroundColor: 'transparent',
     borderRadius: 0,
     padding: 0,
-    paddingVertical: 16,
+    paddingVertical: 10,
     justifyContent: 'space-around',
     borderWidth: 0,
     borderTopWidth: 0.5,
@@ -1334,42 +1337,43 @@ const styles = StyleSheet.create({
   },
   statNumber: { 
     color: '#FFFFFF', 
-    fontSize: 20, 
+    fontSize: 16, 
     fontWeight: '700',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   statLabel: { 
     color: '#888', 
-    fontSize: 13,
+    fontSize: 10,
     fontWeight: '400',
   },
   actionColumn: { flexDirection: 'column' },
   actionColumnSingle: { 
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 20,
-    marginBottom: 8,
+    gap: 6,
+    marginTop: 8,
+    marginBottom: 6,
     justifyContent: 'center',
+    paddingHorizontal: 12,
   },
   primaryButton: { 
     backgroundColor: '#FFFFFF', 
-    padding: 10, 
-    borderRadius: 8, 
+    padding: 8, 
+    borderRadius: 6, 
     alignItems: 'center', 
-    marginBottom: 8, 
-    minWidth: 100 
+    marginBottom: 6, 
+    minWidth: 80 
   },
   primaryText: { 
     color: '#000000', 
     fontWeight: '700',
-    fontSize: 15,
+    fontSize: 13,
   },
   primaryButtonSingle: { 
     backgroundColor: '#FFFFFF', 
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
@@ -1379,25 +1383,24 @@ const styles = StyleSheet.create({
   secondaryButton: { 
     borderColor: 'rgba(255, 255, 255, 0.3)', 
     borderWidth: 1, 
-    padding: 8, 
-    borderRadius: 8, 
+    padding: 6, 
+    borderRadius: 6, 
     alignItems: 'center', 
-    minWidth: 100 
+    minWidth: 80 
   },
   secondaryText: { 
     color: '#FFFFFF',
     fontWeight: '600',
-    fontSize: 15,
+    fontSize: 13,
   },
   secondaryButtonSmall: { 
     backgroundColor: 'transparent',
     borderColor: 'rgba(255, 255, 255, 0.3)',
     borderWidth: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
     alignItems: 'center',
-    flexDirection: 'row',
     justifyContent: 'center',
     flex: 1,
     minWidth: 0,
@@ -1415,10 +1418,10 @@ const styles = StyleSheet.create({
   sectionTitle: { 
     color: '#FFFFFF', 
     fontWeight: '800',
-    fontSize: 18,
-    marginBottom: 16,
-    letterSpacing: 0.5,
-    paddingHorizontal: 20,
+    fontSize: 16,
+    marginBottom: 12,
+    letterSpacing: 0.3,
+    paddingHorizontal: 16
   },
   placeholder: { 
     color: '#555', 
@@ -1430,12 +1433,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: 0,
-    gap: 2,
+    gap: 1,
   },
   gridItem: {
-    width: '25%',
+    width: '33.33%',
     aspectRatio: 0.7,
-    padding: 1,
+    padding: 0.5,
   },
   gridImage: {
     width: '100%',
@@ -1462,14 +1465,13 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     paddingVertical: 80,
-    paddingHorizontal: 40,
+    paddingHorizontal: 30,
   },
   emptyStateText: {
     color: '#666',
-    fontSize: 18,
-    marginTop: 20,
-    marginBottom: 8,
-    textAlign: 'center',
+    fontSize: 16,
+    marginTop: 16,
+    marginBottom: 6,
     fontWeight: '600',
   },
   emptyStateButton: {
@@ -1486,19 +1488,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   workCard: { 
-    width: 130, 
-    marginRight: 16,
+    width: 120, 
+    marginRight: 12,
   },
   workCover: { 
-    width: 130, 
-    height: 195, 
+    width: 120, 
+    height: 180, 
     borderRadius: 8, 
     backgroundColor: '#1A1A1A',
   },
   workTitle: { 
     color: '#E0E0E0', 
     fontSize: 13, 
-    marginTop: 10, 
+    marginTop: 8, 
     textAlign: 'left',
     fontWeight: '600',
     lineHeight: 18,
@@ -1545,13 +1547,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   playlistCard: {
-    width: 180,
+    width: 160,
     marginRight: 16,
   },
   playlistMain: {
     backgroundColor: '#1A1A1A',
     borderRadius: 16,
-    padding: 18,
+    padding: 16,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#2A2A2A',
@@ -1626,9 +1628,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderColor: 'rgba(255, 255, 255, 0.3)',
     borderWidth: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
@@ -1637,7 +1639,7 @@ const styles = StyleSheet.create({
   },
   themeButtonText: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '600',
   },
 });
