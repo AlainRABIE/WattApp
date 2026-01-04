@@ -373,6 +373,14 @@ export default function CommunityChat() {
         const snap = await getDocs(collection(db, 'communityChats', String(category), 'members'));
         const list = snap.docs.map(doc => doc.data());
         setMembers(list);
+        
+        // Vérifier si l'utilisateur actuel est membre
+        const auth = getAuth(app);
+        const user = auth.currentUser;
+        if (user) {
+          const isUserMember = list.some((member: any) => member.uid === user.uid);
+          setIsMember(isUserMember);
+        }
       } catch (e) {
         // Optionnel : log erreur
       }
