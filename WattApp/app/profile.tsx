@@ -149,11 +149,11 @@ const Profile: React.FC = () => {
       {(item.coverImageUrl || item.coverImage) ? (
         <Image source={{ uri: item.coverImageUrl || item.coverImage }} style={styles.workCover} />
       ) : (
-        <View style={[styles.workCover, { backgroundColor: '#222', justifyContent: 'center', alignItems: 'center' }]}>
-          <Text style={{ color: '#888', fontSize: 12 }}>Pas d'image</Text>
+        <View style={[styles.workCover, { backgroundColor: theme.colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
+          <Text style={{ color: theme.colors.textSecondary, fontSize: 12 }}>Pas d'image</Text>
         </View>
       )}
-      <Text style={styles.workTitle} numberOfLines={2}>{item.title ? item.title : 'Sans titre'}</Text>
+      <Text style={[styles.workTitle, { color: theme.colors.text }]} numberOfLines={2}>{item.title ? item.title : 'Sans titre'}</Text>
     </TouchableOpacity>
   );
 
@@ -304,7 +304,7 @@ const Profile: React.FC = () => {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#000000' }}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       {/* Header avec engrenage en haut à droite */}
       <View style={{ 
         flexDirection: 'row', 
@@ -321,10 +321,10 @@ const Profile: React.FC = () => {
         zIndex: 10,
       }}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+          <Ionicons name="chevron-back" size={28} color={theme.colors.text} />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push('/settings')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="settings-outline" size={28} color="#FFFFFF" />
+          <Ionicons name="settings-outline" size={28} color={theme.colors.text} />
         </TouchableOpacity>
       </View>
       <ScrollView contentContainerStyle={styles.container}>
@@ -383,7 +383,7 @@ const Profile: React.FC = () => {
               setUploading(false);
             }
           }}>
-            <Ionicons name="camera" size={24} color="#FFFFFF" />
+            <Ionicons name="camera" size={24} color={theme.colors.text} />
           </TouchableOpacity>
         </View>
 
@@ -446,18 +446,18 @@ const Profile: React.FC = () => {
             })()}
           </TouchableOpacity>
           <View style={styles.metaText}>
-            <Text style={styles.nameLarge}>{displayName || 'Utilisateur'}</Text>
-            <Text style={styles.email}>{email}</Text>
+            <Text style={[styles.nameLarge, { color: theme.colors.text }]}>{displayName || 'Utilisateur'}</Text>
+            <Text style={[styles.email, { color: theme.colors.textSecondary }]}>{email}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, justifyContent: 'center' }}>
               {isPrivate ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Ionicons name="lock-closed" size={14} color="#888" style={{ marginRight: 4 }} />
-                  <Text style={{ color: '#888', fontSize: 12 }}>Privé</Text>
+                  <Ionicons name="lock-closed" size={14} color={theme.colors.textSecondary} style={{ marginRight: 4 }} />
+                  <Text style={{ color: theme.colors.textSecondary, fontSize: 12 }}> Privé</Text>
                 </View>
               ) : (
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Ionicons name="earth" size={14} color="#888" style={{ marginRight: 4 }} />
-                  <Text style={{ color: '#888', fontSize: 12 }}>Public</Text>
+                  <Ionicons name="earth" size={14} color={theme.colors.textSecondary} style={{ marginRight: 4 }} />
+                  <Text style={{ color: theme.colors.textSecondary, fontSize: 12 }}>Public</Text>
                 </View>
               )}
             </View>
@@ -467,7 +467,7 @@ const Profile: React.FC = () => {
         {/* bio */}
         {bio ? (
           <View style={styles.bioBubble}>
-            <Text style={styles.bioBubbleText}>{bio}</Text>
+            <Text style={[styles.bioBubbleText, { color: theme.colors.text }]}>{bio}</Text>
           </View>
         ) : null}
 
@@ -475,23 +475,23 @@ const Profile: React.FC = () => {
         <View style={styles.rowBetween}>
           <View style={styles.statsRowSmall}>
             <View style={styles.statBoxSmall}>
-              <Text style={styles.statNumber}>{String(worksCount ?? '-')}</Text>
-              <Text style={styles.statLabel}>Œuvres</Text>
+              <Text style={[styles.statNumber, { color: theme.colors.text }]}>{String(worksCount ?? '-')}</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Œuvres</Text>
             </View>
             <View style={styles.statBoxSmall}>
-              <Text style={styles.statNumber}>{String(followersCount ?? '-')}</Text>
-              <Text style={styles.statLabel}>Abonnés</Text>
+              <Text style={[styles.statNumber, { color: theme.colors.text }]}>{String(followersCount ?? '-')}</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Abonnés</Text>
             </View>
             <View style={styles.statBoxSmall}>
-              <Text style={styles.statNumber}>{String(friendsCount ?? '-')}</Text>
-              <Text style={styles.statLabel}>Amis</Text>
+              <Text style={[styles.statNumber, { color: theme.colors.text }]}>{String(friendsCount ?? '-')}</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Amis</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.actionColumnSingle}>
           <TouchableOpacity style={styles.primaryButtonSingle} onPress={() => router.push('/EditProfile')}>
-            <Text style={styles.primaryText}>Éditer le profil</Text>
+            <Text style={[styles.primaryText, { color: theme.colors.text }]}>Éditer le profil</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryButtonSmall} onPress={async () => {
             try {
@@ -511,16 +511,16 @@ const Profile: React.FC = () => {
               console.error('Erreur partage:', error);
             }
           }}>
-            <Text style={styles.secondaryText}>Partager</Text>
+            <Text style={[styles.secondaryText, { color: theme.colors.text }]}>Partager</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.themeButtonSmall} onPress={() => router.push('/settings')}>
-            <Ionicons name="person-add-outline" size={20} color="#FFFFFF" />
+            <Ionicons name="person-add-outline" size={20} color={theme.colors.text} />
           </TouchableOpacity>
         </View>
 
         {/* Sections avec onglets */}
         <View style={styles.section}>
-          <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.1)' }}>
+          <View style={{ borderTopWidth: 1, borderTopColor: `${theme.colors.border}50` }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 0 }}>
               <TouchableOpacity 
                 style={{ flex: 1, alignItems: 'center', paddingVertical: 14 }}
@@ -529,7 +529,7 @@ const Profile: React.FC = () => {
                   scrollViewRef.current?.scrollTo({ x: 0, animated: true });
                 }}
               >
-                <Ionicons name="grid-outline" size={24} color={activeTab === 'grid' ? '#FFFFFF' : '#555'} />
+                <Ionicons name="grid-outline" size={24} color={activeTab === 'grid' ? theme.colors.text : theme.colors.textSecondary} />
               </TouchableOpacity>
               <TouchableOpacity 
                 style={{ flex: 1, alignItems: 'center', paddingVertical: 14 }}
@@ -538,7 +538,7 @@ const Profile: React.FC = () => {
                   scrollViewRef.current?.scrollTo({ x: screenWidth, animated: true });
                 }}
               >
-                <Ionicons name="musical-notes-outline" size={24} color={activeTab === 'playlists' ? '#FFFFFF' : '#555'} />
+                <Ionicons name="musical-notes-outline" size={24} color={activeTab === 'playlists' ? theme.colors.text : theme.colors.textSecondary} />
               </TouchableOpacity>
               <TouchableOpacity 
                 style={{ flex: 1, alignItems: 'center', paddingVertical: 14 }}
@@ -547,14 +547,14 @@ const Profile: React.FC = () => {
                   scrollViewRef.current?.scrollTo({ x: screenWidth * 2, animated: true });
                 }}
               >
-                <Ionicons name="bookmark-outline" size={24} color={activeTab === 'bookmarks' ? '#FFFFFF' : '#555'} />
+                <Ionicons name="bookmark-outline" size={24} color={activeTab === 'bookmarks' ? theme.colors.text : theme.colors.textSecondary} />
               </TouchableOpacity>
             </View>
             {/* Barre animée */}
             <Animated.View
               style={{
                 height: 1,
-                backgroundColor: '#FFFFFF',
+                backgroundColor: theme.colors.primary,
                 width: `${100 / 3}%`,
                 transform: [{
                   translateX: scrollX.interpolate({
@@ -590,9 +590,9 @@ const Profile: React.FC = () => {
             <View style={{ width: screenWidth }}>
               {(works && works.length) === 0 ? (
                 <View style={styles.emptyState}>
-                  <Ionicons name="book-outline" size={80} color="#222" />
-                  <Text style={styles.emptyStateText}>Aucune œuvre</Text>
-                  <Text style={{ color: '#555', fontSize: 13, marginBottom: 24 }}>Créez votre première œuvre</Text>
+                  <Ionicons name="book-outline" size={80} color={theme.colors.textSecondary} />
+                  <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>Aucune œuvre</Text>
+                  <Text style={{ color: theme.colors.textSecondary, fontSize: 13, marginBottom: 24 }}>Créez votre première œuvre</Text>
                 </View>
               ) : (
                 <View style={styles.gridContainer}>
@@ -605,8 +605,8 @@ const Profile: React.FC = () => {
                       {(item.coverImageUrl || item.coverImage) ? (
                         <Image source={{ uri: item.coverImageUrl || item.coverImage }} style={styles.gridImage} />
                       ) : (
-                        <View style={[styles.gridImage, styles.gridPlaceholder]}>
-                          <Ionicons name="book" size={32} color="#333" />
+                        <View style={[styles.gridImage, styles.gridPlaceholder, { backgroundColor: theme.colors.surface }]}>
+                          <Ionicons name="book" size={32} color={theme.colors.textSecondary} />
                         </View>
                       )}
                     </TouchableOpacity>
@@ -619,9 +619,9 @@ const Profile: React.FC = () => {
             <View style={{ width: screenWidth }}>
               {playlists.length === 0 ? (
                 <View style={styles.emptyState}>
-                  <Ionicons name="musical-notes-outline" size={80} color="#222" />
-                  <Text style={styles.emptyStateText}>Aucune playlist</Text>
-                  <Text style={{ color: '#555', fontSize: 13, marginBottom: 24 }}>Ajoutez vos playlists favorites</Text>
+                  <Ionicons name="musical-notes-outline" size={80} color={theme.colors.textSecondary} />
+                  <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>Aucune playlist</Text>
+                  <Text style={{ color: theme.colors.textSecondary, fontSize: 13, marginBottom: 24 }}>Ajoutez vos playlists favorites</Text>
                 </View>
               ) : (
                 <View style={{ paddingHorizontal: 20, paddingVertical: 16 }}>
@@ -631,12 +631,12 @@ const Profile: React.FC = () => {
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',
-                        backgroundColor: '#1A1A1A',
+                        backgroundColor: theme.colors.surface,
                         borderRadius: 12,
                         padding: 12,
                         marginBottom: 12,
                         borderWidth: 1,
-                        borderColor: '#2A2A2A',
+                        borderColor: theme.colors.border,
                       }}
                       onPress={() => openPlaylist(playlist)}
                       onLongPress={() => deletePlaylist(playlist.id)}
@@ -653,23 +653,23 @@ const Profile: React.FC = () => {
                         {renderPlatformIcon(playlist.platform, playlist.icon)}
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '700', marginBottom: 4 }} numberOfLines={1}>
+                        <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '700', marginBottom: 4 }} numberOfLines={1}>
                           {playlist.name}
                         </Text>
-                        <Text style={{ color: '#888', fontSize: 13 }}>
+                        <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>
                           {playlist.platform.toUpperCase()} • {playlist.isPrivate ? 'Privée' : 'Publique'}
                         </Text>
                       </View>
                       <TouchableOpacity
                         style={{
-                          backgroundColor: 'rgba(255, 169, 77, 0.2)',
+                          backgroundColor: `${theme.colors.primary}20`,
                           borderRadius: 18,
                           width: 36,
                           height: 36,
                           alignItems: 'center',
                           justifyContent: 'center',
                           borderWidth: 1,
-                          borderColor: '#FFA94D',
+                          borderColor: theme.colors.primary,
                         }}
                         onPress={(e) => {
                           e.stopPropagation();
@@ -690,9 +690,9 @@ const Profile: React.FC = () => {
             <View style={{ width: screenWidth }}>
               {(libraryBooks && libraryBooks.length) === 0 ? (
                 <View style={styles.emptyState}>
-                  <Ionicons name="bookmark-outline" size={80} color="#222" />
-                  <Text style={styles.emptyStateText}>Aucun livre enregistré</Text>
-                  <Text style={{ color: '#555', fontSize: 13, marginBottom: 24 }}>Enregistrez vos livres préférés dans votre bibliothèque</Text>
+                  <Ionicons name="bookmark-outline" size={80} color={theme.colors.textSecondary} />
+                  <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>Aucun livre enregistré</Text>
+                  <Text style={{ color: theme.colors.textSecondary, fontSize: 13, marginBottom: 24 }}>Enregistrez vos livres préférés dans votre bibliothèque</Text>
                 </View>
               ) : (
                 <ScrollView 
@@ -704,28 +704,28 @@ const Profile: React.FC = () => {
                     <View key={String(item.id)} style={{
                       width: isPhone ? 120 : 140,
                       marginRight: isPhone ? 12 : 16,
-                      backgroundColor: '#232323',
+                      backgroundColor: theme.colors.surface,
                       borderRadius: isPhone ? 10 : 12,
                       padding: isPhone ? 10 : 12,
                       borderWidth: 1,
-                      borderColor: '#333',
+                      borderColor: theme.colors.border,
                     }}>
                       <TouchableOpacity onPress={() => router.push(`../book/${item.id}`)}>
                         {(item.coverImageUrl || item.coverImage) ? (
                           <Image 
                             source={{ uri: item.coverImageUrl || item.coverImage }} 
-                            style={{ width: '100%', height: isPhone ? 140 : 160, borderRadius: 8, backgroundColor: '#181818', marginBottom: 8 }}
+                            style={{ width: '100%', height: isPhone ? 140 : 160, borderRadius: 8, backgroundColor: theme.colors.background, marginBottom: 8 }}
                           />
                         ) : (
-                          <View style={{ width: '100%', height: isPhone ? 140 : 160, borderRadius: 8, backgroundColor: '#181818', marginBottom: 8, justifyContent: 'center', alignItems: 'center' }}>
-                            <Ionicons name="book" size={isPhone ? 40 : 48} color="#333" />
+                          <View style={{ width: '100%', height: isPhone ? 140 : 160, borderRadius: 8, backgroundColor: theme.colors.background, marginBottom: 8, justifyContent: 'center', alignItems: 'center' }}>
+                            <Ionicons name="book" size={isPhone ? 40 : 48} color={theme.colors.textSecondary} />
                           </View>
                         )}
                         <View style={{ alignItems: 'center' }}>
-                          <Text style={{ color: '#FFA94D', fontSize: isPhone ? 13 : 14, fontWeight: '600', textAlign: 'center', marginBottom: 4 }} numberOfLines={2}>
+                          <Text style={{ color: theme.colors.primary, fontSize: isPhone ? 13 : 14, fontWeight: '600', textAlign: 'center', marginBottom: 4 }} numberOfLines={2}>
                             {item.title || item.titre || 'Sans titre'}
                           </Text>
-                          <Text style={{ color: '#ccc', fontSize: isPhone ? 11 : 12, textAlign: 'center' }} numberOfLines={1}>
+                          <Text style={{ color: theme.colors.textSecondary, fontSize: isPhone ? 11 : 12, textAlign: 'center' }} numberOfLines={1}>
                             par {item.author || item.auteur || 'Auteur inconnu'}
                           </Text>
                         </View>
@@ -741,14 +741,14 @@ const Profile: React.FC = () => {
         {/* Bouton de déconnexion */}
         <TouchableOpacity
           style={{
-            backgroundColor: '#FFA94D',
+            backgroundColor: theme.colors.primary,
             padding: 16,
             borderRadius: 16,
             alignItems: 'center',
             marginHorizontal: 24,
             marginTop: 32,
             marginBottom: 32,
-            shadowColor: '#FFA94D',
+            shadowColor: theme.colors.primary,
             shadowOffset: { width: 0, height: 6 },
             shadowOpacity: 0.4,
             shadowRadius: 12,
@@ -764,8 +764,8 @@ const Profile: React.FC = () => {
             }
           }}
         >
-          <Ionicons name="log-out-outline" size={20} color="#0F0F0F" style={{ marginRight: 10 }} />
-          <Text style={{ color: '#0F0F0F', fontWeight: '800', fontSize: 16 }}>Se déconnecter</Text>
+          <Ionicons name="log-out-outline" size={20} color={theme.colors.background} style={{ marginRight: 10 }} />
+          <Text style={{ color: theme.colors.background, fontWeight: '800', fontSize: 16 }}>Se déconnecter</Text>
         </TouchableOpacity>
         <View style={{ height: 80 }} />
         <ThemeSelector
@@ -786,7 +786,7 @@ const Profile: React.FC = () => {
             justifyContent: 'flex-end',
           }}>
             <View style={{
-              backgroundColor: '#1A1A1A',
+              backgroundColor: theme.colors.surface,
               borderTopLeftRadius: 20,
               borderTopRightRadius: 20,
               paddingTop: 20,
@@ -797,14 +797,14 @@ const Profile: React.FC = () => {
               <View style={{
                 width: 40,
                 height: 4,
-                backgroundColor: '#444',
+                backgroundColor: theme.colors.border,
                 borderRadius: 2,
                 alignSelf: 'center',
                 marginBottom: 20,
               }} />
 
               <Text style={{
-                color: '#FFFFFF',
+                color: theme.colors.text,
                 fontSize: 20,
                 fontWeight: '700',
                 marginBottom: 20,
@@ -817,14 +817,14 @@ const Profile: React.FC = () => {
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
-                    backgroundColor: '#2A2A2A',
+                    backgroundColor: theme.colors.background,
                     padding: 16,
                     borderRadius: 12,
                   }}
                   onPress={() => handleShareProfile('copy')}
                 >
-                  <Ionicons name="link-outline" size={24} color="#FFA94D" />
-                  <Text style={{ color: '#FFFFFF', fontSize: 16, marginLeft: 16, fontWeight: '600' }}>
+                  <Ionicons name="link-outline" size={24} color={theme.colors.primary} />
+                  <Text style={{ color: theme.colors.text, fontSize: 16, marginLeft: 16, fontWeight: '600' }}>
                     Copier le lien du profil
                   </Text>
                 </TouchableOpacity>
@@ -833,14 +833,14 @@ const Profile: React.FC = () => {
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
-                    backgroundColor: '#2A2A2A',
+                    backgroundColor: theme.colors.background,
                     padding: 16,
                     borderRadius: 12,
                   }}
                   onPress={() => handleShareProfile('instagram')}
                 >
                   <Ionicons name="logo-instagram" size={24} color="#E1306C" />
-                  <Text style={{ color: '#FFFFFF', fontSize: 16, marginLeft: 16, fontWeight: '600' }}>
+                  <Text style={{ color: theme.colors.text, fontSize: 16, marginLeft: 16, fontWeight: '600' }}>
                     Partager sur Instagram
                   </Text>
                 </TouchableOpacity>
@@ -849,14 +849,14 @@ const Profile: React.FC = () => {
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
-                    backgroundColor: '#2A2A2A',
+                    backgroundColor: theme.colors.background,
                     padding: 16,
                     borderRadius: 12,
                   }}
                   onPress={() => handleShareProfile('twitter')}
                 >
                   <Ionicons name="logo-twitter" size={24} color="#1DA1F2" />
-                  <Text style={{ color: '#FFFFFF', fontSize: 16, marginLeft: 16, fontWeight: '600' }}>
+                  <Text style={{ color: theme.colors.text, fontSize: 16, marginLeft: 16, fontWeight: '600' }}>
                     Partager sur Twitter
                   </Text>
                 </TouchableOpacity>
@@ -865,14 +865,14 @@ const Profile: React.FC = () => {
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
-                    backgroundColor: '#2A2A2A',
+                    backgroundColor: theme.colors.background,
                     padding: 16,
                     borderRadius: 12,
                   }}
                   onPress={() => handleShareProfile('whatsapp')}
                 >
                   <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
-                  <Text style={{ color: '#FFFFFF', fontSize: 16, marginLeft: 16, fontWeight: '600' }}>
+                  <Text style={{ color: theme.colors.text, fontSize: 16, marginLeft: 16, fontWeight: '600' }}>
                     Partager sur WhatsApp
                   </Text>
                 </TouchableOpacity>
@@ -881,14 +881,14 @@ const Profile: React.FC = () => {
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
-                    backgroundColor: '#2A2A2A',
+                    backgroundColor: theme.colors.background,
                     padding: 16,
                     borderRadius: 12,
                   }}
                   onPress={() => handleShareProfile('general')}
                 >
-                  <Ionicons name="share-social-outline" size={24} color="#FFA94D" />
-                  <Text style={{ color: '#FFFFFF', fontSize: 16, marginLeft: 16, fontWeight: '600' }}>
+                  <Ionicons name="share-social-outline" size={24} color={theme.colors.primary} />
+                  <Text style={{ color: theme.colors.text, fontSize: 16, marginLeft: 16, fontWeight: '600' }}>
                     Plus d'options
                   </Text>
                 </TouchableOpacity>
@@ -899,7 +899,7 @@ const Profile: React.FC = () => {
                 style={{
                   backgroundColor: 'transparent',
                   borderWidth: 1,
-                  borderColor: '#444',
+                  borderColor: theme.colors.border,
                   padding: 14,
                   borderRadius: 12,
                   marginTop: 16,
@@ -907,7 +907,7 @@ const Profile: React.FC = () => {
                 onPress={() => setShowShareModal(false)}
               >
                 <Text style={{
-                  color: '#FFFFFF',
+                  color: theme.colors.text,
                   fontSize: 16,
                   fontWeight: '600',
                   textAlign: 'center',
@@ -925,14 +925,14 @@ const Profile: React.FC = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.95)',
+            backgroundColor: 'rgba(0, 0, 0, 0.95)',
             justifyContent: 'center',
             alignItems: 'center',
             padding: 20,
             zIndex: 1000,
           }}>
             <View style={{
-              backgroundColor: '#232323',
+              backgroundColor: theme.colors.surface,
               borderRadius: 16,
               padding: 24,
               width: '100%',
@@ -940,26 +940,26 @@ const Profile: React.FC = () => {
               maxHeight: '80%',
             }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                <Text style={{ color: '#FFA94D', fontSize: 20, fontWeight: 'bold' }}>
+                <Text style={{ color: theme.colors.primary, fontSize: 20, fontWeight: 'bold' }}>
                   📚 Livres gratuits
                 </Text>
                 <TouchableOpacity onPress={() => setShowImportModal(false)} disabled={importing}>
-                  <Ionicons name="close" size={28} color="#fff" />
+                  <Ionicons name="close" size={28} color={theme.colors.text} />
                 </TouchableOpacity>
               </View>
 
-              <Text style={{ color: '#999', fontSize: 14, marginBottom: 20 }}>
+              <Text style={{ color: theme.colors.textSecondary, fontSize: 14, marginBottom: 20 }}>
                 Importez des classiques du domaine public pour tester l'application
               </Text>
 
               {importing ? (
                 <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                  <ActivityIndicator size="large" color="#FFA94D" />
-                  <Text style={{ color: '#fff', marginTop: 20, fontSize: 16 }}>
+                  <ActivityIndicator size="large" color={theme.colors.primary} />
+                  <Text style={{ color: theme.colors.text, marginTop: 20, fontSize: 16 }}>
                     Import en cours... {importProgress.current}/{importProgress.total}
                   </Text>
                   {importProgress.bookTitle && (
-                    <Text style={{ color: '#999', marginTop: 8, fontSize: 14, textAlign: 'center' }}>
+                    <Text style={{ color: theme.colors.textSecondary, marginTop: 8, fontSize: 14, textAlign: 'center' }}>
                       {importProgress.bookTitle}
                     </Text>
                   )}
@@ -1100,7 +1100,7 @@ const Profile: React.FC = () => {
                     );
                   }}
                 >
-                  <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
+                  <Text style={{ color: theme.colors.text, fontWeight: 'bold', fontSize: 16 }}>
                     📥 Tout importer ({openSourceBooksService.getAvailableBooks().length} livres)
                   </Text>
                 </TouchableOpacity>
@@ -1152,10 +1152,10 @@ const Profile: React.FC = () => {
                     );
                   }}
                 >
-                  <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
+                  <Text style={{ color: theme.colors.text, fontWeight: 'bold', fontSize: 16 }}>
                     🌟 Importer + de livres ({openSourceBooksService.getExtendedBooks().length} livres)
                   </Text>
-                  <Text style={{ color: '#ccc', fontSize: 12, marginTop: 4 }}>
+                  <Text style={{ color: theme.colors.textSecondary, fontSize: 12, marginTop: 4 }}>
                     Jules Verne, Victor Hugo, Dickens, H.G. Wells...
                   </Text>
                 </TouchableOpacity>
@@ -1212,10 +1212,10 @@ const Profile: React.FC = () => {
                   <Text style={{ color: '#FFD700', fontWeight: 'bold', fontSize: 18 }}>
                     👑 MÉGA COLLECTION 👑
                   </Text>
-                  <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14, marginTop: 4 }}>
+                  <Text style={{ color: theme.colors.text, fontWeight: 'bold', fontSize: 14, marginTop: 4 }}>
                     {openSourceBooksService.getMegaCollection().length} CHEFS-D'ŒUVRE
                   </Text>
-                  <Text style={{ color: '#E1BEE7', fontSize: 11, marginTop: 4, textAlign: 'center' }}>
+                  <Text style={{ color: theme.colors.textSecondary, fontSize: 11, marginTop: 4, textAlign: 'center' }}>
                     Dostoïevski • Zola • Shakespeare • Lovecraft • Dickens
                   </Text>
                 </TouchableOpacity>
@@ -1232,7 +1232,6 @@ const Profile: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     padding: 0,
-    backgroundColor: '#000000',
     minHeight: '100%',
   },
   bannerContainer: {
@@ -1275,28 +1274,24 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     borderWidth: 3,
-    borderColor: '#000000',
     marginBottom: 8,
-    backgroundColor: '#1A1A1A',
   },
   metaText: { 
     width: '100%',
     alignItems: 'center',
   },
   nameLarge: { 
-    color: '#FFFFFF', 
     fontSize: 17, 
     fontWeight: '700',
     marginBottom: 2,
     textAlign: 'center',
   },
   email: { 
-    color: '#888', 
     fontSize: 12,
     marginBottom: 2,
     textAlign: 'center',
   },
-  bio: { color: '#fff', paddingHorizontal: 20, marginTop: 12, lineHeight: 20 },
+  bio: { paddingHorizontal: 20, marginTop: 12, lineHeight: 20 },
   bioBubble: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 8,
@@ -1309,7 +1304,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   bioBubbleText: {
-    color: '#E0E0E0',
     fontSize: 12,
     lineHeight: 16,
     textAlign: 'center',
@@ -1336,13 +1330,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statNumber: { 
-    color: '#FFFFFF', 
     fontSize: 16, 
     fontWeight: '700',
     marginBottom: 2,
   },
   statLabel: { 
-    color: '#888', 
     fontSize: 10,
     fontWeight: '400',
   },
@@ -1357,7 +1349,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   primaryButton: { 
-    backgroundColor: '#FFFFFF', 
     padding: 8, 
     borderRadius: 6, 
     alignItems: 'center', 
@@ -1365,12 +1356,10 @@ const styles = StyleSheet.create({
     minWidth: 80 
   },
   primaryText: { 
-    color: '#000000', 
     fontWeight: '700',
     fontSize: 13,
   },
   primaryButtonSingle: { 
-    backgroundColor: '#FFFFFF', 
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 6,
@@ -1389,7 +1378,6 @@ const styles = StyleSheet.create({
     minWidth: 80 
   },
   secondaryText: { 
-    color: '#FFFFFF',
     fontWeight: '600',
     fontSize: 13,
   },
@@ -1407,16 +1395,15 @@ const styles = StyleSheet.create({
   },
   tabsRow: { width: '100%', flexDirection: 'row', paddingHorizontal: 10, marginTop: 18 },
   tabButton: { flex: 1, paddingVertical: 10, alignItems: 'center' },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: '#FFA94D' },
-  tabText: { color: '#fff' },
-  tabTextActive: { color: '#FFA94D', fontWeight: '700' },
+  tabActive: { borderBottomWidth: 2 },
+  tabText: { },
+  tabTextActive: { fontWeight: '700' },
   section: { 
     width: '100%', 
     marginTop: 32, 
     paddingHorizontal: 0,
   },
   sectionTitle: { 
-    color: '#FFFFFF', 
     fontWeight: '800',
     fontSize: 16,
     marginBottom: 12,
@@ -1424,7 +1411,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16
   },
   placeholder: { 
-    color: '#555', 
     fontStyle: 'italic',
     textAlign: 'center',
     paddingVertical: 24,
@@ -1443,7 +1429,6 @@ const styles = StyleSheet.create({
   gridImage: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#0A0A0A',
   },
   gridPlaceholder: {
     justifyContent: 'center',
@@ -1458,7 +1443,6 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   gridTitle: {
-    color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '600',
   },
@@ -1468,14 +1452,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
   },
   emptyStateText: {
-    color: '#666',
     fontSize: 16,
     marginTop: 16,
     marginBottom: 6,
     fontWeight: '600',
   },
   emptyStateButton: {
-    backgroundColor: '#FFFFFF',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 24,
@@ -1483,7 +1465,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyStateButtonText: {
-    color: '#000',
     fontWeight: '700',
     fontSize: 15,
   },
@@ -1494,11 +1475,9 @@ const styles = StyleSheet.create({
   workCover: { 
     width: 120, 
     height: 180, 
-    borderRadius: 8, 
-    backgroundColor: '#1A1A1A',
+    borderRadius: 8,
   },
   workTitle: { 
-    color: '#E0E0E0', 
     fontSize: 13, 
     marginTop: 8, 
     textAlign: 'left',
@@ -1512,31 +1491,25 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   addPlaylistBtn: {
-    backgroundColor: '#FFA94D',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    shadowColor: '#FFA94D',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,
   },
   addPlaylistText: {
-    color: '#0F0F0F',
     fontWeight: '700',
     fontSize: 13,
   },
   emptyPlaylistContainer: {
     alignItems: 'center',
     paddingVertical: 32,
-    backgroundColor: '#1A1A1A',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
   },
   placeholderSubtext: {
-    color: '#666',
     fontSize: 13,
     textAlign: 'center',
     marginTop: 8,
@@ -1551,13 +1524,10 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   playlistMain: {
-    backgroundColor: '#1A1A1A',
     borderRadius: 16,
     padding: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2A2A2A',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -1593,7 +1563,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   playlistName: {
-    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
     textAlign: 'center',
@@ -1601,7 +1570,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   playlistPlatform: {
-    color: '#888',
     fontSize: 11,
     textAlign: 'center',
   },
@@ -1612,14 +1580,12 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   lockButton: {
-    backgroundColor: 'rgba(255, 169, 77, 0.2)',
     borderRadius: 18,
     width: 36,
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: '#FFA94D',
   },
   lockIcon: {
     fontSize: 16,
@@ -1638,7 +1604,6 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   themeButtonText: {
-    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
   },

@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { Modal, StatusBar, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { Modal, StatusBar, ActivityIndicator, Platform, Animated, Dimensions } from 'react-native';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import BottomNav from '../components/BottomNav';
 import { getAuth } from 'firebase/auth';
 import { db } from '../../constants/firebaseConfig';
 import { onSnapshot, query, where, collection, orderBy, limit, getDocs, addDoc } from 'firebase/firestore';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useTheme } from '../../contexts/ThemeContext';
 
 type ChatItem = {
   id: string;
@@ -16,7 +18,11 @@ type ChatItem = {
   avatar: string;
   lastMsg: string;
   lastMsgAt: Date;
+  unreadCount?: number;
+  isOnline?: boolean;
 };
+
+const { width } = Dimensions.get('window');
 
 export default function MessengerList() {
   const [chats, setChats] = useState<ChatItem[]>([]);
@@ -24,6 +30,13 @@ export default function MessengerList() {
   const [friends, setFriends] = useState<any[]>([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
   const router = useRouter();
+  const { theme } = useTheme();
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 100],
+    outputRange: [1, 0.85],
+    extrapolate: 'clamp',
+  });
 
   const formatTime = (date: Date) => {
     const now = new Date();
@@ -186,76 +199,262 @@ export default function MessengerList() {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       
-      {/* Header */}
-      <LinearGradient colors={['#1a1a1a', '#0F0F0F']} style={styles.header}>
-        <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.headerTitle}>Messages</Text>
-            <Text style={styles.headerSubtitle}>{chats.length} conversation{chats.length > 1 ? 's' : ''}</Text>
-          </View>
-        </View>
-      </LinearGradient>
+      {/* Header glassmorphism avec blur */}
+      <Animated.View style={{ opacity: headerOpacity }}>
+        <BlurView intensity={95} tint="default" style={styles.headerBlur}>
+          <LinearGradient 
+            colors={[
+              `${theme.colors.primary}15`,
+              `${theme.colors.primary}08`,
+              'transparent'
+            ]} 
+            style={styles.header}
+          >
+            <View style={styles.headerContent}>
+              <View style={styles.headerLeft}>
+                <View style={styles.titleContainer}>
+                  <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Messages</Text>
+                  <View style={[styles.liveDot, { backgroundColor: '#00E676' }]} />
+                </View>
+                <View style={styles.headerBadgeRow}>
+                  <View style={[styles.headerBadge, { 
+                    backgroundColor: theme.colors.primary,
+                    shadowColor: theme.colors.primary,
+                    shadowOpacity: 0.3,
+                    shadowRadius: 8,
+                    shadowOffset: { width: 0, height: 4 },
+                    elevation: 6
+                  }]}>
+                    <Ionicons name="chatbubbles" size={12} color={theme.colors.background} />
+                    <Text style={[styles.headerBadgeText, { color: theme.colors.background }]}>
+                      {chats.length}
+                    </Text>
+                  </View>
+                  <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>
+                    {chats.length === 0 ? 'Aucune conversation' : `${chats.length} conversation${chats.length > 1 ? 's' : ''}`}
+                  </Text>
+                </View>
+              </View>
+              
+              {/* Boutons d'action */}
+              <View style={styles.headerActions}>
+                <TouchableOpacity 
+                  style={[styles.actionButton, { backgroundColor: `${theme.colors.primary}12` }]}
+                  onPress={() => {/* TODO: Recherche */}}
+                  activeOpacity={0.75}
+                >
+                  <Ionicons name="search" size={20} color={theme.colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.actionButton, { backgroundColor: `${theme.colors.primary}12` }]}
+                  onPress={() => {/* TODO: Filtres */}}
+                  activeOpacity={0.75}
+                >
+                  <Ionicons name="options" size={20} color={theme.colors.primary} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </LinearGradient>
+        </BlurView>
+      </Animated.View>
 
-      {/* Liste des conversations */}
-      <FlatList
+      {/* Liste des conversations ultra-moderne */}
+      <Animated.FlatList
         data={chats}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
+        scrollEventThrottle={16}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconCircle}>
-              <MaterialCommunityIcons name="chat-outline" size={60} color="#FFA94D" />
-            </View>
-            <Text style={styles.emptyTitle}>Aucune conversation</Text>
-            <Text style={styles.emptyText}>Commencez à discuter avec vos amis</Text>
-            <TouchableOpacity
-              onPress={() => {
-                setShowFriendsModal(true);
-                loadFriendsForModal();
-              }}
-              style={styles.emptyButton}
-            >
-              <LinearGradient colors={['#FFA94D', '#FF8C42']} style={styles.emptyButtonGradient}>
-                <Ionicons name="add-circle-outline" size={20} color="#181818" style={{ marginRight: 8 }} />
-                <Text style={styles.emptyButtonText}>Nouveau message</Text>
+            <View style={[styles.emptyCard, { backgroundColor: theme.colors.surface }]}>
+              <LinearGradient
+                colors={[
+                  `${theme.colors.primary}25`,
+                  `${theme.colors.primary}15`,
+                  `${theme.colors.primary}05`
+                ]}
+                style={styles.emptyIconCircle}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={[styles.innerCircle, { backgroundColor: `${theme.colors.primary}10` }]}>
+                  <MaterialCommunityIcons name="chat-processing" size={64} color={theme.colors.primary} />
+                </View>
               </LinearGradient>
-            </TouchableOpacity>
+              <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>Commencez une conversation</Text>
+              <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+                Discutez en temps réel avec vos amis{'\n'}Partagez, réagissez et restez connectés
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowFriendsModal(true);
+                  loadFriendsForModal();
+                }}
+                activeOpacity={0.8}
+              >
+                <LinearGradient 
+                  colors={[theme.colors.primary, `${theme.colors.primary}DD`]} 
+                  style={styles.emptyButton}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <Ionicons name="add-circle-outline" size={24} color={theme.colors.background} />
+                  <Text style={[styles.emptyButtonText, { color: theme.colors.background }]}>Nouveau message</Text>
+                  <Ionicons name="arrow-forward" size={20} color={theme.colors.background} style={{ marginLeft: 4 }} />
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           </View>
         }
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.chatItem}
-            onPress={() => router.push({ pathname: `/chat/[chatId]`, params: { chatId: item.id } })}
-          >
-            <Image source={{ uri: item.avatar }} style={styles.avatar} />
-            <View style={styles.chatInfo}>
-              <View style={styles.chatHeader}>
-                <Text style={styles.chatName}>{item.name}</Text>
-                <Text style={styles.chatTime}>{formatTime(item.lastMsgAt)}</Text>
-              </View>
-              <Text style={styles.chatMessage} numberOfLines={1}>{item.lastMsg}</Text>
-            </View>
-          </TouchableOpacity>
-        )}
+        renderItem={({ item, index }) => {
+          const hasUnread = item.unreadCount && item.unreadCount > 0;
+          
+          return (
+            <TouchableOpacity
+                style={[
+                  styles.chatItem,
+                  { backgroundColor: theme.colors.surface },
+                ]}
+                onPress={() => router.push({ pathname: `/chat/[chatId]`, params: { chatId: item.id } })}
+                activeOpacity={0.65}
+              >
+                {/* Accent bar pour messages non lus */}
+                {hasUnread && (
+                  <View style={[styles.unreadBar, { backgroundColor: theme.colors.primary }]} />
+                )}
+                
+                {/* Avatar avec effet de profondeur */}
+                <View style={[
+                  styles.avatarContainer,
+                  hasUnread && { 
+                    shadowColor: theme.colors.primary,
+                    shadowOpacity: 0.3,
+                    shadowRadius: 8,
+                    shadowOffset: { width: 0, height: 4 },
+                  }
+                ]}>
+                  <View style={[
+                    styles.avatarWrapper,
+                    hasUnread && { 
+                      borderColor: theme.colors.primary,
+                      borderWidth: 2.5,
+                    }
+                  ]}>
+                    <Image 
+                      source={{ uri: item.avatar }} 
+                      style={styles.avatar} 
+                    />
+                  </View>
+                  {item.isOnline && (
+                    <LinearGradient
+                      colors={['#00E676', '#00C853']}
+                      style={[styles.onlineIndicator, { borderColor: theme.colors.surface }]}
+                    />
+                  )}
+                </View>
+                
+                <View style={styles.chatInfo}>
+                  <View style={styles.chatHeader}>
+                    <View style={styles.nameContainer}>
+                      <Text 
+                        style={[
+                          styles.chatName, 
+                          { color: theme.colors.text },
+                          hasUnread && { fontWeight: '800' }
+                        ]} 
+                        numberOfLines={1}
+                      >
+                        {item.name}
+                      </Text>
+                      {item.type === 'dm' && (
+                        <View style={[styles.typeBadge, { backgroundColor: `${theme.colors.primary}12` }]}>
+                          <Ionicons name="person" size={10} color={theme.colors.primary} />
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.timeContainer}>
+                      <Text style={[styles.chatTime, { color: hasUnread ? theme.colors.primary : theme.colors.textSecondary }]}>
+                        {formatTime(item.lastMsgAt)}
+                      </Text>
+                      {hasUnread && (
+                        <View style={[styles.newIndicator, { backgroundColor: theme.colors.primary }]} />
+                      )}
+                    </View>
+                  </View>
+                  
+                  <View style={styles.messageRow}>
+                    <View style={styles.messageContent}>
+                      <MaterialCommunityIcons 
+                        name="message-text" 
+                        size={14} 
+                        color={theme.colors.textSecondary} 
+                        style={{ marginRight: 6 }}
+                      />
+                      <Text 
+                        style={[
+                          styles.chatMessage,
+                          { color: hasUnread ? theme.colors.text : theme.colors.textSecondary },
+                          hasUnread && { fontWeight: '600' }
+                        ]} 
+                        numberOfLines={1}
+                      >
+                        {item.lastMsg}
+                      </Text>
+                    </View>
+                    {hasUnread && (
+                      <LinearGradient
+                        colors={[theme.colors.primary, `${theme.colors.primary}DD`]}
+                        style={styles.unreadBadge}
+                      >
+                        <Text style={[styles.unreadText, { color: theme.colors.background }]}>
+                          {item.unreadCount! > 99 ? '99+' : item.unreadCount}
+                        </Text>
+                      </LinearGradient>
+                    )}
+                  </View>
+                </View>
+                
+                <View style={[styles.chevronContainer, { backgroundColor: `${theme.colors.primary}08` }]}>
+                  <Ionicons name="chevron-forward" size={18} color={theme.colors.primary} />
+                </View>
+              </TouchableOpacity>
+          );
+        }}
       />
 
-      {/* Bouton flottant */}
+      {/* FAB ultra-moderne */}
       <TouchableOpacity
         style={styles.fab}
         onPress={() => {
           setShowFriendsModal(true);
           loadFriendsForModal();
         }}
+        activeOpacity={0.8}
       >
-        <LinearGradient colors={['#FFA94D', '#FF8C42']} style={styles.fabGradient}>
-          <Ionicons name="add" size={28} color="#181818" />
+        <LinearGradient 
+          colors={[theme.colors.primary, `${theme.colors.primary}CC`]} 
+          style={styles.fabGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <BlurView intensity={20} tint="light" style={styles.fabBlur}>
+            <View style={styles.fabContent}>
+              <Ionicons name="add" size={28} color={theme.colors.background} style={{ fontWeight: '900' }} />
+              <Text style={[styles.fabText, { color: theme.colors.background }]}>Nouveau</Text>
+            </View>
+          </BlurView>
         </LinearGradient>
       </TouchableOpacity>
 
-      {/* Modal sélection ami */}
+      {/* Modal sélection ami redesigné */}
       <Modal
         visible={showFriendsModal}
         animationType="slide"
@@ -263,50 +462,81 @@ export default function MessengerList() {
         onRequestClose={() => setShowFriendsModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Nouveau message</Text>
-              <TouchableOpacity onPress={() => setShowFriendsModal(false)} style={styles.modalCloseButton}>
-                <Ionicons name="close" size={28} color="#FFA94D" />
-              </TouchableOpacity>
-            </View>
+          <BlurView intensity={20} style={styles.modalBlur}>
+            <View style={[styles.modalContainer, { backgroundColor: theme.colors.surface }]}>
+              {/* Header modal amélioré */}
+              <View style={[styles.modalHeader, { borderBottomColor: theme.colors.background }]}>
+                <View>
+                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Nouveau message</Text>
+                  <Text style={[styles.modalSubtitle, { color: theme.colors.textSecondary }]}>
+                    Sélectionnez un ami
+                  </Text>
+                </View>
+                <TouchableOpacity 
+                  onPress={() => setShowFriendsModal(false)} 
+                  style={[styles.modalCloseButton, { backgroundColor: `${theme.colors.primary}15` }]}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="close" size={24} color={theme.colors.primary} />
+                </TouchableOpacity>
+              </View>
 
-            {loadingFriends ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FFA94D" />
-                <Text style={styles.loadingText}>Chargement...</Text>
-              </View>
-            ) : friends.length === 0 ? (
-              <View style={styles.emptyFriendsContainer}>
-                <MaterialCommunityIcons name="account-search" size={60} color="#666" />
-                <Text style={styles.emptyFriendsText}>Aucun ami trouvé</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={friends}
-                keyExtractor={(item) => item.uid}
-                contentContainerStyle={styles.friendsListContent}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.friendItem}
-                    onPress={() => handleCreateChat(item.uid, item)}
-                  >
-                    <Image
-                      source={{ 
-                        uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.pseudo || 'User')}&background=FFA94D&color=181818&size=128` 
-                      }}
-                      style={styles.friendAvatar}
-                    />
-                    <View style={styles.friendInfo}>
-                      <Text style={styles.friendName}>{item.pseudo || item.displayName || 'Utilisateur'}</Text>
-                      <Text style={styles.friendEmail}>{item.mail || ''}</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color="#FFA94D" />
-                  </TouchableOpacity>
-                )}
-              />
-            )}
-          </View>
+              {loadingFriends ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={theme.colors.primary} />
+                  <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
+                    Chargement de vos amis...
+                  </Text>
+                </View>
+              ) : friends.length === 0 ? (
+                <View style={styles.emptyFriendsContainer}>
+                  <View style={[styles.emptyFriendsIcon, { backgroundColor: `${theme.colors.primary}15` }]}>
+                    <MaterialCommunityIcons name="account-search" size={60} color={theme.colors.primary} />
+                  </View>
+                  <Text style={[styles.emptyFriendsTitle, { color: theme.colors.text }]}>
+                    Aucun ami trouvé
+                  </Text>
+                  <Text style={[styles.emptyFriendsText, { color: theme.colors.textSecondary }]}>
+                    Ajoutez des amis pour commencer{'\n'}à discuter avec eux
+                  </Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={friends}
+                  keyExtractor={(item) => item.uid}
+                  contentContainerStyle={styles.friendsListContent}
+                  showsVerticalScrollIndicator={false}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[styles.friendItem, { backgroundColor: theme.colors.background }]}
+                      onPress={() => handleCreateChat(item.uid, item)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.friendAvatarContainer}>
+                        <Image
+                          source={{ 
+                            uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.pseudo || 'User')}&background=random&size=128` 
+                          }}
+                          style={[styles.friendAvatar, { borderColor: theme.colors.primary }]}
+                        />
+                      </View>
+                      <View style={styles.friendInfo}>
+                        <Text style={[styles.friendName, { color: theme.colors.text }]} numberOfLines={1}>
+                          {item.pseudo || item.displayName || 'Utilisateur'}
+                        </Text>
+                        <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                          {item.mail || ''}
+                        </Text>
+                      </View>
+                      <View style={[styles.friendAction, { backgroundColor: `${theme.colors.primary}15` }]}>
+                        <Ionicons name="chatbubble" size={18} color={theme.colors.primary} />
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                />
+              )}
+            </View>
+          </BlurView>
         </View>
       </Modal>
 
@@ -318,56 +548,126 @@ export default function MessengerList() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F0F0F',
+  },
+  headerBlur: {
+    overflow: 'hidden',
   },
   header: {
-    paddingTop: 60,
+    paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 0) + 20,
     paddingBottom: 20,
     paddingHorizontal: 24,
   },
   headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  titleContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 10,
   },
   headerTitle: {
-    color: '#fff',
-    fontSize: 32,
+    fontSize: 38,
     fontWeight: '900',
-    letterSpacing: -1,
+    letterSpacing: -1.5,
+    marginRight: 10,
   },
-  headerSubtitle: {
-    color: '#666',
-    fontSize: 14,
-    fontWeight: '600',
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     marginTop: 4,
   },
+  headerBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  headerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    gap: 5,
+  },
+  headerBadgeText: {
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    opacity: 0.7,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  actionButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   listContent: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 100,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 120,
   },
   chatItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
-    borderRadius: 16,
+    borderRadius: 24,
     padding: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+    overflow: 'hidden',
+  },
+  unreadBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    borderTopLeftRadius: 24,
+    borderBottomLeftRadius: 24,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 16,
+  },
+  avatarWrapper: {
+    borderRadius: 30,
+    overflow: 'hidden',
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    marginRight: 14,
-    backgroundColor: '#2a2a2a',
-    borderWidth: 2,
-    borderColor: '#FFA94D',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  onlineIndicator: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 3,
   },
   chatInfo: {
     flex: 1,
+    marginRight: 12,
   },
   chatHeader: {
     flexDirection: 'row',
@@ -375,168 +675,297 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 8,
+  },
   chatName: {
-    color: '#fff',
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  typeBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   chatTime: {
-    color: '#666',
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  newIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  messageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  messageContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   chatMessage: {
-    color: '#999',
-    fontSize: 15,
+    fontSize: 14,
+    flex: 1,
+    lineHeight: 18,
+  },
+  unreadBadge: {
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    marginLeft: 8,
+  },
+  unreadText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  chevronContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   fab: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 110,
     right: 24,
     borderRadius: 30,
-    shadowColor: '#FFA94D',
-    shadowOpacity: 0.5,
-    shadowRadius: 15,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 15,
+    overflow: 'hidden',
   },
   fabGradient: {
-    width: 60,
-    height: 60,
     borderRadius: 30,
-    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  fabBlur: {
+    borderRadius: 30,
+    overflow: 'hidden',
+  },
+  fabContent: {
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    gap: 8,
+  },
+  fabText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 80,
-    paddingHorizontal: 40,
+    paddingVertical: 60,
+    paddingHorizontal: 30,
+  },
+  emptyCard: {
+    width: '100%',
+    borderRadius: 32,
+    padding: 40,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 8,
   },
   emptyIconCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255, 169, 77, 0.1)',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 32,
+  },
+  innerCircle: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyTitle: {
-    color: '#fff',
-    fontSize: 22,
-    fontWeight: '800',
-    marginBottom: 8,
+    fontSize: 26,
+    fontWeight: '900',
+    marginBottom: 12,
+    letterSpacing: -0.8,
+    textAlign: 'center',
   },
   emptyText: {
-    color: '#666',
     fontSize: 15,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 36,
+    lineHeight: 22,
+    opacity: 0.8,
   },
   emptyButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  emptyButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
+    paddingHorizontal: 32,
+    paddingVertical: 18,
+    borderRadius: 20,
+    gap: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 15,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
   },
   emptyButtonText: {
-    color: '#181818',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
+    letterSpacing: 0.5,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalBlur: {
+    flex: 1,
     justifyContent: 'flex-end',
   },
   modalContainer: {
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    maxHeight: '80%',
-    borderTopWidth: 1,
-    borderColor: '#2a2a2a',
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    maxHeight: '90%',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 30,
+    elevation: 20,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 24,
+    paddingHorizontal: 28,
+    paddingTop: 32,
+    paddingBottom: 24,
     borderBottomWidth: 1,
-    borderBottomColor: '#2a2a2a',
   },
   modalTitle: {
-    color: '#fff',
-    fontSize: 24,
+    fontSize: 30,
     fontWeight: '900',
+    letterSpacing: -1,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 6,
+    opacity: 0.7,
   },
   modalCloseButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255, 169, 77, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingContainer: {
-    paddingVertical: 60,
+    paddingVertical: 100,
     alignItems: 'center',
-    gap: 16,
+    gap: 20,
   },
   loadingText: {
-    color: '#666',
     fontSize: 15,
     fontWeight: '600',
   },
   emptyFriendsContainer: {
-    paddingVertical: 60,
+    paddingVertical: 100,
     alignItems: 'center',
-    gap: 16,
+    paddingHorizontal: 40,
+  },
+  emptyFriendsIcon: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  emptyFriendsTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    marginBottom: 10,
+    letterSpacing: -0.5,
   },
   emptyFriendsText: {
-    color: '#666',
-    fontSize: 15,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    opacity: 0.7,
   },
   friendsListContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
   },
   friendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#232323',
-    borderRadius: 16,
+    borderRadius: 22,
     padding: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  friendAvatarContainer: {
+    marginRight: 16,
   },
   friendAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 14,
-    backgroundColor: '#2a2a2a',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     borderWidth: 2,
-    borderColor: '#FFA94D',
   },
   friendInfo: {
     flex: 1,
   },
   friendName: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '800',
     marginBottom: 4,
+    letterSpacing: -0.3,
   },
   friendEmail: {
-    color: '#666',
     fontSize: 13,
+    fontWeight: '500',
+    opacity: 0.7,
+  },
+  friendAction: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
