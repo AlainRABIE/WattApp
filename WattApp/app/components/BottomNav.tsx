@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
 import { collection, query, where, getDocs } from 'firebase/firestore';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const TABS = [
   { id: 'home', label: 'Home', icon: 'home-outline', route: '/home/home' },
@@ -26,6 +27,7 @@ export default function BottomNav() {
   const insets = useSafeAreaInsets(); // Support Dynamic Island
   const isPhone = width < 768;
   const active = segments[segments.length - 1] || '';
+  const { theme } = useTheme();
 
   const handlePress = (route: string) => {
     // Si déjà sur la page, ne rien faire (pour tous les boutons)
@@ -150,6 +152,7 @@ export default function BottomNav() {
                     {isActive ? (
                       <BlurView intensity={60} tint="light" style={[
                         styles.activeBubble,
+                        { backgroundColor: theme.colors.primary },
                         isPhone && styles.activeBubblePhone  // Taille réduite pour téléphone
                       ]}>
                         <View style={[
@@ -163,7 +166,7 @@ export default function BottomNav() {
                             tab.id === 'library' ? 'book-outline' :
                             tab.id === 'short' ? 'flash-outline' :
                             (tab.icon as any)
-                          } size={isPhone ? 22 : 26} color={'#181818'} />
+                          } size={isPhone ? 22 : 26} color={theme.colors.background} />
                         </View>
                       </BlurView>
                     ) : (
@@ -174,7 +177,7 @@ export default function BottomNav() {
                         tab.id === 'library' ? 'book-outline' :
                         tab.id === 'short' ? 'flash-outline' :
                         (tab.icon as any)
-                      } size={isPhone ? 22 : 26} color={'#F5E9DA'} />
+                      } size={isPhone ? 22 : 26} color={theme.colors.textSecondary} />
                     )}
                   </View>
                 </Animated.View>

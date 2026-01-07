@@ -11,7 +11,7 @@ import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemeSelector } from './components/ThemeSelector';
-import { useTheme } from '../hooks/useTheme';
+import { useTheme } from '../contexts/ThemeContext';
 import { OpenSourceBooksService } from '../services/OpenSourceBooksService';
 
 const Profile: React.FC = () => {

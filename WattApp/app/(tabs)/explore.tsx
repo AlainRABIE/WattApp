@@ -5,6 +5,7 @@ import { collection, getDocs, query, limit as queryLimit } from 'firebase/firest
 import app, { db } from '../../constants/firebaseConfig';
 import { useRouter } from 'expo-router';
 import { getAuth } from 'firebase/auth';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const CATEGORIES = [
   'Roman d\'amour', 'Fanfiction', 'Fiction générale', 'Roman pour adolescents', 'Aléatoire',
@@ -20,6 +21,7 @@ export default function ExploreScreen() {
   const [category, setCategory] = useState(CATEGORIES[0]);
   const router = useRouter();
   const debounceRef = useRef<number | null>(null);
+  const { theme } = useTheme();
 
   useEffect(() => {
     (async () => {
@@ -63,24 +65,24 @@ export default function ExploreScreen() {
 
   const renderBook = ({ item, index }: { item: any, index: number }) => (
     <TouchableOpacity
-      style={styles.bookCard}
+      style={[styles.bookCard, { backgroundColor: theme.colors.surface }]}
       onPress={() => router.push(`/book/${item.id}`)}
       activeOpacity={0.85}
     >
-      <View style={styles.bookRank}><Text style={styles.bookRankText}>{index + 1}</Text></View>
+      <View style={[styles.bookRank, { backgroundColor: theme.colors.primary }]}><Text style={[styles.bookRankText, { color: theme.colors.background }]}>{index + 1}</Text></View>
       <Image source={{ uri: item.coverImageUrl || item.couverture || item.coverImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.titre || item.title || 'Livre')}&background=23232a&color=FFA94D&size=128` }} style={styles.bookCover} />
       <View style={styles.bookInfo}>
-        <Text style={styles.bookTitle} numberOfLines={1}>{item.titre || item.title || 'Sans titre'}</Text>
-        <Text style={styles.bookAuthor} numberOfLines={1}>{item.auteur || item.author || 'Auteur inconnu'}</Text>
+        <Text style={[styles.bookTitle, { color: theme.colors.text }]} numberOfLines={1}>{item.titre || item.title || 'Sans titre'}</Text>
+        <Text style={[styles.bookAuthor, { color: theme.colors.textSecondary }]} numberOfLines={1}>{item.auteur || item.author || 'Auteur inconnu'}</Text>
         <View style={styles.bookStatsRow}>
-          <Text style={styles.bookStat}><Feather name="eye" size={14} color="#aaa" /> {item.views || '—'}</Text>
-          <Text style={styles.bookStat}><Feather name="list" size={14} color="#aaa" /> {item.chapters || item.nbChapitres || '—'}</Text>
+          <Text style={[styles.bookStat, { color: theme.colors.textSecondary }]}><Feather name="eye" size={14} color={theme.colors.textSecondary} /> {item.views || '—'}</Text>
+          <Text style={[styles.bookStat, { color: theme.colors.textSecondary }]}><Feather name="list" size={14} color={theme.colors.textSecondary} /> {item.chapters || item.nbChapitres || '—'}</Text>
         </View>
         <View style={styles.bookTagsRow}>
           {(item.tags || []).slice(0, 3).map((tag: string, i: number) => (
-            <View key={i} style={styles.bookTag}><Text style={styles.bookTagText}>{tag}</Text></View>
+            <View key={i} style={[styles.bookTag, { backgroundColor: theme.colors.primary }]}><Text style={[styles.bookTagText, { color: theme.colors.background }]}>{tag}</Text></View>
           ))}
-          {(item.tags || []).length > 3 && <View style={styles.bookTag}><Text style={styles.bookTagText}>+ autres</Text></View>}
+          {(item.tags || []).length > 3 && <View style={[styles.bookTag, { backgroundColor: theme.colors.primary }]}><Text style={[styles.bookTagText, { color: theme.colors.background }]}>+ autres</Text></View>}
         </View>
       </View>
     </TouchableOpacity>
@@ -247,32 +249,32 @@ const styles = StyleSheet.create({
 });
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       {/* Barre de recherche + onglets (une seule fois) */}
       <View style={{marginBottom: 0}}>
-        <View style={styles.topBar}>
-          <Ionicons name="chevron-back" size={24} color="#fff" style={{ marginRight: 8, opacity: 0 }} />
+        <View style={[styles.topBar, { backgroundColor: theme.colors.background }]}>
+          <Ionicons name="chevron-back" size={24} color={theme.colors.text} style={{ marginRight: 8, opacity: 0 }} />
           <TextInput
             value={q}
             onChangeText={setQ}
             placeholder="Rechercher des histoires/personnes"
-            placeholderTextColor="#888"
-            style={styles.searchBar}
+            placeholderTextColor={theme.colors.textSecondary}
+            style={[styles.searchBar, { backgroundColor: theme.colors.surface, color: theme.colors.text }]}
             returnKeyType="search"
             onSubmitEditing={Keyboard.dismiss}
           />
-          <TouchableOpacity style={styles.filterBtn}>
-            <Feather name="filter" size={20} color="#fff" />
+          <TouchableOpacity style={[styles.filterBtn, { backgroundColor: theme.colors.surface }]}>
+            <Feather name="filter" size={20} color={theme.colors.text} />
           </TouchableOpacity>
         </View>
         {/* Onglets catégories */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.tabsRow, {marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0}]} contentContainerStyle={{ paddingHorizontal: 8, marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.tabsRow, { backgroundColor: theme.colors.background, borderBottomColor: theme.colors.surface, marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0}]} contentContainerStyle={{ paddingHorizontal: 8, marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}>
           {CATEGORIES.map(cat => (
             <TouchableOpacity
               key={cat}
-              style={[styles.tabBtn, category === cat && styles.tabBtnActive]}
+              style={[styles.tabBtn, category === cat && { backgroundColor: theme.colors.surface }]}
               onPress={() => setCategory(cat)}>
-              <Text style={[styles.tabBtnText, category === cat && styles.tabBtnTextActive]}>{cat}</Text>
+              <Text style={[styles.tabBtnText, { color: category === cat ? theme.colors.primary : theme.colors.textSecondary }]}>{cat}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -280,10 +282,10 @@ const styles = StyleSheet.create({
       {/* Résultats */}
       <View style={{ flex: 1 }}>
         {loading ? (
-          <ActivityIndicator color="#FFA94D" style={{ marginTop: 32 }} size="large" />
+          <ActivityIndicator color={theme.colors.primary} style={{ marginTop: 32 }} size="large" />
         ) : filteredBooks.length === 0 ? (
           <View style={styles.noResultContainer}>
-            <Text style={styles.noResult}>Aucun résultat trouvé.</Text>
+            <Text style={[styles.noResult, { color: theme.colors.textSecondary }]}>Aucun résultat trouvé.</Text>
           </View>
         ) : (
           <FlatList

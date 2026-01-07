@@ -1,5 +1,3 @@
-
-
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, StatusBar, ScrollView, Image, useWindowDimensions, Platform, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,10 +7,12 @@ import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import ProfileMigrationService from '../../services/ProfileMigrationService';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const Home: React.FC = () => {
 	const router = useRouter();
 	const insets = useSafeAreaInsets(); // Support Dynamic Island
+	const { theme } = useTheme();
 	// helper to open explore
 	const openExplore = () => (router as any).push('/explore');
 
@@ -137,7 +137,7 @@ const Home: React.FC = () => {
 	}, []);
 
 	return (
-		<View style={{ flex: 1, backgroundColor: '#181818' }}>
+		<View style={{ flex: 1, backgroundColor: theme.colors.background }}>
 			<StatusBar barStyle="light-content" />
 			
 			{/* Barre de navigation fixe en haut - RESTE TOUJOURS VISIBLE */}
@@ -147,7 +147,7 @@ const Home: React.FC = () => {
 				left: 0,
 				right: 0,
 				height: Platform.OS === 'ios' ? 100 : 80,
-				backgroundColor: '#181818',
+				backgroundColor: theme.colors.background,
 				zIndex: 999,
 				borderBottomWidth: 1,
 				borderBottomColor: '#2a2a2a',
@@ -176,13 +176,13 @@ const Home: React.FC = () => {
 						elevation: 5
 					}}
 				>
-					<Ionicons name="people" size={28} color="#FFA94D" />
+					<Ionicons name="people" size={28} color={theme.colors.primary} />
 				</TouchableOpacity>
 
 				{/* Logo central WattApp */}
 				<View style={{ alignItems: 'center' }}>
 					<Text style={{
-						color: '#FFA94D',
+						color: theme.colors.primary,
 						fontSize: 24,
 						fontWeight: 'bold',
 						letterSpacing: 1,
@@ -201,22 +201,22 @@ const Home: React.FC = () => {
 						onPress={() => router.push('/wallet')}
 						activeOpacity={0.8}
 						style={{
-							backgroundColor: '#232323',
+							backgroundColor: theme.colors.surface,
 							borderRadius: 20,
 							paddingHorizontal: 12,
 							paddingVertical: 6,
 							flexDirection: 'row',
 							alignItems: 'center',
 							borderWidth: 1,
-							borderColor: '#FFA94D',
+							borderColor: theme.colors.primary,
 							shadowColor: '#000',
 							shadowOpacity: 0.3,
 							shadowRadius: 4,
 							elevation: 5
 						}}
 					>
-						<Ionicons name="wallet-outline" size={18} color="#FFA94D" />
-						<Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 13, marginLeft: 4 }}>
+						<Ionicons name="wallet-outline" size={18} color={theme.colors.primary} />
+						<Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 13, marginLeft: 4 }}>
 							{String(walletBalance.toFixed(2))}€
 						</Text>
 					</TouchableOpacity>
@@ -230,8 +230,8 @@ const Home: React.FC = () => {
 								height: 40, 
 								borderRadius: 20, 
 								borderWidth: 2, 
-								borderColor: '#FFA94D', 
-								backgroundColor: '#232323'
+								borderColor: theme.colors.primary, 
+								backgroundColor: theme.colors.surface
 							}}
 							resizeMode="cover"
 						/>
@@ -249,7 +249,7 @@ const Home: React.FC = () => {
 				showsVerticalScrollIndicator={false}
 			>
 				{/* Carrousel principal */}
-				<Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 20, marginTop: 28, marginLeft: 18, marginBottom: 8 }}>À la une</Text>
+				<Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 20, marginTop: 28, marginLeft: 18, marginBottom: 8 }}>À la une</Text>
 				<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 18, paddingRight: 18 }}>
 					{(() => {
 						if (loadingBooks) return <Text style={styles.placeholder}>Chargement...</Text>;
@@ -288,7 +288,7 @@ const Home: React.FC = () => {
 												<View
 													key={tagIndex}
 													style={{
-														backgroundColor: '#FFA94D',
+														backgroundColor: theme.colors.primary,
 														borderRadius: 8,
 														paddingHorizontal: 6,
 														paddingVertical: 2,
@@ -296,7 +296,7 @@ const Home: React.FC = () => {
 														marginBottom: 2,
 													}}
 												>
-													<Text style={{ color: '#181818', fontSize: 10, fontWeight: 'bold' }}>
+													<Text style={{ color: theme.colors.background, fontSize: 10, fontWeight: 'bold' }}>
 														{tag}
 													</Text>
 												</View>
@@ -310,7 +310,7 @@ const Home: React.FC = () => {
 									)}
 									{/* Prix */}
 									<View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-										<Text style={{ color: '#FFA94D', fontSize: 14, fontWeight: 'bold' }}>
+												<Text style={{ color: theme.colors.primary, fontSize: 14, fontWeight: 'bold' }}>
 											{livre.price && livre.price > 0 ? `${String(livre.price.toFixed(2))}€` : 'Gratuit'}
 										</Text>
 										<Text style={{ color: '#888', fontSize: 12, marginLeft: 8 }}>👁️ {String(livre.reads || 0)}</Text>
@@ -322,7 +322,7 @@ const Home: React.FC = () => {
 				</ScrollView>
 
 				{/* Section Explorer */}
-				<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 18, marginTop: 28, marginLeft: 18, marginBottom: 8 }}>Explorer</Text>
+				<Text style={{ color: theme.colors.text, fontWeight: 'bold', fontSize: 18, marginTop: 28, marginLeft: 18, marginBottom: 8 }}>Explorer</Text>
 				<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 18, paddingRight: 18 }}>
 					{(() => {
 						if (loadingBooks) return <Text style={styles.placeholder}>Chargement...</Text>;
@@ -344,12 +344,12 @@ const Home: React.FC = () => {
 								>
 									<Image
 										source={{ uri: livre.coverImageUrl || livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
-										style={{ width: 80, height: 120, borderRadius: 8, backgroundColor: '#232323' }}
+										style={{ width: 80, height: 120, borderRadius: 8, backgroundColor: theme.colors.surface }}
 										resizeMode="cover"
 									/>
-									<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13, marginTop: 6 }} numberOfLines={2}>{livre.title || 'Titre inconnu'}</Text>
+									<Text style={{ color: theme.colors.text, fontWeight: 'bold', fontSize: 13, marginTop: 6 }} numberOfLines={2}>{livre.title || 'Titre inconnu'}</Text>
 									{/* Auteur et Prix */}
-									<Text style={{ color: '#888', fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+									<Text style={{ color: theme.colors.textSecondary, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
 										par {livre.author || livre.auteur || 'Auteur inconnu'}
 									</Text>
 									{/* Tags */}
@@ -357,25 +357,25 @@ const Home: React.FC = () => {
 										<View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 3 }}>
 											<View
 												style={{
-													backgroundColor: '#FFA94D',
+													backgroundColor: theme.colors.primary,
 													borderRadius: 6,
 													paddingHorizontal: 4,
 													paddingVertical: 1,
 													marginRight: 3,
 												}}
 											>
-												<Text style={{ color: '#181818', fontSize: 9, fontWeight: 'bold' }}>
+												<Text style={{ color: theme.colors.background, fontSize: 9, fontWeight: 'bold' }}>
 													{livre.tags[0]}
 												</Text>
 											</View>
 											{livre.tags.length > 1 && (
-												<Text style={{ color: '#888', fontSize: 9, marginTop: 1 }}>
+												<Text style={{ color: theme.colors.textSecondary, fontSize: 9, marginTop: 1 }}>
 													+{livre.tags.length - 1}
 												</Text>
 											)}
 										</View>
 									)}
-									<Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>
+									<Text style={{ color: theme.colors.primary, fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>
 										{livre.price && livre.price > 0 ? `${String(livre.price.toFixed(2))}€` : 'Gratuit'}
 									</Text>
 								</TouchableOpacity>
@@ -385,7 +385,7 @@ const Home: React.FC = () => {
 				</ScrollView>
 
 				{/* Section Vos auteurs suivis */}
-				<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 18, marginTop: 28, marginLeft: 18, marginBottom: 8 }}>Vos auteurs suivis</Text>
+			<Text style={{ color: theme.colors.text, fontWeight: 'bold', fontSize: 18, marginTop: 28, marginLeft: 18, marginBottom: 8 }}>Vos auteurs suivis</Text>
 				<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 18, paddingRight: 18 }}>
 					{(() => {
 						if (loadingBooks) return <Text style={styles.placeholder}>Chargement...</Text>;
@@ -407,12 +407,12 @@ const Home: React.FC = () => {
 								>
 									<Image
 										source={{ uri: livre.coverImageUrl || livre.coverImage || 'https://ui-avatars.com/api/?name=Livre&background=FFA94D&color=181818&size=128' }}
-										style={{ width: 80, height: 120, borderRadius: 8, backgroundColor: '#232323' }}
+									style={{ width: 80, height: 120, borderRadius: 8, backgroundColor: theme.colors.surface }}
 										resizeMode="cover"
 									/>
-									<Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13, marginTop: 6 }} numberOfLines={2}>{livre.title || 'Titre inconnu'}</Text>
+								<Text style={{ color: theme.colors.text, fontWeight: 'bold', fontSize: 13, marginTop: 6 }} numberOfLines={2}>{livre.title || 'Titre inconnu'}</Text>
 									{/* Auteur et Prix */}
-									<Text style={{ color: '#888', fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+								<Text style={{ color: theme.colors.textSecondary, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
 										par {livre.author || livre.auteur || 'Auteur inconnu'}
 									</Text>
 									{/* Tags */}
@@ -420,25 +420,25 @@ const Home: React.FC = () => {
 										<View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 3 }}>
 											<View
 												style={{
-													backgroundColor: '#FFA94D',
+												backgroundColor: theme.colors.primary,
 													borderRadius: 6,
 													paddingHorizontal: 4,
 													paddingVertical: 1,
 													marginRight: 3,
 												}}
 											>
-												<Text style={{ color: '#181818', fontSize: 9, fontWeight: 'bold' }}>
+											<Text style={{ color: theme.colors.background, fontSize: 9, fontWeight: 'bold' }}>
 													{livre.tags[0]}
 												</Text>
 											</View>
 											{livre.tags.length > 1 && (
-												<Text style={{ color: '#888', fontSize: 9, marginTop: 1 }}>
+											<Text style={{ color: theme.colors.textSecondary, fontSize: 9, marginTop: 1 }}>
 													+{livre.tags.length - 1}
 												</Text>
 											)}
 										</View>
 									)}
-									<Text style={{ color: '#FFA94D', fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>
+								<Text style={{ color: theme.colors.primary, fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>
 										{livre.price && livre.price > 0 ? `${String(livre.price.toFixed(2))}€` : 'Gratuit'}
 									</Text>
 								</TouchableOpacity>
@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
 		height: 50,
 		borderRadius: 25,
 		borderWidth: 2,
-		borderColor: '#FFA94D',
+		borderColor: 'rgba(255, 169, 77, 0.8)', // Sera remplacé dynamiquement
 		backgroundColor: '#181818',
 	},
 	livreCardHorizontal: {
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 	livreTitre: {
-		color: '#FFA94D',
+		color: 'rgba(255, 169, 77, 0.9)', // Sera remplacé dynamiquement par theme.colors.primary
 		fontSize: 18,
 		fontWeight: 'bold',
 		marginBottom: 4,
@@ -539,7 +539,7 @@ const styles = StyleSheet.create({
 		paddingTop: 120, // leave more space for fixed avatar/header overlay
 	},
 	button: {
-		backgroundColor: '#FFA94D',
+		backgroundColor: 'rgba(255, 169, 77, 0.9)', // Sera remplacé dynamiquement
 		paddingVertical: 18,
 		borderRadius: 10,
 		width: '90%',
@@ -560,10 +560,10 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		marginBottom: 18,
 		borderWidth: 2,
-		borderColor: '#FFA94D',
+		borderColor: 'rgba(255, 169, 77, 0.9)', // Sera remplacé dynamiquement
 	},
 	buttonTextSecondary: {
-		color: '#FFA94D',
+		color: 'rgba(255, 169, 77, 0.9)', // Sera remplacé dynamiquement
 		fontSize: 20,
 		fontWeight: 'bold',
 	},
@@ -576,14 +576,14 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	infoText: {
-		color: '#FFA94D',
+		color: 'rgba(255, 169, 77, 0.9)', // Sera remplacé dynamiquement
 		fontSize: 16,
 		marginBottom: 8,
 	},
 	sectionTitle: {
 		fontSize: 22,
 		fontWeight: 'bold',
-		color: '#FFA94D',
+		color: 'rgba(255, 169, 77, 0.9)', // Sera remplacé dynamiquement
 		marginTop: 18,
 		marginBottom: 8,
 		alignSelf: 'flex-start',
@@ -634,7 +634,7 @@ const styles = StyleSheet.create({
 		height: 44,
 		borderRadius: 22,
 		borderWidth: 2,
-		borderColor: '#FFA94D',
+		borderColor: 'rgba(255, 169, 77, 0.9)', // Sera remplacé dynamiquement
 		backgroundColor: '#181818',
 	},
 });

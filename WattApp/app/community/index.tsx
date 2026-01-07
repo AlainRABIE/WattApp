@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const CATEGORIES = [
   { name: "Roman d'amour", icon: "heart-circle", emoji: "💕", color: ["#FF6B9D", "#FFA94D"] as const, description: "Histoires romantiques" },
@@ -36,6 +37,7 @@ export default function CommunityIndex() {
   const router = useRouter();
   const scrollY = React.useRef(new Animated.Value(0)).current;
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const { theme } = useTheme();
 
   // Animation d'entrée
   React.useEffect(() => {
@@ -116,12 +118,12 @@ export default function CommunityIndex() {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle="light-content" />
       
       {/* Background gradient animé */}
       <LinearGradient
-        colors={['#0F0F0F', '#181818', '#1a1a1a']}
+        colors={[theme.colors.background, theme.colors.surface, theme.colors.surface]}
         style={StyleSheet.absoluteFillObject}
       />
       
@@ -138,36 +140,36 @@ export default function CommunityIndex() {
         {/* Header Hero Section */}
         <Animated.View style={[styles.heroContainer, { opacity: fadeAnim }]}>
           <LinearGradient
-            colors={['rgba(255, 169, 77, 0.15)', 'transparent']}
+            colors={[`${theme.colors.primary}26`, 'transparent']}
             style={styles.heroGradient}
           >
             <View style={styles.heroContent}>
               <View style={styles.heroIconContainer}>
                 <LinearGradient
-                  colors={['#FFA94D', '#FF8C42']}
+                  colors={[theme.colors.primary, theme.colors.secondary]}
                   style={styles.heroIconGradient}
                 >
-                  <MaterialCommunityIcons name="account-group" size={32} color="#181818" />
+                  <MaterialCommunityIcons name="account-group" size={32} color={theme.colors.background} />
                 </LinearGradient>
               </View>
-              <Text style={styles.heroTitle}>Communauté</Text>
-              <Text style={styles.heroSubtitle}>Connectez-vous avec des passionnés d'écriture</Text>
+              <Text style={[styles.heroTitle, { color: theme.colors.text }]}>Communauté</Text>
+              <Text style={[styles.heroSubtitle, { color: theme.colors.textSecondary }]}>Connectez-vous avec des passionnés d'écriture</Text>
               
               {/* Stats Row */}
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>{popularGroups.length > 0 ? popularGroups.reduce((sum, g) => sum + g.memberCount, 0) : '0'}</Text>
-                  <Text style={styles.statLabel}>Membres</Text>
+                  <Text style={[styles.statNumber, { color: theme.colors.primary }]}>{popularGroups.length > 0 ? popularGroups.reduce((sum, g) => sum + g.memberCount, 0) : '0'}</Text>
+                  <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Membres</Text>
                 </View>
-                <View style={styles.statDivider} />
+                <View style={[styles.statDivider, { backgroundColor: `${theme.colors.primary}33` }]} />
                 <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>{CATEGORIES.length}</Text>
-                  <Text style={styles.statLabel}>Catégories</Text>
+                  <Text style={[styles.statNumber, { color: theme.colors.primary }]}>{CATEGORIES.length}</Text>
+                  <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Catégories</Text>
                 </View>
-                <View style={styles.statDivider} />
+                <View style={[styles.statDivider, { backgroundColor: `${theme.colors.primary}33` }]} />
                 <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>{myGroups.length}</Text>
-                  <Text style={styles.statLabel}>Mes Groupes</Text>
+                  <Text style={[styles.statNumber, { color: theme.colors.primary }]}>{myGroups.length}</Text>
+                  <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Mes Groupes</Text>
                 </View>
               </View>
             </View>
@@ -178,21 +180,17 @@ export default function CommunityIndex() {
         <Animated.View style={[styles.sectionContainer, { opacity: fadeAnim }]}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
-              <View style={styles.sectionIconContainer}>
-                <Ionicons name="flame" size={20} color="#FFA94D" />
+              <View style={[styles.sectionIconContainer, { backgroundColor: `${theme.colors.primary}26` }]}>
+                <Ionicons name="flame" size={20} color={theme.colors.primary} />
               </View>
-              <Text style={styles.sectionTitle}>Groupes Populaires</Text>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Groupes Populaires</Text>
             </View>
-            <TouchableOpacity onPress={() => router.push('/community/my-groups')} style={styles.seeAllBtn}>
-              <Text style={styles.seeAllText}>Tout voir</Text>
-              <Ionicons name="chevron-forward" size={16} color="#FFA94D" />
-            </TouchableOpacity>
           </View>
           
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#FFA94D" />
-              <Text style={styles.loadingText}>Chargement...</Text>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Chargement...</Text>
             </View>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
@@ -200,7 +198,7 @@ export default function CommunityIndex() {
                 popularGroups.map((group, idx) => (
                   <TouchableOpacity
                     key={idx}
-                    style={styles.popularCard}
+                    style={[styles.popularCard, { backgroundColor: theme.colors.surface, borderColor: `${theme.colors.primary}26` }]}
                     activeOpacity={0.85}
                     onPress={() => router.push({ pathname: `/community/[category]`, params: { category: group.name } })}
                   >
@@ -214,9 +212,9 @@ export default function CommunityIndex() {
                     >
                       <BlurView intensity={10} tint="dark" style={styles.popularCardBlur}>
                         <View style={styles.popularCardContent}>
-                          <Text style={styles.popularCardTitle} numberOfLines={2}>{group.name}</Text>
+                          <Text style={[styles.popularCardTitle, { color: theme.colors.text }]} numberOfLines={2}>{group.name}</Text>
                           <View style={styles.membersBadge}>
-                            <MaterialCommunityIcons name="account-multiple" size={14} color="#FFA94D" />
+                            <MaterialCommunityIcons name="account-multiple" size={14} color={theme.colors.primary} />
                             <Text style={styles.membersText}>{group.members}</Text>
                           </View>
                         </View>
@@ -242,10 +240,10 @@ export default function CommunityIndex() {
           <Animated.View style={[styles.sectionContainer, { opacity: fadeAnim }]}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleRow}>
-                <View style={styles.sectionIconContainer}>
-                  <MaterialCommunityIcons name="account-group" size={20} color="#FFA94D" />
+                <View style={[styles.sectionIconContainer, { backgroundColor: `${theme.colors.primary}26` }]}>
+                  <MaterialCommunityIcons name="account-group" size={20} color={theme.colors.primary} />
                 </View>
-                <Text style={styles.sectionTitle}>Mes Groupes</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Mes Groupes</Text>
               </View>
             </View>
             
@@ -259,14 +257,14 @@ export default function CommunityIndex() {
                 >
                   <BlurView intensity={20} tint="dark" style={styles.myGroupBlur}>
                     <LinearGradient
-                      colors={['rgba(255, 169, 77, 0.15)', 'rgba(255, 140, 66, 0.05)']}
+                      colors={[`${theme.colors.primary}26`, `${theme.colors.secondary}0D`]}
                       style={styles.myGroupGradient}
                     >
                       <View style={styles.myGroupIcon}>
-                        <MaterialCommunityIcons name="library" size={28} color="#FFA94D" />
+                        <MaterialCommunityIcons name="library" size={28} color={theme.colors.primary} />
                       </View>
-                      <Text style={styles.myGroupTitle} numberOfLines={2}>{item.groupId}</Text>
-                      <Ionicons name="chevron-forward" size={16} color="#FFA94D" style={styles.myGroupArrow} />
+                      <Text style={[styles.myGroupTitle, { color: theme.colors.text }]} numberOfLines={2}>{item.groupId}</Text>
+                      <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} style={styles.myGroupArrow} />
                     </LinearGradient>
                   </BlurView>
                 </TouchableOpacity>
@@ -279,10 +277,10 @@ export default function CommunityIndex() {
         <Animated.View style={[styles.sectionContainer, { opacity: fadeAnim }]}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
-              <View style={styles.sectionIconContainer}>
-                <MaterialCommunityIcons name="view-grid" size={20} color="#FFA94D" />
+              <View style={[styles.sectionIconContainer, { backgroundColor: `${theme.colors.primary}26` }]}>
+                <MaterialCommunityIcons name="view-grid" size={20} color={theme.colors.primary} />
               </View>
-              <Text style={styles.sectionTitle}>Explorer</Text>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Explorer</Text>
             </View>
           </View>
           

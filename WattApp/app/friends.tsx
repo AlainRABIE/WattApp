@@ -5,9 +5,11 @@ import { collection, getDocs, query as firestoreQuery, where, deleteDoc } from '
 import { addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { useRouter } from 'expo-router';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function FriendsScreen() {
   const router = useRouter();
+  const { theme } = useTheme();
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any[]>([]);
@@ -262,11 +264,11 @@ export default function FriendsScreen() {
           const isPending = !!(pendingOutgoing && toUid && pendingOutgoing[toUid]);
           return (
             <TouchableOpacity
-              style={[styles.addButton, isPending ? { backgroundColor: '#ccc' } : {}]}
+              style={[styles.addButton, { backgroundColor: isPending ? theme.colors.surface : theme.colors.primary }]}
               onPress={() => { if (!isPending) sendFriendRequest(item); }}
               disabled={isPending}
             >
-              <Text style={{ color: isPending ? '#666' : '#181818', fontWeight: '700' }}>{isPending ? 'En attente' : 'Ajouter'}</Text>
+              <Text style={{ color: isPending ? theme.colors.textSecondary : theme.colors.background, fontWeight: '700' }}>{isPending ? 'En attente' : 'Ajouter'}</Text>
             </TouchableOpacity>
           );
         })()
@@ -296,24 +298,24 @@ export default function FriendsScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header moderne */}
-      <View style={styles.headerBar}>
-        <Text style={styles.headerTitle}>Amis</Text>
+      <View style={[styles.headerBar, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.surface }]}>
+        <Text style={[styles.headerTitle, { color: theme.colors.primary }]}>Amis</Text>
       </View>
       {/* Onglets modernes */}
-      <View style={styles.tabsRow}>
-        <TouchableOpacity onPress={() => { setView('search'); loadPendingOutgoing(); }} style={[styles.tabBtn, view === 'search' && styles.tabBtnActive]}>
-          <Text style={[styles.tabBtnText, view === 'search' && styles.tabBtnTextActive]}>Rechercher</Text>
+      <View style={[styles.tabsRow, { backgroundColor: theme.colors.background, borderBottomColor: theme.colors.surface }]}>
+        <TouchableOpacity onPress={() => { setView('search'); loadPendingOutgoing(); }} style={[styles.tabBtn, { backgroundColor: view === 'search' ? theme.colors.surface : 'transparent' }]}>
+          <Text style={[styles.tabBtnText, { color: view === 'search' ? theme.colors.primary : theme.colors.textSecondary }]}>Rechercher</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => { setView('friends'); loadFriends(); }} style={[styles.tabBtn, view === 'friends' && styles.tabBtnActive]}>
-          <Text style={[styles.tabBtnText, view === 'friends' && styles.tabBtnTextActive]}>Mes amis</Text>
+        <TouchableOpacity onPress={() => { setView('friends'); loadFriends(); }} style={[styles.tabBtn, { backgroundColor: view === 'friends' ? theme.colors.surface : 'transparent' }]}>
+          <Text style={[styles.tabBtnText, { color: view === 'friends' ? theme.colors.primary : theme.colors.textSecondary }]}>Mes amis</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => { setView('incoming'); loadIncomingRequests(); }} style={[styles.tabBtn, view === 'incoming' && styles.tabBtnActive]}> 
+        <TouchableOpacity onPress={() => { setView('incoming'); loadIncomingRequests(); }} style={[styles.tabBtn, { backgroundColor: view === 'incoming' ? theme.colors.surface : 'transparent' }]}> 
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={[styles.tabBtnText, view === 'incoming' && styles.tabBtnTextActive]}>Demandes</Text>
+            <Text style={[styles.tabBtnText, { color: view === 'incoming' ? theme.colors.primary : theme.colors.textSecondary }]}>Demandes</Text>
             {incomingCount > 0 ? (
-              <View style={styles.badge}><Text style={styles.badgeText}>{incomingCount}</Text></View>
+              <View style={[styles.badge, { backgroundColor: theme.colors.primary }]}><Text style={[styles.badgeText, { color: theme.colors.background }]}>{incomingCount}</Text></View>
             ) : null}
           </View>
         </TouchableOpacity>
@@ -322,14 +324,14 @@ export default function FriendsScreen() {
       {/* Contenu selon l'onglet */}
       {view === 'search' ? (
         <>
-          <TextInput value={q} onChangeText={setQ} placeholder="Rechercher par pseudo ou email" placeholderTextColor="#888" style={styles.inputModern} />
-          {loading ? <ActivityIndicator color="#FFA94D" style={{ marginTop: 12 }} /> : null}
+          <TextInput value={q} onChangeText={setQ} placeholder="Rechercher par pseudo ou email" placeholderTextColor={theme.colors.textSecondary} style={[styles.inputModern, { backgroundColor: theme.colors.surface, color: theme.colors.text }]} />
+          {loading ? <ActivityIndicator color={theme.colors.primary} style={{ marginTop: 12 }} /> : null}
           <FlatList data={results} keyExtractor={(i) => i.id} renderItem={renderItem} style={{ width: '100%', marginTop: 12 }} />
           {(!q || results.length === 0) && !loading ? <Text style={styles.subtitle}>Ta liste d'amis apparaîtra ici.</Text> : null}
         </>
       ) : view === 'friends' ? (
         <>
-          {friendsList.length === 0 ? <Text style={{ color: '#fff', marginTop: 12 }}>Tu n'as pas encore d'amis.</Text> : (
+          {friendsList.length === 0 ? <Text style={{ color: theme.colors.text, marginTop: 12 }}>Tu n'as pas encore d'amis.</Text> : (
             <FlatList
               data={friendsList}
               keyExtractor={(i) => i.id}
@@ -360,7 +362,7 @@ export default function FriendsScreen() {
         </>
       ) : (
         <>
-          {incoming.length === 0 ? <Text style={{ color: '#fff', marginTop: 12 }}>Aucune demande entrante.</Text> : (
+          {incoming.length === 0 ? <Text style={{ color: theme.colors.text, marginTop: 12 }}>Aucune demande entrante.</Text> : (
             <FlatList data={incoming} keyExtractor={(i) => i.id} renderItem={renderIncoming} style={{ width: '100%', marginTop: 12 }} />
           )}
         </>
@@ -370,19 +372,16 @@ export default function FriendsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#181818', paddingHorizontal: 0, paddingTop: 0 },
+  container: { flex: 1, paddingHorizontal: 0, paddingTop: 0 },
   headerBar: {
-    backgroundColor: '#23232a',
     paddingTop: 48,
     paddingBottom: 18,
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#23232a',
     marginBottom: 0,
     zIndex: 10,
   },
   headerTitle: {
-    color: '#FFA94D',
     fontSize: 28,
     fontWeight: 'bold',
     letterSpacing: 0.5,
@@ -391,11 +390,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#181818',
     paddingVertical: 10,
     marginBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#23232a',
   },
   tabBtn: {
     paddingHorizontal: 18,
@@ -405,19 +402,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   tabBtnActive: {
-    backgroundColor: '#23232a',
   },
   tabBtnText: {
-    color: '#aaa',
     fontSize: 15,
     fontWeight: '500',
   },
   tabBtnTextActive: {
-    color: '#FFA94D',
     fontWeight: 'bold',
   },
   badge: {
-    backgroundColor: '#ff6b6b',
     minWidth: 20,
     height: 20,
     borderRadius: 10,
@@ -427,31 +420,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   badgeText: {
-    color: '#fff',
     fontSize: 12,
     fontWeight: '700',
   },
   inputModern: {
-    backgroundColor: '#23232a',
-    color: '#fff',
     padding: 14,
     borderRadius: 14,
     marginTop: 16,
     marginHorizontal: 18,
     fontSize: 16,
   },
-  subtitle: { color: '#fff', marginTop: 12, textAlign: 'center' },
+  subtitle: { marginTop: 12, textAlign: 'center' },
   // Liste recherche
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#23232a', marginHorizontal: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, marginHorizontal: 10 },
   avatar: { width: 48, height: 48, borderRadius: 24, marginRight: 14, backgroundColor: '#333' },
-  name: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  email: { color: '#aaa', fontSize: 13, marginTop: 2 },
-  addButton: { backgroundColor: '#FFA94D', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, marginLeft: 8 },
+  name: { fontSize: 16, fontWeight: '600' },
+  email: { fontSize: 13, marginTop: 2 },
+  addButton: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, marginLeft: 8 },
   // Liste amis
-  friendRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#23232a', marginHorizontal: 10 },
+  friendRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, marginHorizontal: 10 },
   avatarModern: { width: 52, height: 52, borderRadius: 26, marginRight: 16, backgroundColor: '#333' },
-  nameModern: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  emailModern: { color: '#aaa', fontSize: 13, marginTop: 2 },
+  nameModern: { fontSize: 17, fontWeight: '700' },
+  emailModern: { fontSize: 13, marginTop: 2 },
   chatBtn: { backgroundColor: '#3b82f6', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10, marginRight: 8 },
   chatBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   removeBtn: { backgroundColor: '#ff6b6b', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },

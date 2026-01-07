@@ -6,6 +6,21 @@ import { collectionGroup, onSnapshot, query, where } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
+const CATEGORY_EMOJIS: Record<string, string> = {
+  "Roman d'amour": "💕",
+  "Fanfiction": "✨",
+  "Fiction générale": "📚",
+  "Roman pour adolescents": "🎓",
+  "Aléatoire": "🎲",
+  "Action": "⚡",
+  "Aventure": "🧭",
+  "Nouvelles": "📰",
+  "Fantasy": "🔮",
+  "Non-Fiction": "📖",
+  "Fantastique": "🚀",
+  "Mystère": "🕵️",
+};
+
 export default function MyGroupsAndDMs() {
   const [myGroups, setMyGroups] = useState<any[]>([]);
   const [myDMs, setMyDMs] = useState<any[]>([]); // à brancher plus tard
@@ -25,7 +40,11 @@ export default function MyGroupsAndDMs() {
           groupId: parent?.id,
         };
       });
-      setMyGroups(groups);
+      // Filtrer les doublons basés sur groupId
+      const uniqueGroups = groups.filter((group, index, self) => 
+        index === self.findIndex((g) => g.groupId === group.groupId)
+      );
+      setMyGroups(uniqueGroups);
     });
     // DMs (à brancher sur ta structure Firestore plus tard)
     // setMyDMs(...)
@@ -51,7 +70,9 @@ export default function MyGroupsAndDMs() {
             />
             <View style={styles.chatContent}>
               <View style={styles.chatHeaderRow}>
-                <Text style={styles.chatName}>{item.groupId}</Text>
+                <Text style={styles.chatName}>
+                  {CATEGORY_EMOJIS[item.groupId] ? `${CATEGORY_EMOJIS[item.groupId]} ` : ''}{item.groupId}
+                </Text>
                 <Text style={styles.chatTime}>14:32</Text>
               </View>
               <View style={styles.chatFooterRow}>

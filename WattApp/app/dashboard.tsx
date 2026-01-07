@@ -7,10 +7,11 @@ import { getAuth } from 'firebase/auth';
 import app, { db } from '../constants/firebaseConfig';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-
-const COLORS = ['#FFA94D', '#4FC3F7', '#FF5A5F', '#7C3AED', '#43D9AD'];
+import { useTheme } from '../contexts/ThemeContext';
 
 const DashboardScreen = () => {
+  const { theme } = useTheme();
+  const COLORS = [theme.colors.primary, theme.colors.accent, theme.colors.error, theme.colors.secondary, theme.colors.success];
   const [stats, setStats] = useState({ likes: 0, views: 0, comments: 0, purchases: 0 });
   const [loading, setLoading] = useState(true);
   const [book, setBook] = useState<any>(null);
@@ -63,9 +64,9 @@ const DashboardScreen = () => {
   ];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ alignItems: 'center', paddingBottom: 40 }}>
-      <Text style={styles.title}>Statistiques du livre</Text>
-      <View style={styles.pieContainer}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]} contentContainerStyle={{ alignItems: 'center', paddingBottom: 40 }}>
+      <Text style={[styles.title, { color: theme.colors.text }]}>Statistiques du livre</Text>
+      <View style={[styles.pieContainer, { backgroundColor: theme.colors.surface }]}>
         {pieData.length > 1 ? (
           <>
             <PieChart
@@ -75,7 +76,7 @@ const DashboardScreen = () => {
               outerRadius={90}
             />
             <View style={styles.pieCenter}>
-              <Ionicons name="stats-chart-outline" size={38} color="#FFA94D" />
+              <Ionicons name="stats-chart-outline" size={38} color={theme.colors.primary} />
             </View>
           </>
         ) : (

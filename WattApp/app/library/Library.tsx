@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import { Alert } from 'react-native';
 import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
+import { useTheme } from '../../contexts/ThemeContext';
 import { collection, query, where, getDocs, orderBy, deleteDoc, doc, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { getWishlistBooks } from './wishlistUtils';
 import { Ionicons } from '@expo/vector-icons';
@@ -81,6 +82,7 @@ const Library: React.FC = () => {
   const router = useRouter();
   const { width, height } = useWindowDimensions();
   const isTablet = Math.max(width, height) >= 768;
+  const { theme } = useTheme();
 
 
   // State
@@ -950,14 +952,15 @@ Variables d'état:
       >
         <Pressable style={styles.contextMenuOverlay} onPress={closeContextMenu}>
           <View style={[styles.contextMenu, { 
+            backgroundColor: theme.colors.surface,
             left: Math.min(menuPosition.x, 300), 
             top: Math.min(menuPosition.y, 500) 
           }]}>
             <View style={styles.contextMenuHeader}>
-              <Text style={styles.contextMenuTitle} numberOfLines={1}>
+              <Text style={[styles.contextMenuTitle, { color: theme.colors.primary }]} numberOfLines={1}>
                 {selectedBook.title || selectedBook.titre}
               </Text>
-              <Text style={styles.contextMenuSubtitle} numberOfLines={1}>
+              <Text style={[styles.contextMenuSubtitle, { color: theme.colors.textSecondary }]} numberOfLines={1}>
                 {selectedBook.author || selectedBook.auteur}
               </Text>
             </View>
@@ -982,7 +985,7 @@ Variables d'état:
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle="light-content" />
       
       {/* Extracteur de pages PDF */}
@@ -999,19 +1002,19 @@ Variables d'état:
       {/* Indicateur de progrès d'extraction */}
       {extractingPages && extractionProgress && (
         <View style={styles.extractionProgress}>
-          <Text style={styles.extractionText}>
+          <Text style={[styles.extractionText, { color: theme.colors.text }]}>
             Extraction des pages... {extractionProgress.current}/{extractionProgress.total}
           </Text>
           {selectedPdfFile && (
-            <Text style={styles.extractionSubtext}>
+            <Text style={[styles.extractionSubtext, { color: theme.colors.textSecondary }]}>
               📄 {selectedPdfFile.name} ({selectedPdfFile.size ? (selectedPdfFile.size / (1024 * 1024)).toFixed(1) + ' MB' : 'Taille inconnue'})
             </Text>
           )}
-          <View style={styles.progressBar}>
+          <View style={[styles.progressBar, { backgroundColor: theme.colors.surface }]}>
             <View 
               style={[
                 styles.progressFill, 
-                { width: `${(extractionProgress.current / extractionProgress.total) * 100}%` }
+                { width: `${(extractionProgress.current / extractionProgress.total) * 100}%`, backgroundColor: theme.colors.primary }
               ]} 
             />
           </View>
@@ -1019,39 +1022,39 @@ Variables d'état:
       )}
       
       {/* Header avec padding pour éviter la BottomNav */}
-      <View style={styles.headerSection}>
+      <View style={[styles.headerSection, { backgroundColor: theme.colors.background }]}>
         <View style={styles.headerRow}>
-          <Text style={styles.title}>Bibliothèque</Text>
+          <Text style={[styles.title, { color: theme.colors.primary }]}>Bibliothèque</Text>
           <View style={styles.actionButtons}>
             <TouchableOpacity 
               onPress={showDownloadManager} 
-              style={[styles.actionBtn, styles.downloadManagerBtn]}
+              style={[styles.actionBtn, styles.downloadManagerBtn, { backgroundColor: theme.colors.primary }]}
             >
-              <Ionicons name="cloud-done-outline" size={16} color="#181818" />
-              <Text style={styles.actionText}>{downloadedBooks.size}/{MAX_DOWNLOADS}</Text>
+              <Ionicons name="cloud-done-outline" size={16} color={theme.colors.background} />
+              <Text style={[styles.actionText, { color: theme.colors.background }]}>{downloadedBooks.size}/{MAX_DOWNLOADS}</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               onPress={handleImportPDF} 
-              style={[styles.actionBtn, styles.importBtn]}
+              style={[styles.actionBtn, styles.importBtn, { backgroundColor: theme.colors.primary }]}
               disabled={importing}
             >
               {importing ? (
-                <ActivityIndicator size="small" color="#181818" />
+                <ActivityIndicator size="small" color={theme.colors.background} />
               ) : (
                 <>
-                  <Ionicons name="cloud-upload-outline" size={16} color="#181818" />
-                  <Text style={styles.actionText}>Importer</Text>
+                  <Ionicons name="cloud-upload-outline" size={16} color={theme.colors.background} />
+                  <Text style={[styles.actionText, { color: theme.colors.background }]}>Importer</Text>
                 </>
               )}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/write')} style={[styles.actionBtn, styles.addBtn]}>
-              <Ionicons name="add" size={16} color="#181818" />
-              <Text style={styles.actionText}>Nouveau</Text>
+            <TouchableOpacity onPress={() => router.push('/write')} style={[styles.actionBtn, styles.addBtn, { backgroundColor: theme.colors.primary }]}>
+              <Ionicons name="add" size={16} color={theme.colors.background} />
+              <Text style={[styles.actionText, { color: theme.colors.background }]}>Nouveau</Text>
             </TouchableOpacity>
             {/* Bouton de diagnostic temporaire */}
             <TouchableOpacity onPress={diagnosticPDFCapabilities} style={[styles.actionBtn, { backgroundColor: '#4A90E2' }]}>
-              <Ionicons name="bug-outline" size={16} color="#fff" />
-              <Text style={[styles.actionText, { color: '#fff' }]}>Debug</Text>
+              <Ionicons name="bug-outline" size={16} color={theme.colors.text} />
+              <Text style={[styles.actionText, { color: theme.colors.text }]}>Debug</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1060,10 +1063,10 @@ Variables d'état:
           <View style={styles.searchContainer}>
             <TextInput
               placeholder="Rechercher titre, auteur, tag..."
-              placeholderTextColor="#888"
+              placeholderTextColor={theme.colors.textSecondary}
               value={search}
               onChangeText={setSearch}
-              style={styles.searchInput}
+              style={[styles.searchInput, { backgroundColor: theme.colors.surface, color: theme.colors.text }]}
             />
             <View style={styles.searchIcon}>
               <Text style={styles.searchIconText}>🔍</Text>
@@ -1074,7 +1077,7 @@ Variables d'état:
 
       {loading ? (
         <View style={styles.loader}>
-          <ActivityIndicator size="large" color="#FFA94D" />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       ) : (
         <ScrollView 
@@ -1084,15 +1087,15 @@ Variables d'état:
           {/* Section : Liste d'envie */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>💛 Liste d'envie</Text>
-              <Text style={styles.sectionCount}>{wishlist.length}</Text>
+              <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>💛 Liste d'envie</Text>
+              <Text style={[styles.sectionCount, { color: theme.colors.primary }]}>{wishlist.length}</Text>
               <TouchableOpacity onPress={handleClearWishlist} disabled={wishlistLoading || wishlist.length === 0} style={{ marginLeft: 12, opacity: wishlist.length === 0 ? 0.4 : 1 }}>
-                <Ionicons name="trash" size={22} color="#FF4D4D" />
+                <Ionicons name="trash" size={22} color={theme.colors.error || '#FF4D4D'} />
               </TouchableOpacity>
             </View>
             {wishlist.length === 0 ? (
               <View style={styles.emptySection}>
-                <Text style={styles.emptySectionText}>Aucun livre dans la liste d'envie</Text>
+                <Text style={[styles.emptySectionText, { color: theme.colors.textSecondary }]}>Aucun livre dans la liste d'envie</Text>
               </View>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
@@ -1117,16 +1120,16 @@ Variables d'état:
                       </View>
                       <View style={styles.horizontalCardContent}>
                         <View style={styles.titleRow}>
-                          <Text style={styles.horizontalBookTitle} numberOfLines={2}>{book.titre || book.title || 'Titre inconnu'}</Text>
+                          <Text style={[styles.horizontalBookTitle, { color: theme.colors.primary }]} numberOfLines={2}>{book.titre || book.title || 'Titre inconnu'}</Text>
                           {book.type === 'pdf' && (
                             <Ionicons name="document-text-outline" size={16} color="#FF6B6B" style={styles.typeIcon} />
                           )}
                         </View>
-                        <Text style={styles.horizontalBookAuthor} numberOfLines={1}>par {book.auteur || book.author || 'Auteur inconnu'}</Text>
+                        <Text style={[styles.horizontalBookAuthor, { color: theme.colors.textSecondary }]} numberOfLines={1}>par {book.auteur || book.author || 'Auteur inconnu'}</Text>
                       </View>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => handleRemoveFromWishlist(book.id)} style={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(255,77,77,0.9)', borderRadius: 16, padding: 4 }}>
-                      <Ionicons name="trash" size={18} color="#fff" />
+                      <Ionicons name="trash" size={18} color={theme.colors.text} />
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -1138,8 +1141,8 @@ Variables d'état:
           {localBooks.length > 0 && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>📱 PDFs Locaux</Text>
-                <Text style={styles.sectionCount}>{localBooks.length}</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>📱 PDFs Locaux</Text>
+                <Text style={[styles.sectionCount, { color: theme.colors.primary }]}>{localBooks.length}</Text>
                 <TouchableOpacity 
                   onPress={async () => {
                     const totalSize = await NativePDFService.getTotalStorageUsed();
@@ -1201,10 +1204,10 @@ Variables d'état:
                           <Ionicons name="phone-portrait" size={12} color="#fff" />
                         </View>
                       </View>
-                      <Text style={styles.horizontalBookTitle} numberOfLines={2}>
+                      <Text style={[styles.horizontalBookTitle, { color: theme.colors.primary }]} numberOfLines={2}>
                         {localBook.title}
                       </Text>
-                      <Text style={styles.horizontalBookAuthor}>
+                      <Text style={[styles.horizontalBookAuthor, { color: theme.colors.textSecondary }]}>
                         Local • {NativePDFService.formatFileSize(localBook.fileSize || 0)}
                       </Text>
                     </TouchableOpacity>
@@ -1217,16 +1220,16 @@ Variables d'état:
           {filtered.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>📚</Text>
-              <Text style={styles.empty}>Aucun livre trouvé</Text>
-              <Text style={styles.emptySubtext}>Essayez une autre recherche</Text>
+              <Text style={[styles.empty, { color: theme.colors.text }]}>Aucun livre trouvé</Text>
+              <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>Essayez une autre recherche</Text>
             </View>
           ) : (
             <>
               {/* Section: Mes livres - Carousel horizontal */}
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>📚 Mes livres</Text>
-                  <Text style={styles.sectionCount}>{myBooks.length}</Text>
+                  <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>📚 Mes livres</Text>
+                  <Text style={[styles.sectionCount, { color: theme.colors.primary }]}>{myBooks.length}</Text>
                 </View>
                 <ScrollView 
                   horizontal 
@@ -1302,18 +1305,18 @@ Variables d'état:
                           </View>
                           <View style={styles.horizontalCardContent}>
                             <View style={styles.titleRow}>
-                              <Text style={styles.horizontalBookTitle} numberOfLines={2}>{book.titre || book.title || 'Titre inconnu'}</Text>
+                              <Text style={[styles.horizontalBookTitle, { color: theme.colors.primary }]} numberOfLines={2}>{book.titre || book.title || 'Titre inconnu'}</Text>
                               {book.type === 'pdf' && (
                                 <Ionicons name="document-text-outline" size={16} color="#FF6B6B" style={styles.typeIcon} />
                               )}
                             </View>
-                            <Text style={styles.horizontalBookAuthor} numberOfLines={1}>par {book.auteur || book.author || 'Auteur inconnu'}</Text>
+                            <Text style={[styles.horizontalBookAuthor, { color: theme.colors.textSecondary }]} numberOfLines={1}>par {book.auteur || book.author || 'Auteur inconnu'}</Text>
                           </View>
                         </TouchableOpacity>
                         {/* Affichage du pourcentage d'avancement si le livre a été lu */}
                         {percent > 0 && (
                           <View style={{ alignItems: 'center', marginTop: 6 }}>
-                            <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 13 }}>
+                            <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 13 }}>
                               {percent}% lu
                             </Text>
                           </View>
@@ -1328,8 +1331,8 @@ Variables d'état:
               {readBooks.length > 0 && (
                 <View style={styles.section}>
                   <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>📖 Livres lus</Text>
-                    <Text style={styles.sectionCount}>{readBooks.length}</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>📖 Livres lus</Text>
+                    <Text style={[styles.sectionCount, { color: theme.colors.primary }]}>{readBooks.length}</Text>
                   </View>
                   <ScrollView 
                     horizontal 
@@ -1405,17 +1408,17 @@ Variables d'état:
                             </View>
                             <View style={styles.horizontalCardContent}>
                               <View style={styles.titleRow}>
-                                <Text style={styles.horizontalBookTitle} numberOfLines={2}>{book.titre || book.title || 'Titre inconnu'}</Text>
+                                <Text style={[styles.horizontalBookTitle, { color: theme.colors.primary }]} numberOfLines={2}>{book.titre || book.title || 'Titre inconnu'}</Text>
                                 {book.type === 'pdf' && (
                                   <Ionicons name="document-text-outline" size={16} color="#FF6B6B" style={styles.typeIcon} />
                                 )}
                               </View>
-                              <Text style={styles.horizontalBookAuthor} numberOfLines={1}>par {book.auteur || book.author || 'Auteur inconnu'}</Text>
+                              <Text style={[styles.horizontalBookAuthor, { color: theme.colors.textSecondary }]} numberOfLines={1}>par {book.auteur || book.author || 'Auteur inconnu'}</Text>
                             </View>
                           </TouchableOpacity>
                           {/* Affichage du pourcentage d'avancement */}
                           <View style={{ alignItems: 'center', marginTop: 6 }}>
-                            <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 13 }}>
+                            <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 13 }}>
                               {percent}% lu
                             </Text>
                           </View>
@@ -1429,13 +1432,13 @@ Variables d'état:
               {/* Section: Mes brouillons - Carousel horizontal */}
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>📝 Mes brouillons</Text>
-                  <Text style={styles.sectionCount}>{drafts.length}</Text>
+                  <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>📝 Mes brouillons</Text>
+                  <Text style={[styles.sectionCount, { color: theme.colors.primary }]}>{drafts.length}</Text>
                 </View>
                 {drafts.length === 0 ? (
                   <View style={styles.emptySection}>
-                    <Text style={styles.emptySectionText}>Aucun brouillon</Text>
-                    <Text style={styles.emptySectionSubtext}>Créez votre premier brouillon</Text>
+                    <Text style={[styles.emptySectionText, { color: theme.colors.textSecondary }]}>Aucun brouillon</Text>
+                    <Text style={[styles.emptySectionSubtext, { color: theme.colors.textSecondary }]}>Créez votre premier brouillon</Text>
                   </View>
                 ) : (
                   <ScrollView 
@@ -1473,17 +1476,17 @@ Variables d'état:
                           </View>
                         </TouchableOpacity>
                         <View style={styles.draftCardContent}>
-                          <Text style={styles.draftTitle} numberOfLines={2}>
+                          <Text style={[styles.draftTitle, { color: theme.colors.primary }]} numberOfLines={2}>
                             {draft.title || '(Sans titre)'}
                           </Text>
-                          <Text style={styles.draftTemplate} numberOfLines={1}>
+                          <Text style={[styles.draftTemplate, { color: theme.colors.textSecondary }]} numberOfLines={1}>
                             {draft.templateId || 'Sans template'}
                           </Text>
-                          <Text style={styles.draftDate} numberOfLines={1}>
+                          <Text style={[styles.draftDate, { color: theme.colors.textSecondary }]} numberOfLines={1}>
                             Créé: {draft.createdAt?.toDate?.()?.toLocaleDateString?.('fr-FR') || 'Date inconnue'}
                           </Text>
                           {draft.updatedAt && (
-                            <Text style={styles.draftUpdatedDate} numberOfLines={1}>
+                            <Text style={[styles.draftUpdatedDate, { color: theme.colors.primary }]} numberOfLines={1}>
                               Modifié: {draft.updatedAt?.toDate?.()?.toLocaleString?.('fr-FR', {
                                 day: '2-digit',
                                 month: '2-digit', 
@@ -1494,7 +1497,7 @@ Variables d'état:
                             </Text>
                           )}
                           <TouchableOpacity
-                            style={{ backgroundColor: '#FFA94D', borderRadius: 18, paddingVertical: 7, paddingHorizontal: 18, alignSelf: 'flex-end', marginTop: 8, flexDirection: 'row', alignItems: 'center' }}
+                            style={{ backgroundColor: theme.colors.primary, borderRadius: 18, paddingVertical: 7, paddingHorizontal: 18, alignSelf: 'flex-end', marginTop: 8, flexDirection: 'row', alignItems: 'center' }}
                             onPress={() => {
                               if (draft.type === 'manga') {
                                 (router as any).push(`/write/manga-editor/simple?projectId=${draft.id}`);
@@ -1504,7 +1507,7 @@ Variables d'état:
                             }}
                             activeOpacity={0.85}
                           >
-                            <Text style={{ color: '#18191c', fontWeight: 'bold', fontSize: 15 }}>
+                            <Text style={{ color: theme.colors.background, fontWeight: 'bold', fontSize: 15 }}>
                               {draft.type === 'manga' ? 'Éditer' : 'Aperçu'}
                             </Text>
                           </TouchableOpacity>
@@ -1528,13 +1531,11 @@ Variables d'état:
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#181818',
   },
   headerSection: {
     paddingTop: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 80, // Plus d'espace pour la BottomNav
     paddingHorizontal: 20,
     paddingBottom: 16,
-    backgroundColor: '#181818',
   },
   headerRow: {
     flexDirection: 'row',
@@ -1543,7 +1544,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
-    color: '#FFA94D',
     fontSize: 28,
     fontWeight: 'bold',
   },
