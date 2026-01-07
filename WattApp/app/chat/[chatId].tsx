@@ -20,6 +20,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTheme } from '../../contexts/ThemeContext';
 import app, { db } from '../../constants/firebaseConfig';
 import {
   collection,
@@ -39,6 +40,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Swipeable } from 'react-native-gesture-handler';
 
 export default function ChatThread() {
+  const { theme } = useTheme();
   const window = Dimensions.get('window');
   const params = useLocalSearchParams();
   const router = useRouter();
@@ -99,6 +101,12 @@ export default function ChatThread() {
       unsubTyping();
     };
   }, [chatId]);
+
+  // Détermine l'UID de l'autre participant
+  const auth = getAuth(app);
+  const currentUser = auth.currentUser;
+  const myUid = currentUser?.uid;
+  const otherUid = Object.keys(participants).find((uid) => uid !== myUid);
 
   // Animation header on scroll
   const onScroll = Animated.event(
@@ -211,12 +219,6 @@ export default function ChatThread() {
     }
   };
 
-  // Détermine l'UID de l'autre participant
-  const auth = getAuth(app);
-  const currentUser = auth.currentUser;
-  const myUid = currentUser?.uid;
-  const otherUid = Object.keys(participants).find((uid) => uid !== myUid);
-
   // Récupère les infos du destinataire si besoin
   useEffect(() => {
     let cancelled = false;
@@ -307,14 +309,14 @@ export default function ChatThread() {
 
     return (
       <LinearGradient
-        colors={['#232323', '#1a1a1a']}
+        colors={[theme.colors.surface, theme.colors.background]}
         style={styles.headerUltraModernWrap}
       >
         <StatusBar barStyle="light-content" />
         <View style={styles.headerContent}>
           <Pressable style={styles.headerUltraBack} onPress={() => router.back()}>
-            <View style={styles.backButton}>
-              <Ionicons name="chevron-back" size={28} color="#FFA94D" />
+            <View style={[styles.backButton, { backgroundColor: `${theme.colors.primary}26` }]}>
+              <Ionicons name="chevron-back" size={28} color={theme.colors.primary} />
             </View>
           </Pressable>
           
@@ -331,25 +333,25 @@ export default function ChatThread() {
                 otherUserInfo?.mail ||
                 otherUserInfo?.email
               ) ? (
-                <ActivityIndicator size="small" color="#FFA94D" />
+                <ActivityIndicator size="small" color={theme.colors.primary} />
               ) : (
                 <>
-                  <Image source={{ uri: photoURL }} style={styles.headerUltraAvatar} />
-                  <View style={styles.onlineIndicator} />
+                  <Image source={{ uri: photoURL }} style={[styles.headerUltraAvatar, { borderColor: theme.colors.primary }]} />
+                  <View style={[styles.onlineIndicator, { borderColor: theme.colors.surface }]} />
                 </>
               )}
             </View>
             <View style={styles.headerTextContainer}>
-              <Text style={styles.headerUltraName} numberOfLines={1}>
+              <Text style={[styles.headerUltraName, { color: theme.colors.text }]} numberOfLines={1}>
                 {displayName}
               </Text>
               {otherUserTyping ? (
                 <View style={styles.typingContainer}>
-                  <Text style={styles.typingText}>En train d'écrire</Text>
+                  <Text style={[styles.typingText, { color: theme.colors.primary }]}>En train d'écrire</Text>
                   <View style={styles.typingDots}>
-                    <Animated.View style={[styles.typingDot, { opacity: scrollY }]} />
-                    <Animated.View style={[styles.typingDot, { opacity: scrollY }]} />
-                    <Animated.View style={[styles.typingDot, { opacity: scrollY }]} />
+                    <Animated.View style={[styles.typingDot, { opacity: scrollY, backgroundColor: theme.colors.primary }]} />
+                    <Animated.View style={[styles.typingDot, { opacity: scrollY, backgroundColor: theme.colors.primary }]} />
+                    <Animated.View style={[styles.typingDot, { opacity: scrollY, backgroundColor: theme.colors.primary }]} />
                   </View>
                 </View>
               ) : (
@@ -358,8 +360,8 @@ export default function ChatThread() {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.headerActionButton}>
-            <Ionicons name="ellipsis-vertical" size={24} color="#FFA94D" />
+          <TouchableOpacity style={[styles.headerActionButton, { backgroundColor: `${theme.colors.primary}26` }]}>
+            <Ionicons name="ellipsis-vertical" size={24} color={theme.colors.primary} />
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -429,8 +431,8 @@ export default function ChatThread() {
       <View>
         {showDateSeparator && (
           <View style={styles.dateSeparator}>
-            <View style={styles.dateSeparatorLine} />
-            <Text style={styles.dateSeparatorText}>
+            <View style={[styles.dateSeparatorLine, { backgroundColor: theme.colors.surface }]} />
+            <Text style={[styles.dateSeparatorText, { color: theme.colors.textSecondary }]}>
               {new Date(item.createdAt?.toDate?.() || item.createdAt).toLocaleDateString('fr-FR', { 
                 weekday: 'long', 
                 day: 'numeric', 
@@ -462,19 +464,19 @@ export default function ChatThread() {
               {!isMe && (
                 <Image
                   source={{ uri: userPhoto }}
-                  style={styles.messageAvatar}
+                  style={[styles.messageAvatar, { borderColor: theme.colors.surface }]}
                   resizeMode="cover"
                 />
               )}
               <View style={styles.messageContainer}>
                 {item.replyTo && (
-                  <View style={styles.replyPreview}>
-                    <View style={styles.replyLine} />
+                  <View style={[styles.replyPreview, { backgroundColor: `${theme.colors.primary}1A`, borderLeftColor: theme.colors.primary }]}>
+                    <View style={[styles.replyLine, { backgroundColor: theme.colors.primary }]} />
                     <View style={styles.replyContent}>
-                      <Text style={styles.replyName}>
+                      <Text style={[styles.replyName, { color: theme.colors.primary }]}>
                         {item.replyTo.sender === myUid ? 'Vous' : 'Réponse à'}
                       </Text>
-                      <Text style={styles.replyText} numberOfLines={1}>
+                      <Text style={[styles.replyText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
                         {item.replyTo.text}
                       </Text>
                     </View>
@@ -483,10 +485,10 @@ export default function ChatThread() {
                 <View
                   style={[
                     styles.messageBubble,
-                    isMe ? styles.messageBubbleMe : styles.messageBubbleOther,
+                    isMe ? { ...styles.messageBubbleMe, backgroundColor: theme.colors.primary } : { ...styles.messageBubbleOther, backgroundColor: theme.colors.surface },
                   ]}
                 >
-                  <Text style={[styles.messageText, isMe && styles.messageTextMe]}>
+                  <Text style={[styles.messageText, { color: isMe ? theme.colors.background : theme.colors.text }]}>
                     {item.text}
                   </Text>
                 </View>
@@ -497,25 +499,25 @@ export default function ChatThread() {
                     {Object.entries(item.reactions).map(([emoji, users]: any) => (
                       <TouchableOpacity 
                         key={emoji}
-                        style={styles.reactionBubble}
+                        style={[styles.reactionBubble, { backgroundColor: `${theme.colors.primary}33`, borderColor: `${theme.colors.primary}4D` }]}
                         onPress={() => addReaction(item.id, emoji)}
                       >
                         <Text style={styles.reactionEmoji}>{emoji}</Text>
-                        <Text style={styles.reactionCount}>{users.length}</Text>
+                        <Text style={[styles.reactionCount, { color: theme.colors.primary }]}>{users.length}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
                 )}
                 
                 <View style={styles.messageFooter}>
-                  <Text style={[styles.messageTime, isMe && styles.messageTimeMe]}>
+                  <Text style={[styles.messageTime, { color: theme.colors.textSecondary }, isMe && styles.messageTimeMe]}>
                     {formatTime(item.createdAt)}
                   </Text>
                   {isMe && (
                     <Ionicons 
                       name={item.read ? "checkmark-done" : "checkmark"} 
                       size={14} 
-                      color={item.read ? "#4CAF50" : "#666"}
+                      color={item.read ? "#4CAF50" : theme.colors.textSecondary}
                       style={styles.readIcon}
                     />
                   )}
@@ -524,7 +526,7 @@ export default function ChatThread() {
               {isMe && (
                 <Image
                   source={{ uri: userPhoto }}
-                  style={styles.messageAvatar}
+                  style={[styles.messageAvatar, { borderColor: theme.colors.surface }]}
                   resizeMode="cover"
                 />
               )}
@@ -541,7 +543,7 @@ export default function ChatThread() {
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={{ flex: 1, backgroundColor: '#181818' }}>
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
         {/* Header */}
         {renderHeader()}
 
@@ -558,20 +560,20 @@ export default function ChatThread() {
         />
 
         {/* Zone de saisie */}
-        <BlurView intensity={95} tint="dark" style={styles.composerBlur}>
+        <BlurView intensity={95} tint="dark" style={[styles.composerBlur, { borderTopColor: theme.colors.surface }]}>
           {replyingTo && (
-            <View style={styles.replyingBanner}>
+            <View style={[styles.replyingBanner, { backgroundColor: `${theme.colors.primary}1A`, borderBottomColor: `${theme.colors.primary}33` }]}>
               <View style={styles.replyingBannerContent}>
-                <Ionicons name="arrow-undo" size={16} color="#FFA94D" />
+                <Ionicons name="arrow-undo" size={16} color={theme.colors.primary} />
                 <View style={styles.replyingBannerText}>
-                  <Text style={styles.replyingBannerTitle}>Répondre à</Text>
-                  <Text style={styles.replyingBannerMessage} numberOfLines={1}>
+                  <Text style={[styles.replyingBannerTitle, { color: theme.colors.primary }]}>Répondre à</Text>
+                  <Text style={[styles.replyingBannerMessage, { color: theme.colors.textSecondary }]} numberOfLines={1}>
                     {replyingTo.text}
                   </Text>
                 </View>
               </View>
               <TouchableOpacity onPress={() => setReplyingTo(null)}>
-                <Ionicons name="close" size={20} color="#666" />
+                <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
               </TouchableOpacity>
             </View>
           )}
@@ -582,14 +584,14 @@ export default function ChatThread() {
             ]}
           >
             <TouchableOpacity style={styles.attachButton}>
-              <Ionicons name="add-circle" size={28} color="#FFA94D" />
+              <Ionicons name="add-circle" size={28} color={theme.colors.primary} />
             </TouchableOpacity>
             
-            <View style={styles.inputWrapper}>
+            <View style={[styles.inputWrapper, { backgroundColor: theme.colors.surface, borderColor: theme.colors.surface }]}>
               <TextInput
-                style={styles.composerInput}
+                style={[styles.composerInput, { color: theme.colors.text }]}
                 placeholder="Écris ton message..."
-                placeholderTextColor="#666"
+                placeholderTextColor={theme.colors.textSecondary}
                 value={text}
                 onChangeText={handleTyping}
                 onFocus={() => setComposerFocused(true)}
@@ -606,7 +608,7 @@ export default function ChatThread() {
                 activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={['#FFA94D', '#FF8C42']}
+                  colors={[theme.colors.primary, theme.colors.primary]}
                   style={styles.sendButtonUltra}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
@@ -614,14 +616,14 @@ export default function ChatThread() {
                   <Ionicons
                     name="send"
                     size={20}
-                    color="#181818"
+                    color={theme.colors.background}
                     style={{ marginLeft: 2 }}
                   />
                 </LinearGradient>
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity style={styles.voiceButton}>
-                <Ionicons name="mic" size={24} color="#FFA94D" />
+              <TouchableOpacity style={[styles.voiceButton, { backgroundColor: `${theme.colors.primary}26` }]}>
+                <Ionicons name="mic" size={24} color={theme.colors.primary} />
               </TouchableOpacity>
             )}
           </View>
@@ -639,13 +641,13 @@ export default function ChatThread() {
             onPress={() => setShowEmojiPicker(false)}
           >
             <BlurView intensity={90} tint="dark" style={styles.emojiModalOverlay}>
-              <View style={styles.emojiPickerContainer}>
-                <Text style={styles.emojiPickerTitle}>Réagir au message</Text>
+              <View style={[styles.emojiPickerContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.surface }]}>
+                <Text style={[styles.emojiPickerTitle, { color: theme.colors.primary }]}>Réagir au message</Text>
                 <View style={styles.emojiGrid}>
                   {['❤️', '😂', '😮', '😢', '👍', '👎', '🔥', '🎉', '💯', '⭐', '✨', '💪'].map((emoji) => (
                     <TouchableOpacity
                       key={emoji}
-                      style={styles.emojiButton}
+                      style={[styles.emojiButton, { backgroundColor: `${theme.colors.primary}26`, borderColor: `${theme.colors.primary}4D` }]}
                       onPress={() => {
                         if (selectedMessage) {
                           addReaction(selectedMessage, emoji);
@@ -678,7 +680,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    borderBottomColor: 'transparent',
   },
   headerContent: {
     flexDirection: 'row',
@@ -692,7 +694,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 169, 77, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -711,7 +712,6 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: '#222',
     borderWidth: 2,
-    borderColor: '#FFA94D',
   },
   onlineIndicator: {
     position: 'absolute',
@@ -722,14 +722,12 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: '#4CAF50',
     borderWidth: 2,
-    borderColor: '#232323',
   },
   headerTextContainer: {
     marginLeft: 12,
     flex: 1,
   },
   headerUltraName: {
-    color: '#fff',
     fontWeight: 'bold',
     fontSize: 17,
     marginBottom: 2,
@@ -744,7 +742,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   typingText: {
-    color: '#FFA94D',
     fontSize: 13,
     fontWeight: '500',
     marginRight: 6,
@@ -757,13 +754,11 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#FFA94D',
   },
   headerActionButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 169, 77, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -786,7 +781,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 6,
     backgroundColor: '#222',
     borderWidth: 2,
-    borderColor: '#333',
   },
   messageContainer: {
     maxWidth: '70%',
@@ -803,24 +797,19 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
   },
   messageBubbleMe: {
-    backgroundColor: '#FFA94D',
     borderBottomRightRadius: 4,
   },
   messageBubbleOther: {
-    backgroundColor: '#2a2a2a',
     borderBottomLeftRadius: 4,
   },
   messageText: {
-    color: '#fff',
     fontSize: 15,
     lineHeight: 20,
   },
   messageTextMe: {
-    color: '#181818',
   },
   messageTime: {
     fontSize: 11,
-    color: '#666',
     marginLeft: 8,
   },
   messageTimeMe: {
@@ -845,10 +834,8 @@ const styles = StyleSheet.create({
   dateSeparatorLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#333',
   },
   dateSeparatorText: {
-    color: '#666',
     fontSize: 12,
     paddingHorizontal: 12,
     textTransform: 'capitalize',
@@ -863,22 +850,18 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   swipeActionText: {
-    color: '#FFA94D',
     fontSize: 11,
     fontWeight: '600',
   },
   replyPreview: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 169, 77, 0.1)',
     borderRadius: 12,
     padding: 8,
     marginBottom: 6,
     borderLeftWidth: 3,
-    borderLeftColor: '#FFA94D',
   },
   replyLine: {
     width: 3,
-    backgroundColor: '#FFA94D',
     marginRight: 8,
     borderRadius: 2,
   },
@@ -886,13 +869,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   replyName: {
-    color: '#FFA94D',
     fontSize: 12,
     fontWeight: '600',
     marginBottom: 2,
   },
   replyText: {
-    color: '#999',
     fontSize: 13,
   },
   reactionsContainer: {
@@ -907,19 +888,16 @@ const styles = StyleSheet.create({
   reactionBubble: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 169, 77, 0.2)',
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 4,
     gap: 4,
     borderWidth: 1,
-    borderColor: 'rgba(255, 169, 77, 0.3)',
   },
   reactionEmoji: {
     fontSize: 14,
   },
   reactionCount: {
-    color: '#FFA94D',
     fontSize: 11,
     fontWeight: '600',
   },
@@ -927,11 +905,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255, 169, 77, 0.1)',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 169, 77, 0.2)',
   },
   replyingBannerContent: {
     flexDirection: 'row',
@@ -943,12 +919,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   replyingBannerTitle: {
-    color: '#FFA94D',
     fontSize: 12,
     fontWeight: '600',
   },
   replyingBannerMessage: {
-    color: '#999',
     fontSize: 13,
     marginTop: 2,
   },
@@ -959,16 +933,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   emojiPickerContainer: {
-    backgroundColor: '#232323',
     borderRadius: 20,
     padding: 20,
     width: '80%',
     maxWidth: 320,
     borderWidth: 1,
-    borderColor: '#333',
   },
   emojiPickerTitle: {
-    color: '#FFA94D',
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 16,
@@ -983,12 +954,10 @@ const styles = StyleSheet.create({
   emojiButton: {
     width: 50,
     height: 50,
-    backgroundColor: 'rgba(255, 169, 77, 0.15)',
     borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 169, 77, 0.3)',
   },
   emojiText: {
     fontSize: 28,
@@ -999,7 +968,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderTopWidth: 1,
-    borderTopColor: '#333',
   },
   composerWrap: {
     flexDirection: 'row',
@@ -1020,15 +988,12 @@ const styles = StyleSheet.create({
   },
   inputWrapper: {
     flex: 1,
-    backgroundColor: '#2a2a2a',
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#333',
   },
   composerInput: {
     minHeight: 44,
     maxHeight: 120,
-    color: '#fff',
     fontSize: 15,
     paddingHorizontal: 18,
     paddingVertical: 12,
@@ -1047,7 +1012,6 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255, 169, 77, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },

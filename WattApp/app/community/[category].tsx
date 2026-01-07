@@ -15,6 +15,7 @@ import { getAuth } from 'firebase/auth';
 import app, { db } from '../../constants/firebaseConfig';
 import * as ImagePicker from 'expo-image-picker';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const CATEGORY_LABELS: Record<string, string> = {
   "Roman d'amour": "💕 Roman d'amour",
@@ -52,6 +53,7 @@ export default function CommunityChat() {
   const router = useRouter();
   const auth = getAuth(app);
   const user = auth.currentUser;
+  const { theme } = useTheme();
 
   const formatTime = (timestamp: any) => {
     if (!timestamp) return '';
@@ -333,7 +335,7 @@ export default function CommunityChat() {
   const renderLeftActions = (item: any) => {
     return (
       <View style={styles.swipeAction}>
-        <Ionicons name="arrow-undo" size={24} color="#FFA94D" />
+        <Ionicons name="arrow-undo" size={24} color={theme.colors.primary} />
       </View>
     );
   };
@@ -366,43 +368,43 @@ export default function CommunityChat() {
             source={{
               uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128`,
             }}
-            style={styles.messageAvatar}
+            style={[styles.messageAvatar, { borderColor: theme.colors.primary }]}
           />
         )}
         <View style={{ maxWidth: '70%' }}>
           {/* Message répondu */}
           {item.replyTo && (
-            <View style={[styles.replyPreview, isMe ? styles.replyPreviewMe : styles.replyPreviewOther]}>
-              <View style={styles.replyBar} />
+            <View style={[styles.replyPreview, isMe ? [styles.replyPreviewMe, { backgroundColor: `${theme.colors.primary}33` }] : [styles.replyPreviewOther, { backgroundColor: theme.colors.background }]]}>
+              <View style={[styles.replyBar, { backgroundColor: theme.colors.primary }]} />
               <View style={styles.replyContent}>
-                <Text style={styles.replyUser}>{item.replyTo.user}</Text>
-                <Text style={styles.replyText} numberOfLines={1}>
+                <Text style={[styles.replyUser, { color: theme.colors.primary }]}>{item.replyTo.user}</Text>
+                <Text style={[styles.replyText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
                   {item.replyTo.text || '📷 Image'}
                 </Text>
               </View>
             </View>
           )}
           
-          <View style={[styles.messageBubble, isMe ? styles.messageBubbleMe : styles.messageBubbleOther]}>
-            {!isMe && <Text style={styles.messageUser}>{item.user}</Text>}
+          <View style={[styles.messageBubble, isMe ? [styles.messageBubbleMe, { backgroundColor: theme.colors.primary }] : [styles.messageBubbleOther, { backgroundColor: theme.colors.surface }]]}>
+            {!isMe && <Text style={[styles.messageUser, { color: theme.colors.primary }]}>{item.user}</Text>}
             
             {item.type === 'image' && item.imageUrl && (
               <Image source={{ uri: item.imageUrl }} style={styles.messageImage} />
             )}
             
             {item.type === 'text' && item.text && (
-              <Text style={[styles.messageText, isMe && styles.messageTextMe]}>{item.text}</Text>
+              <Text style={[styles.messageText, isMe && [styles.messageTextMe, { color: theme.colors.background }], !isMe && { color: theme.colors.text }]}>{item.text}</Text>
             )}
             
             <View style={styles.messageFooter}>
-              <Text style={[styles.messageTime, isMe && styles.messageTimeMe]}>
+              <Text style={[styles.messageTime, isMe ? [styles.messageTimeMe, { color: `${theme.colors.background}99` }] : { color: theme.colors.textSecondary }]}>
                 {formatTime(item.createdAt)}
               </Text>
               {isMe && (
                 <Ionicons 
                   name="checkmark-done" 
                   size={14} 
-                  color={isMe ? 'rgba(24, 24, 24, 0.6)' : '#666'} 
+                  color={`${theme.colors.background}99`} 
                   style={{ marginLeft: 4 }}
                 />
               )}
@@ -418,18 +420,19 @@ export default function CommunityChat() {
                   onPress={() => addReaction(item.id, emoji)}
                   style={[
                     styles.reactionBubble,
-                    uids.includes(user?.uid) && styles.reactionBubbleActive
+                    { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+                    uids.includes(user?.uid) && [styles.reactionBubbleActive, { backgroundColor: `${theme.colors.primary}33`, borderColor: theme.colors.primary }]
                   ]}
                 >
                   <Text style={styles.reactionEmoji}>{emoji}</Text>
-                  <Text style={styles.reactionCount}>{uids.length}</Text>
+                  <Text style={[styles.reactionCount, { color: theme.colors.text }]}>{uids.length}</Text>
                 </TouchableOpacity>
               ))}
               <TouchableOpacity
                 onPress={() => setShowReactions(item.id)}
-                style={styles.reactionBubble}
+                style={[styles.reactionBubble, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
               >
-                <Ionicons name="add" size={12} color="#666" />
+                <Ionicons name="add" size={12} color={theme.colors.textSecondary} />
               </TouchableOpacity>
             </View>
           )}
@@ -440,18 +443,18 @@ export default function CommunityChat() {
               onPress={() => setShowReactions(item.id)}
               style={[styles.quickReaction, isMe && styles.quickReactionMe]}
             >
-              <Ionicons name="heart-outline" size={14} color="#666" />
+              <Ionicons name="heart-outline" size={14} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           )}
           
           {/* Sélecteur de réaction */}
           {showReactions === item.id && (
-            <View style={[styles.reactionPicker, isMe && styles.reactionPickerMe]}>
+            <View style={[styles.reactionPicker, [isMe && styles.reactionPickerMe, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]]}>
               {EMOJI_REACTIONS.map(emoji => (
                 <TouchableOpacity
                   key={emoji}
                   onPress={() => addReaction(item.id, emoji)}
-                  style={styles.reactionOption}
+                  style={[styles.reactionOption, { backgroundColor: theme.colors.background }]}
                 >
                   <Text style={styles.reactionOptionEmoji}>{emoji}</Text>
                 </TouchableOpacity>
@@ -462,9 +465,9 @@ export default function CommunityChat() {
                   setShowReactions(null);
                   setSelectedMessage(item);
                 }}
-                style={[styles.reactionOption, { backgroundColor: '#1a1a1a' }]}
+                style={[styles.reactionOption, { backgroundColor: theme.colors.background }]}
               >
-                <Ionicons name="ellipsis-horizontal" size={20} color="#FFA94D" />
+                <Ionicons name="ellipsis-horizontal" size={20} color={theme.colors.primary} />
               </TouchableOpacity>
             </View>
           )}
@@ -475,7 +478,7 @@ export default function CommunityChat() {
             source={{
               uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128`,
             }}
-            style={styles.messageAvatar}
+            style={[styles.messageAvatar, { borderColor: theme.colors.primary }]}
           />
         )}
       </TouchableOpacity>
@@ -485,27 +488,27 @@ export default function CommunityChat() {
 
   if (!isMember) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <StatusBar barStyle="light-content" />
-        <LinearGradient colors={['#0F0F0F', '#1a1a1a']} style={StyleSheet.absoluteFillObject} />
+        <LinearGradient colors={[theme.colors.background, theme.colors.surface]} style={StyleSheet.absoluteFillObject} />
         
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="chevron-back" size={28} color="#FFA94D" />
+        <View style={[styles.header, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.surface }]}>
+          <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: `${theme.colors.primary}15` }]}>
+            <Ionicons name="chevron-back" size={28} color={theme.colors.primary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{CATEGORY_LABELS[String(category)] || category}</Text>
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{CATEGORY_LABELS[String(category)] || category}</Text>
           <View style={{ width: 40 }} />
         </View>
 
         {/* Join Screen */}
         <View style={styles.joinContainer}>
-          <View style={styles.joinCard}>
-            <View style={styles.joinIconCircle}>
-              <MaterialCommunityIcons name="shield-account" size={64} color="#FFA94D" />
+          <View style={[styles.joinCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.surface }]}>
+            <View style={[styles.joinIconCircle, { backgroundColor: `${theme.colors.primary}15`, borderColor: `${theme.colors.primary}30` }]}>
+              <MaterialCommunityIcons name="shield-account" size={64} color={theme.colors.primary} />
             </View>
-            <Text style={styles.joinTitle}>Rejoindre le groupe</Text>
-            <Text style={styles.joinSubtitle}>{members.length} membre{members.length > 1 ? 's' : ''}</Text>
+            <Text style={[styles.joinTitle, { color: theme.colors.text }]}>Rejoindre le groupe</Text>
+            <Text style={[styles.joinSubtitle, { color: theme.colors.textSecondary }]}>{members.length} membre{members.length > 1 ? 's' : ''}</Text>
             
             {/* Preview membres */}
             <View style={styles.membersPreview}>
@@ -524,9 +527,9 @@ export default function CommunityChat() {
             </View>
 
             <TouchableOpacity onPress={joinGroup} style={styles.joinButton} activeOpacity={0.85}>
-              <LinearGradient colors={['#FFA94D', '#FF8C42']} style={styles.joinButtonGradient}>
-                <Ionicons name="enter" size={22} color="#181818" style={{ marginRight: 8 }} />
-                <Text style={styles.joinButtonText}>Rejoindre</Text>
+              <LinearGradient colors={[theme.colors.primary, theme.colors.primary]} style={styles.joinButtonGradient}>
+                <Ionicons name="enter" size={22} color={theme.colors.background} style={{ marginRight: 8 }} />
+                <Text style={[styles.joinButtonText, { color: theme.colors.background }]}>Rejoindre</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -536,21 +539,21 @@ export default function CommunityChat() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle="light-content" />
-      <LinearGradient colors={['#0F0F0F', '#1a1a1a']} style={StyleSheet.absoluteFillObject} />
+      <LinearGradient colors={[theme.colors.background, theme.colors.surface]} style={StyleSheet.absoluteFillObject} />
       
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={28} color="#FFA94D" />
+      <View style={[styles.header, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.surface }]}>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: `${theme.colors.primary}15` }]}>
+          <Ionicons name="chevron-back" size={28} color={theme.colors.primary} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>{CATEGORY_LABELS[String(category)] || category}</Text>
-          <Text style={styles.headerSubtitle}>{members.length} membre{members.length > 1 ? 's' : ''}</Text>
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{CATEGORY_LABELS[String(category)] || category}</Text>
+          <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>{members.length} membre{members.length > 1 ? 's' : ''}</Text>
         </View>
-        <TouchableOpacity onPress={() => setShowMembersSidebar(true)} style={styles.membersBtn}>
-          <Ionicons name="people" size={24} color="#FFA94D" />
+        <TouchableOpacity onPress={() => setShowMembersSidebar(true)} style={[styles.membersBtn, { backgroundColor: `${theme.colors.primary}15` }]}>
+          <Ionicons name="people" size={24} color={theme.colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -565,9 +568,9 @@ export default function CommunityChat() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyMessages}>
-              <MaterialCommunityIcons name="chat-outline" size={64} color="#666" />
-              <Text style={styles.emptyText}>Aucun message pour le moment</Text>
-              <Text style={styles.emptySubtext}>Soyez le premier à envoyer un message !</Text>
+              <MaterialCommunityIcons name="chat-outline" size={64} color={theme.colors.textSecondary} />
+              <Text style={[styles.emptyText, { color: theme.colors.text }]}>Aucun message pour le moment</Text>
+              <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>Soyez le premier à envoyer un message !</Text>
             </View>
           }
         />
@@ -577,11 +580,11 @@ export default function CommunityChat() {
       {typingUsers.length > 0 && (
         <View style={styles.typingIndicator}>
           <View style={styles.typingDots}>
-            <View style={styles.typingDot} />
-            <View style={styles.typingDot} />
-            <View style={styles.typingDot} />
+            <View style={[styles.typingDot, { backgroundColor: theme.colors.primary }]} />
+            <View style={[styles.typingDot, { backgroundColor: theme.colors.primary }]} />
+            <View style={[styles.typingDot, { backgroundColor: theme.colors.primary }]} />
           </View>
-          <Text style={styles.typingText}>
+          <Text style={[styles.typingText, { color: theme.colors.textSecondary }]}>
             {typingUsers[0]} {typingUsers.length > 1 && `et ${typingUsers.length - 1} autre${typingUsers.length > 2 ? 's' : ''}`} en train d'écrire...
           </Text>
         </View>
@@ -589,18 +592,18 @@ export default function CommunityChat() {
 
       {/* Barre de réponse */}
       {replyingTo && (
-        <View style={styles.replyBarContainer}>
+        <View style={[styles.replyBarContainer, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.surface }]}>
           <View style={styles.replyBarContent}>
-            <Ionicons name="return-down-forward" size={20} color="#FFA94D" />
+            <Ionicons name="return-down-forward" size={20} color={theme.colors.primary} />
             <View style={styles.replyBarText}>
-              <Text style={styles.replyBarUser}>Répondre à {replyingTo.user}</Text>
-              <Text style={styles.replyBarMessage} numberOfLines={1}>
+              <Text style={[styles.replyBarUser, { color: theme.colors.primary }]}>Répondre à {replyingTo.user}</Text>
+              <Text style={[styles.replyBarMessage, { color: theme.colors.textSecondary }]} numberOfLines={1}>
                 {replyingTo.text || '📷 Image'}
               </Text>
             </View>
           </View>
           <TouchableOpacity onPress={() => setReplyingTo(null)}>
-            <Ionicons name="close" size={24} color="#666" />
+            <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
           </TouchableOpacity>
         </View>
       )}
@@ -610,20 +613,20 @@ export default function CommunityChat() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <View style={styles.inputContainer}>
-          <TouchableOpacity onPress={pickImage} style={styles.attachButton} disabled={uploading}>
+        <View style={[styles.inputContainer, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.surface }]}>
+          <TouchableOpacity onPress={pickImage} style={[styles.attachButton, { backgroundColor: `${theme.colors.primary}15` }]} disabled={uploading}>
             {uploading ? (
-              <ActivityIndicator size="small" color="#FFA94D" />
+              <ActivityIndicator size="small" color={theme.colors.primary} />
             ) : (
-              <Ionicons name="image" size={24} color="#FFA94D" />
+              <Ionicons name="image" size={24} color={theme.colors.primary} />
             )}
           </TouchableOpacity>
           
           <View style={styles.inputWrapper}>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text, borderColor: theme.colors.surface }]}
               placeholder="Message..."
-              placeholderTextColor="#666"
+              placeholderTextColor={theme.colors.textSecondary}
               value={input}
               onChangeText={handleInputChange}
               multiline
@@ -636,10 +639,10 @@ export default function CommunityChat() {
               activeOpacity={0.7}
             >
               <LinearGradient
-                colors={input.trim() ? ['#FFA94D', '#FF8C42'] : ['#333', '#2a2a2a']}
+                colors={input.trim() ? [theme.colors.primary, theme.colors.primary] : [theme.colors.surface, theme.colors.surface]}
                 style={styles.sendButtonGradient}
               >
-                <Ionicons name="send" size={20} color={input.trim() ? '#181818' : '#666'} />
+                <Ionicons name="send" size={20} color={input.trim() ? theme.colors.background : theme.colors.textSecondary} />
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -654,23 +657,23 @@ export default function CommunityChat() {
           onPress={() => setShowMembersSidebar(false)}
         >
           <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
-            <BlurView intensity={100} style={styles.sidebar}>
-              <View style={styles.sidebarHeader}>
-                <Text style={styles.sidebarTitle}>Membres ({members.length})</Text>
+            <BlurView intensity={100} style={[styles.sidebar, { backgroundColor: theme.colors.surface }]}>
+              <View style={[styles.sidebarHeader, { borderBottomColor: theme.colors.surface }]}>
+                <Text style={[styles.sidebarTitle, { color: theme.colors.text }]}>Membres ({members.length})</Text>
                 <TouchableOpacity onPress={() => setShowMembersSidebar(false)}>
-                  <Ionicons name="close" size={28} color="#FFA94D" />
+                  <Ionicons name="close" size={28} color={theme.colors.primary} />
                 </TouchableOpacity>
               </View>
               <FlatList
                 data={members}
                 keyExtractor={(item) => item.uid}
                 renderItem={({ item }) => (
-                  <View style={styles.memberItem}>
+                  <View style={[styles.memberItem, { backgroundColor: theme.colors.background, borderColor: theme.colors.surface }]}>
                     <Image
                       source={{ uri: item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user || 'U')}&background=FFA94D&color=181818&size=128` }}
-                      style={styles.memberItemAvatar}
+                      style={[styles.memberItemAvatar, { borderColor: theme.colors.primary }]}
                     />
-                    <Text style={styles.memberItemName}>{item.user}</Text>
+                    <Text style={[styles.memberItemName, { color: theme.colors.text }]}>{item.user}</Text>
                   </View>
                 )}
                 contentContainerStyle={styles.membersList}
@@ -689,20 +692,20 @@ export default function CommunityChat() {
           onRequestClose={() => setSelectedMessage(null)}
         >
           <Pressable style={styles.modalOverlay} onPress={() => setSelectedMessage(null)}>
-            <BlurView intensity={90} style={styles.actionSheet}>
+            <BlurView intensity={90} style={[styles.actionSheet, { backgroundColor: theme.colors.surface }]}>
               <TouchableOpacity
-                style={styles.actionSheetButton}
+                style={[styles.actionSheetButton, { backgroundColor: theme.colors.background }]}
                 onPress={() => {
                   setReplyingTo(selectedMessage);
                   setSelectedMessage(null);
                 }}
               >
-                <Ionicons name="return-down-forward" size={24} color="#FFA94D" />
-                <Text style={styles.actionSheetText}>Répondre</Text>
+                <Ionicons name="return-down-forward" size={24} color={theme.colors.primary} />
+                <Text style={[styles.actionSheetText, { color: theme.colors.text }]}>Répondre</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={styles.actionSheetButton}
+                style={[styles.actionSheetButton, { backgroundColor: theme.colors.background }]}
                 onPress={() => {
                   if (selectedMessage.text) {
                     // TODO: Copier le texte
@@ -711,8 +714,8 @@ export default function CommunityChat() {
                   setSelectedMessage(null);
                 }}
               >
-                <Ionicons name="copy" size={24} color="#FFA94D" />
-                <Text style={styles.actionSheetText}>Copier</Text>
+                <Ionicons name="copy" size={24} color={theme.colors.primary} />
+                <Text style={[styles.actionSheetText, { color: theme.colors.text }]}>Copier</Text>
               </TouchableOpacity>
               
               {selectedMessage.uid === user?.uid && (
@@ -726,10 +729,10 @@ export default function CommunityChat() {
               )}
               
               <TouchableOpacity
-                style={[styles.actionSheetButton, { marginTop: 12 }]}
+                style={[styles.actionSheetButton, { marginTop: 12, backgroundColor: theme.colors.background }]}
                 onPress={() => setSelectedMessage(null)}
               >
-                <Text style={[styles.actionSheetText, { color: '#666' }]}>Annuler</Text>
+                <Text style={[styles.actionSheetText, { color: theme.colors.textSecondary }]}>Annuler</Text>
               </TouchableOpacity>
             </BlurView>
           </Pressable>
