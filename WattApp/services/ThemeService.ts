@@ -1,6 +1,7 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { db } from '../constants/firebaseConfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface AppTheme {
   name: string;
@@ -169,36 +170,89 @@ class ThemeService {
     
     if (user) {
       try {
+        // D'abord chercher dans le document users principal
+        const qUser = query(collection(db, 'users'), where('uid', '==', user.uid));
+        const snapUser = await getDocs(qUser);
+        
+        if (!snapUser.empty) {
+          const userData = snapUser.docs[0].data();
+          if (userData.selectedTheme) {
+            this.currentTheme = userData.selectedTheme;
+            // Sauvegarder localement aussi
+            await AsyncStorage.setItem('selectedTheme', userData.selectedTheme);
+            return this.currentTheme;
+          }
+        }
+        
+        // Sinon chercher dans la sous-collection (ancien système)
         const themeRef = doc(db, 'users', user.uid, 'preferences', 'theme');
         const themeSnap = await getDoc(themeRef);
         
         if (themeSnap.exists() && themeSnap.data().selected) {
           this.currentTheme = themeSnap.data().selected;
+          // Sauvegarder localement
+          await AsyncStorage.setItem('selectedTheme', this.currentTheme);
+          return this.currentTheme;
         }
       } catch (error) {
-        console.error('Erreur lors du chargement du thème:', error);
+        console.error('Erreur lors du chargement du thème depuis Firebase:', error);
       }
+    }
+    
+    // Fallback sur le stockage local
+    try {
+      const localTheme = await AsyncStorage.getItem('selectedTheme');
+      if (localTheme && appThemes[localTheme]) {
+        this.currentTheme = localTheme;
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement du thème local:', error);
     }
     
     return this.currentTheme;
   }
 
   async saveUserTheme(themeKey: string): Promise<void> {
+    if (!appThemes[themeKey]) {
+      console.error('Thème invalide:', themeKey);
+      return;
+    }
+
+    this.currentTheme = themeKey;
+    this.notifyListeners();
+
+    // Sauvegarder localement d'abord (persistance immédiate)
+    try {
+      await AsyncStorage.setItem('selectedTheme', themeKey);
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde locale du thème:', error);
+    }
+
     const auth = getAuth();
     const user = auth.currentUser;
-    
+
     if (user) {
       try {
+        // Sauvegarder dans le document users principal
+        const qUser = query(collection(db, 'users'), where('uid', '==', user.uid));
+        const snapUser = await getDocs(qUser);
+        
+        if (!snapUser.empty) {
+          const userDoc = snapUser.docs[0];
+          await setDoc(doc(db, 'users', userDoc.id), {
+            selectedTheme: themeKey,
+            updatedAt: new Date()
+          }, { merge: true });
+        }
+        
+        // Sauvegarder aussi dans la sous-collection (compatibilité)
         const themeRef = doc(db, 'users', user.uid, 'preferences', 'theme');
-        await setDoc(themeRef, { 
+        await setDoc(themeRef, {
           selected: themeKey,
           updatedAt: new Date()
         }, { merge: true });
-        
-        this.currentTheme = themeKey;
-        this.notifyListeners();
       } catch (error) {
-        console.error('Erreur lors de la sauvegarde du thème:', error);
+        console.error('Erreur lors de la sauvegarde du thème dans Firebase:', error);
       }
     }
   }
