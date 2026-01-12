@@ -1,0 +1,134 @@
+# Configuration Firebase Functions - WattApp
+# Copier ces commandes et remplacer par vos vraies clés
+
+# ============================================
+# STRIPE CONFIGURATION
+# ============================================
+
+# 1. Obtenir vos clés sur https://dashboard.stripe.com/apikeys
+
+# Clé SECRÈTE (pour les Functions - NE JAMAIS mettre dans le code client!)
+firebase functions:config:set stripe.secret="VOTRE_CLE_SECRETE_STRIPE_ICI"
+
+# Webhook secret (obtenu après avoir créé le webhook sur Stripe)
+firebase functions:config:set stripe.webhook_secret="whsec_VOTRE_WEBHOOK_SECRET_ICI"
+
+# ⚠️ IMPORTANT: Mettre aussi la clé PUBLIQUE dans constants/stripeConfig.ts:
+# PUBLISHABLE_KEY: 'VOTRE_CLE_PUBLIQUE_STRIPE_ICI'
+
+# ============================================
+# PAYPAL CONFIGURATION
+# ============================================
+
+# 1. Créer une app sur https://developer.paypal.com/dashboard/applications
+# 2. Copier le Client ID et Secret
+
+firebase functions:config:set paypal.client_id="VOTRE_CLIENT_ID_ICI"
+firebase functions:config:set paypal.secret="VOTRE_SECRET_ICI"
+
+# Mode: sandbox (test) ou live (production)
+firebase functions:config:set paypal.mode="sandbox"
+
+# ============================================
+# APP CONFIGURATION
+# ============================================
+
+# URL de votre app (pour les redirects Stripe Connect)
+firebase functions:config:set app.url="http://localhost:8081"
+
+# En production, remplacer par:
+# firebase functions:config:set app.url="https://wattapp.com"
+
+# ============================================
+# VÉRIFIER LA CONFIGURATION
+# ============================================
+
+# Voir toute la config actuelle:
+firebase functions:config:get
+
+# ============================================
+# DÉPLOYER
+# ============================================
+
+# Après configuration, déployer:
+cd functions
+npm install
+npm run build
+cd ..
+firebase deploy --only functions
+
+# ============================================
+# CONFIGURER LE WEBHOOK STRIPE
+# ============================================
+
+# 1. Aller sur https://dashboard.stripe.com/webhooks
+# 2. Cliquer "Add endpoint"
+# 3. URL: https://REGION-PROJECT.cloudfunctions.net/stripeWebhook
+#    Exemple: https://us-central1-wattapp-abc123.cloudfunctions.net/stripeWebhook
+# 4. Événements à sélectionner:
+#    - payment_intent.succeeded
+#    - payment_intent.payment_failed
+# 5. Copier le "Signing secret" (whsec_...)
+# 6. Configurer:
+#    firebase functions:config:set stripe.webhook_secret="whsec_..."
+# 7. Re-déployer:
+#    firebase deploy --only functions
+
+# ============================================
+# MODE PRODUCTION
+# ============================================
+
+# Quand vous êtes prêt pour la production:
+
+# 1. Obtenir les clés LIVE sur Stripe Dashboard
+firebase functions:config:set stripe.secret="sk_live_VOTRE_CLE_LIVE"
+
+# 2. Mettre à jour constants/stripeConfig.ts avec pk_live_...
+
+# 3. Passer PayPal en mode live
+firebase functions:config:set paypal.mode="live"
+
+# 4. Mettre à jour l'URL de l'app
+firebase functions:config:set app.url="https://votre-domaine.com"
+
+# 5. Re-configurer le webhook Stripe avec la nouvelle URL
+
+# 6. Re-déployer
+firebase deploy --only functions
+
+# ============================================
+# TESTS
+# ============================================
+
+# Cartes de test Stripe (mode test uniquement):
+# - Succès: 4242 4242 4242 4242
+# - Échec: 4000 0000 0000 0002
+# - 3D Secure: 4000 0027 6000 3184
+
+# Voir les logs en temps réel:
+firebase functions:log --follow
+
+# Voir les logs d'une function spécifique:
+firebase functions:log --only createPaymentIntent
+
+# ============================================
+# DÉPANNAGE
+# ============================================
+
+# Si les functions ne se déploient pas:
+# 1. Vérifier que Node.js 22 est installé
+# 2. Supprimer node_modules et reinstaller:
+#    cd functions
+#    rm -rf node_modules package-lock.json
+#    npm install
+
+# Si le webhook ne fonctionne pas:
+# 1. Vérifier que l'URL est correcte
+# 2. Vérifier que le webhook_secret est configuré
+# 3. Tester avec Stripe CLI:
+#    stripe listen --forward-to localhost:5001/PROJECT/REGION/stripeWebhook
+
+# Si PayPal ne fonctionne pas:
+# 1. Vérifier les credentials
+# 2. S'assurer que l'API Payouts est activée
+# 3. Vérifier le mode (sandbox vs live)

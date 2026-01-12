@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,17 +10,21 @@ import {
   Alert,
   StatusBar,
   Dimensions,
+  Animated,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { mangaService, MangaProject } from '../../services/MangaService';
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 const MangaDetail: React.FC = () => {
   const router = useRouter();
   const { mangaId } = useLocalSearchParams();
+  const scrollY = useRef(new Animated.Value(0)).current;
   
   const [manga, setManga] = useState<MangaProject | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,32 +66,29 @@ const MangaDetail: React.FC = () => {
     return `${price.toFixed(2)} ${currency}`;
   };
 
-  const renderStars = (rating: number) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
-    
-    for (let i = 0; i < fullStars; i++) {
-      stars.push(
-        <Ionicons key={i} name="star" size={16} color="#FFD700" />
-      );
-    }
-    
-    if (hasHalfStar) {
-      stars.push(
-        <Ionicons key="half" name="star-half" size={16} color="#FFD700" />
-      );
-    }
-    
-    const emptyStars = 5 - Math.ceil(rating);
-    for (let i = 0; i < emptyStars; i++) {
-      stars.push(
-        <Ionicons key={`empty-${i}`} name="star-outline" size={16} color="#666" />
-      );
-    }
-    
-    return stars;
+  const handleLike = async () => {
+    setIsLiked(!isLiked);
+    // TODO: Implement like functionality
   };
+
+  // Animations pour le header
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 200],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
+  const imageScale = scrollY.interpolate({
+    inputRange: [-100, 0],
+    outputRange: [1.3, 1],
+    extrapolate: 'clamp',
+  });
+
+  const imageTranslateY = scrollY.interpolate({
+    inputRange: [0, 300],
+    outputRange: [0, -50],
+    extrapolate: 'clamp',
+  });
 
   if (loading) {
     return (
@@ -111,214 +112,202 @@ const MangaDetail: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#181818" />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#FFA94D" />
+      {/* Animated Header */}
+      <Animated.View style={[styles.animatedHeader, { opacity: headerOpacity }]}>
+        <BlurView intensity={80} style={styles.headerBlur}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {manga?.title || ''}
+            </Text>
+            <TouchableOpacity onPress={handleLike} style={styles.headerButton}>
+              <Ionicons 
+                name={isLiked ? "heart" : "heart-outline"} 
+                size={24} 
+                color={isLiked ? "#FF3B30" : "#fff"} 
+              />
+            </TouchableOpacity>
+          </View>
+        </BlurView>
+      </Animated.View>
+
+      {/* Floating Back Button */}
+      <View style={styles.floatingButtons}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.floatingButton}>
+          <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Détails</Text>
-        <TouchableOpacity onPress={() => setIsLiked(!isLiked)}>
+        <TouchableOpacity onPress={handleLike} style={styles.floatingButton}>
           <Ionicons 
             name={isLiked ? "heart" : "heart-outline"} 
             size={24} 
-            color={isLiked ? "#FF6B6B" : "#FFA94D"} 
+            color={isLiked ? "#FF3B30" : "#fff"} 
           />
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Cover and Basic Info */}
-        <View style={styles.topSection}>
-          <View style={styles.coverContainer}>
-            {manga.coverImageUrl ? (
-              <Image source={{ uri: manga.coverImageUrl }} style={styles.coverImage} />
-            ) : (
-              <View style={styles.coverPlaceholder}>
-                <Ionicons name="book-outline" size={60} color="#666" />
-              </View>
-            )}
+      <Animated.ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
+      >
+        {/* Hero Image with Parallax */}
+        <Animated.View style={[styles.heroContainer, { transform: [{ translateY: imageTranslateY }] }]}>
+          <Animated.Image
+            source={{ uri: manga?.coverImageUrl || 'https://via.placeholder.com/400x600' }}
+            style={[styles.heroImage, { transform: [{ scale: imageScale }] }]}
+          />
+          <LinearGradient
+            colors={['transparent', 'rgba(24, 24, 24, 0.7)', '#181818']}
+            style={styles.heroGradient}
+          />
+        </Animated.View>
+
+        {/* Main Content */}
+        <View style={styles.mainContent}>
+          {/* Title Section */}
+          <View style={styles.titleSection}>
+            <Text style={styles.mainTitle}>{manga?.title}</Text>
+            <Text style={styles.authorName}>by {manga?.author}</Text>
           </View>
-          
-          <View style={styles.basicInfo}>
-            <Text style={styles.title}>{manga.title}</Text>
-            <Text style={styles.author}>par {manga.author}</Text>
-            
-            {/* Rating */}
-            {manga.rating_average > 0 && (
-              <View style={styles.ratingContainer}>
-                <View style={styles.stars}>
-                  {renderStars(manga.rating_average)}
-                </View>
-                <Text style={styles.ratingText}>
-                  {manga.rating_average.toFixed(1)} ({manga.rating_count} avis)
-                </Text>
+
+          {/* Stats Bar */}
+          <View style={styles.statsBar}>
+            <View style={styles.statItem}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="star" size={18} color="#FFD700" />
               </View>
-            )}
-            
-            {/* Price */}
-            <View style={styles.priceContainer}>
-              <Text style={styles.price}>
-                {formatPrice(manga.price, manga.currency)}
+              <View>
+                <Text style={styles.statValue}>
+                  {manga?.rating_average ? manga.rating_average.toFixed(1) : 'N/A'}
+                </Text>
+                <Text style={styles.statLabel}>Note</Text>
+              </View>
+            </View>
+
+            <View style={styles.statDivider} />
+
+            <View style={styles.statItem}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="eye" size={18} color="#4A90E2" />
+              </View>
+              <View>
+                <Text style={styles.statValue}>{manga?.views || 0}</Text>
+                <Text style={styles.statLabel}>Vues</Text>
+              </View>
+            </View>
+
+            <View style={styles.statDivider} />
+
+            <View style={styles.statItem}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="book" size={18} color="#FFA94D" />
+              </View>
+              <View>
+                <Text style={styles.statValue}>{manga?.totalPages || 0}</Text>
+                <Text style={styles.statLabel}>Pages</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Price Card */}
+          <View style={styles.priceCard}>
+            <View style={styles.priceContent}>
+              <Text style={styles.priceLabel}>Prix</Text>
+              <Text style={styles.priceValue}>
+                {manga ? formatPrice(manga.price, manga.currency) : '...'}
               </Text>
-              {!manga.isFree && (
-                <View style={styles.discountBadge}>
-                  <Text style={styles.discountText}>-20%</Text>
-                </View>
+            </View>
+            <View style={styles.priceBadge}>
+              <Ionicons name={manga?.isFree ? "gift" : "card"} size={20} color="#FFA94D" />
+            </View>
+          </View>
+
+          {/* Genres */}
+          {manga?.genre && manga.genre.length > 0 && (
+            <View style={styles.genresSection}>
+              <Text style={styles.sectionTitle}>Genres</Text>
+              <View style={styles.genresGrid}>
+                {manga.genre.slice(0, 4).map((genre, index) => (
+                  <View key={index} style={styles.genreChip}>
+                    <Text style={styles.genreText}>{genre}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Synopsis */}
+          <View style={styles.synopsisSection}>
+            <Text style={styles.sectionTitle}>Synopsis</Text>
+            <View style={styles.synopsisCard}>
+              <Text 
+                style={styles.synopsisText} 
+                numberOfLines={showFullDescription ? undefined : 5}
+              >
+                {manga?.synopsis || 'Aucune description disponible.'}
+              </Text>
+              {manga?.synopsis && manga.synopsis.length > 200 && (
+                <TouchableOpacity 
+                  onPress={() => setShowFullDescription(!showFullDescription)}
+                  style={styles.readMoreButton}
+                >
+                  <Text style={styles.readMoreText}>
+                    {showFullDescription ? 'Voir moins' : 'Lire plus'}
+                  </Text>
+                  <Ionicons 
+                    name={showFullDescription ? "chevron-up" : "chevron-down"} 
+                    size={16} 
+                    color="#FFA94D" 
+                  />
+                </TouchableOpacity>
               )}
             </View>
           </View>
-        </View>
 
-        {/* Stats */}
-        <View style={styles.statsSection}>
-          <View style={styles.statItem}>
-            <Ionicons name="eye-outline" size={20} color="#FFA94D" />
-            <Text style={styles.statValue}>{manga.views || 0}</Text>
-            <Text style={styles.statLabel}>Vues</Text>
-          </View>
-          
-          <View style={styles.statItem}>
-            <Ionicons name="download-outline" size={20} color="#FFA94D" />
-            <Text style={styles.statValue}>{manga.downloads || 0}</Text>
-            <Text style={styles.statLabel}>Téléchargements</Text>
-          </View>
-          
-          <View style={styles.statItem}>
-            <Ionicons name="heart-outline" size={20} color="#FFA94D" />
-            <Text style={styles.statValue}>{manga.likes || 0}</Text>
-            <Text style={styles.statLabel}>J'aime</Text>
-          </View>
-          
-          <View style={styles.statItem}>
-            <Ionicons name="document-text-outline" size={20} color="#FFA94D" />
-            <Text style={styles.statValue}>{manga.totalPages}</Text>
-            <Text style={styles.statLabel}>Pages</Text>
-          </View>
-        </View>
-
-        {/* Synopsis */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Synopsis</Text>
-          <Text style={styles.synopsis} numberOfLines={showFullDescription ? undefined : 4}>
-            {manga.synopsis}
-          </Text>
-          {manga.synopsis.length > 200 && (
-            <TouchableOpacity onPress={() => setShowFullDescription(!showFullDescription)}>
-              <Text style={styles.showMoreText}>
-                {showFullDescription ? 'Voir moins' : 'Voir plus'}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Description */}
-        {manga.description && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Description</Text>
-            <Text style={styles.description}>{manga.description}</Text>
-          </View>
-        )}
-
-        {/* Genres and Tags */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Genres</Text>
-          <View style={styles.genresContainer}>
-            {manga.genre.map((genre, index) => (
-              <View key={index} style={styles.genreTag}>
-                <Text style={styles.genreTagText}>{genre}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tags</Text>
-          <View style={styles.tagsContainer}>
-            {manga.tags.map((tag, index) => (
-              <View key={index} style={styles.tagChip}>
-                <Text style={styles.tagChipText}>{tag}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Additional Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Informations</Text>
-          <View style={styles.infoContainer}>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Catégorie:</Text>
-              <Text style={styles.infoValue}>{manga.category}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Public:</Text>
-              <Text style={styles.infoValue}>
-                {manga.targetAudience === 'all' ? 'Tout public' : manga.targetAudience}
-              </Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Classification:</Text>
-              <Text style={styles.infoValue}>{manga.rating}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Langue:</Text>
-              <Text style={styles.infoValue}>{manga.language}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Statut:</Text>
-              <Text style={styles.infoValue}>{manga.status || 'En cours'}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Publié le:</Text>
-              <Text style={styles.infoValue}>
-                {new Date(manga.publishDate).toLocaleDateString('fr-FR')}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Copyright */}
-        {manga.copyrightInfo && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Copyright</Text>
-            <Text style={styles.copyrightText}>{manga.copyrightInfo}</Text>
-          </View>
-        )}
-
-        {/* Action Buttons */}
-        <View style={styles.actionsSection}>
-          <TouchableOpacity
-            style={styles.previewButton}
-            onPress={() => router.push(`/(tabs)/manga/preview/${manga.id}` as any)}
-          >
-            <Ionicons name="eye-outline" size={20} color="#FFA94D" />
-            <Text style={styles.previewButtonText}>
-              Aperçu ({manga.previewPages} pages)
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.purchaseButton, manga.isFree && styles.freeButton]}
-            onPress={handlePurchase}
-          >
-            <LinearGradient
-              colors={manga.isFree ? ['#4CAF50', '#66BB6A'] : ['#FFA94D', '#FF8A65']}
-              style={styles.purchaseGradient}
+          {/* Action Buttons */}
+          <View style={styles.actionsContainer}>
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => router.push(`/(tabs)/manga/preview/${manga?.id}` as any)}
             >
-              <Ionicons 
-                name={manga.isFree ? "play-outline" : "card-outline"} 
-                size={20} 
-                color="#fff" 
-              />
-              <Text style={styles.purchaseButtonText}>
-                {manga.isFree ? 'Lire gratuitement' : `Acheter ${formatPrice(manga.price, manga.currency)}`}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              <Ionicons name="eye-outline" size={22} color="#FFA94D" />
+              <Text style={styles.secondaryButtonText}>Aperçu gratuit</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={handlePurchase}
+            >
+              <LinearGradient
+                colors={manga?.isFree ? ['#00C853', '#00E676'] : ['#FFA94D', '#FF6B35']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.primaryButtonGradient}
+              >
+                <Ionicons 
+                  name={manga?.isFree ? "book-outline" : "cart-outline"} 
+                  size={22} 
+                  color="#fff" 
+                />
+                <Text style={styles.primaryButtonText}>
+                  {manga?.isFree ? 'Lire maintenant' : 'Acheter'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
+          {/* Bottom Spacing */}
+          <View style={{ height: 40 }} />
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 };
@@ -328,250 +317,306 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#181818',
   },
-  centered: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  
+  // Animated Header
+  animatedHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
   },
-  header: {
+  headerBlur: {
+    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+    paddingBottom: 12,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    paddingHorizontal: 16,
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
+    flex: 1,
     color: '#fff',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    textAlign: 'center',
+    marginHorizontal: 12,
   },
-  content: {
+  
+  // Floating Buttons
+  floatingButtons: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 30,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    zIndex: 99,
+  },
+  floatingButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  
+  // Scroll View
+  scrollView: {
     flex: 1,
   },
   
-  // Top Section
-  topSection: {
+  // Hero Section
+  heroContainer: {
+    width: screenWidth,
+    height: screenHeight * 0.55,
+    position: 'relative',
+  },
+  heroImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  heroGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '60%',
+  },
+  
+  // Main Content
+  mainContent: {
+    marginTop: -40,
+    paddingHorizontal: 20,
+  },
+  
+  // Title Section
+  titleSection: {
+    marginBottom: 20,
+  },
+  mainTitle: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#fff',
+    lineHeight: 38,
+    marginBottom: 8,
+  },
+  authorName: {
+    fontSize: 16,
+    color: '#999',
+    fontWeight: '500',
+  },
+  
+  // Stats Bar
+  statsBar: {
     flexDirection: 'row',
-    padding: 20,
-    gap: 16,
+    backgroundColor: '#232329',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  coverContainer: {
-    width: 120,
-    height: 160,
-    borderRadius: 12,
-    overflow: 'hidden',
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  coverImage: {
-    width: '100%',
-    height: '100%',
-  },
-  coverPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#333',
+  statIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 169, 77, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  basicInfo: {
-    flex: 1,
-    gap: 8,
-  },
-  title: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    lineHeight: 24,
-  },
-  author: {
-    color: '#888',
-    fontSize: 16,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stars: {
-    flexDirection: 'row',
-    gap: 2,
-  },
-  ratingText: {
-    color: '#888',
-    fontSize: 14,
-  },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  price: {
-    color: '#FFA94D',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  discountBadge: {
-    backgroundColor: '#FF5722',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  discountText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  
-  // Stats
-  statsSection: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#23232a',
-    marginHorizontal: 20,
-    borderRadius: 12,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
-  },
   statValue: {
-    color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    color: '#fff',
   },
   statLabel: {
-    color: '#888',
     fontSize: 12,
+    color: '#888',
+  },
+  statDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: '#333',
   },
   
-  // Sections
-  section: {
+  // Price Card
+  priceCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#232329',
+    borderRadius: 16,
     padding: 20,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#2a2a30',
+  },
+  priceContent: {
+    flex: 1,
+  },
+  priceLabel: {
+    fontSize: 14,
+    color: '#888',
+    marginBottom: 4,
+  },
+  priceValue: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#FFA94D',
+  },
+  priceBadge: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 169, 77, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
+  // Genres Section
+  genresSection: {
+    marginBottom: 20,
   },
   sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
     color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
     marginBottom: 12,
   },
-  synopsis: {
-    color: '#ccc',
-    fontSize: 16,
-    lineHeight: 24,
+  genresGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
-  showMoreText: {
-    color: '#FFA94D',
-    fontSize: 14,
-    marginTop: 8,
+  genreChip: {
+    backgroundColor: '#FFA94D',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#FFA94D',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  description: {
-    color: '#ccc',
-    fontSize: 14,
-    lineHeight: 20,
+  genreText: {
+    color: '#181818',
+    fontSize: 13,
+    fontWeight: '700',
   },
   
-  // Genres and Tags
-  genresContainer: {
+  // Synopsis Section
+  synopsisSection: {
+    marginBottom: 24,
+  },
+  synopsisCard: {
+    backgroundColor: '#232329',
+    borderRadius: 16,
+    padding: 20,
+  },
+  synopsisText: {
+    fontSize: 16,
+    lineHeight: 26,
+    color: '#ccc',
+  },
+  readMoreButton: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  genreTag: {
-    backgroundColor: '#FFA94D',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  genreTagText: {
-    color: '#181818',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#2a2a30',
     gap: 6,
   },
-  tagChip: {
-    backgroundColor: '#333',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  tagChipText: {
-    color: '#888',
-    fontSize: 11,
-  },
-  
-  // Info
-  infoContainer: {
-    gap: 8,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  infoLabel: {
-    color: '#888',
+  readMoreText: {
     fontSize: 14,
-  },
-  infoValue: {
-    color: '#fff',
-    fontSize: 14,
-  },
-  copyrightText: {
-    color: '#666',
-    fontSize: 12,
-    fontStyle: 'italic',
+    fontWeight: '600',
+    color: '#FFA94D',
   },
   
   // Actions
-  actionsSection: {
-    padding: 20,
+  actionsContainer: {
     gap: 12,
-    paddingBottom: 40,
+    marginBottom: 20,
   },
-  previewButton: {
+  secondaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 25,
-    backgroundColor: '#333',
-    borderWidth: 1,
-    borderColor: '#FFA94D',
-    gap: 8,
-  },
-  previewButtonText: {
-    color: '#FFA94D',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  purchaseButton: {
-    borderRadius: 25,
-    overflow: 'hidden',
-  },
-  freeButton: {},
-  purchaseGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#232329',
+    borderRadius: 16,
     paddingVertical: 16,
-    gap: 8,
+    gap: 10,
+    borderWidth: 2,
+    borderColor: '#FFA94D',
   },
-  purchaseButtonText: {
-    color: '#fff',
+  secondaryButtonText: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    color: '#FFA94D',
+  },
+  primaryButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#FFA94D',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  primaryButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    gap: 10,
+  },
+  primaryButtonText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#fff',
   },
   
-  // Loading/Error
+  // Loading/Error States
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   loadingText: {
     color: '#fff',
     fontSize: 16,
+    marginTop: 12,
   },
   errorText: {
     color: '#fff',
@@ -579,15 +624,16 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   backButton: {
-    marginTop: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    marginTop: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
     backgroundColor: '#FFA94D',
-    borderRadius: 20,
+    borderRadius: 25,
   },
   backButtonText: {
     color: '#181818',
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 16,
   },
 });
 
