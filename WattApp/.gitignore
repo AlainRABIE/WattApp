@@ -31,7 +31,13 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
+.env.local
+
+# Firebase config with secrets
+firebaseConfig.ts
+stripeConfig.ts
 
 # typescript
 *.tsbuildinfo
