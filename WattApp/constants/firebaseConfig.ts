@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
-import { getAuth } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getStorage, connectStorageEmulator } from 'firebase/storage';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: "AIzaSyB0k9QFmsOsgsGXQ4YDugSqsegOdQE080E",
@@ -19,5 +19,19 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const auth = getAuth(app);
+
+// Connecter aux émulateurs en développement
+const USE_EMULATORS = false; // Mettre à true pour utiliser les émulateurs
+
+if (USE_EMULATORS && typeof window !== 'undefined') {
+  try {
+    connectFirestoreEmulator(db, 'localhost', 8080);
+    connectStorageEmulator(storage, 'localhost', 9199);
+    connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+    console.log('🔧 Émulateurs Firebase connectés');
+  } catch (e) {
+    console.log('Émulateurs déjà connectés ou non disponibles');
+  }
+}
 
 export default app;

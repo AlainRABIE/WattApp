@@ -20,6 +20,7 @@ import { doc, getDoc, setDoc, serverTimestamp, collection, addDoc } from 'fireba
 import { db } from '../../constants/firebaseConfig';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../hooks/useTheme';
+import PublishDetailsModal from './PublishDetailsModal';
 
 const WattpadEditor: React.FC = () => {
   const router = useRouter();
@@ -38,6 +39,7 @@ const WattpadEditor: React.FC = () => {
   const [chapters, setChapters] = useState<any[]>([]);
   const [totalChapters, setTotalChapters] = useState(1);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
   
   // États pour le formatage
   const [selection, setSelection] = useState({ start: 0, end: 0 });
@@ -185,9 +187,7 @@ const WattpadEditor: React.FC = () => {
 
     const bookData = projectDoc.data();
     const bookTitle = bookData.bookTitle || '';
-    const bookDescription = bookData.bookDescription || '';
     const coverImage = bookData.coverImage || null;
-    const hashtags = bookData.hashtags || [];
 
     if (!bookTitle.trim()) {
       Alert.alert('Erreur', 'Veuillez ajouter un titre à votre livre');
@@ -199,78 +199,11 @@ const WattpadEditor: React.FC = () => {
       return;
     }
 
-    Alert.alert(
-      'Publier le livre',
-      'Voulez-vous publier votre livre ? Il sera visible par tous les utilisateurs.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { 
-          text: 'Publier', 
-          onPress: async () => {
-            try {
-              setIsPublishing(true);
+    // Sauvegarder d'abord
+    await saveProject();
 
-              // Sauvegarder d'abord
-              await saveProject();
-
-              // Publier dans la collection publique des livres
-              const publishData = {
-                bookTitle,
-                bookDescription,
-                coverImage,
-                hashtags,
-                chapters: chapters.filter(ch => ch.content && ch.content.trim()),
-                totalChapters: chapters.length,
-                authorId: auth.currentUser.uid,
-                authorName: auth.currentUser.displayName || 'Auteur anonyme',
-                publishedAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-                status: 'published',
-                views: 0,
-                likes: 0,
-                comments: 0,
-              };
-
-              if (projectId && projectId !== 'new') {
-                // Mettre à jour dans la collection privée
-                const privateRef = doc(db, 'users', auth.currentUser.uid, 'books', projectId as string);
-                await setDoc(privateRef, { status: 'published', publishedAt: serverTimestamp() }, { merge: true });
-
-                // Publier dans la collection publique
-                const publicRef = doc(db, 'books', projectId as string);
-                await setDoc(publicRef, publishData);
-              } else {
-                // Créer un nouveau livre publié
-                const newBookRef = await addDoc(collection(db, 'books'), publishData);
-                
-                // Sauvegarder aussi dans la collection privée
-                const privateRef = doc(db, 'users', auth.currentUser.uid, 'books', newBookRef.id);
-                await setDoc(privateRef, {
-                  ...publishData,
-                  createdAt: serverTimestamp(),
-                });
-              }
-
-              Alert.alert(
-                'Succès ! 🎉',
-                'Votre livre a été publié avec succès !',
-                [
-                  {
-                    text: 'OK',
-                    onPress: () => router.back()
-                  }
-                ]
-              );
-            } catch (error) {
-              console.error('Erreur publication:', error);
-              Alert.alert('Erreur', 'Impossible de publier le livre');
-            } finally {
-              setIsPublishing(false);
-            }
-          }
-        }
-      ]
-    );
+    // Ouvrir le modal de publication avec prix
+    setShowPublishModal(true);
   };
 
   const switchChapter = useCallback(async (chapterNumber: number) => {
@@ -803,6 +736,87 @@ const WattpadEditor: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Modal Publication avec Prix */}
+      <PublishDetailsModal
+        visible={showPublishModal}
+        onClose={() => setShowPublishModal(false)}
+        onSubmit={async (cover, title, synopsis, price, tags, termsAcceptance, isPrivate) => {
+          setShowPublishModal(false);
+          try {
+            setIsPublishing(true);
+            const auth = getAuth();
+            if (!auth.currentUser) return;
+
+            // Récupérer les infos actuelles du projet
+            const projectRef = doc(db, 'users', auth.currentUser.uid, 'books', projectId as string);
+            const projectDoc = await getDoc(projectRef);
+            const bookData = projectDoc.data();
+
+            // Publier dans la collection publique des livres
+            const publishData = {
+              title: title || bookData?.bookTitle || 'Sans titre',
+              synopsis: synopsis || bookData?.bookDescription || '',
+              coverImage: cover || bookData?.coverImage || '',
+              tags: tags || bookData?.hashtags || [],
+              chapters: chapters.filter(ch => ch.content && ch.content.trim()),
+              totalChapters: chapters.length,
+              authorUid: auth.currentUser.uid,
+              author: auth.currentUser.displayName || 'Auteur anonyme',
+              publishedAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+              createdAt: serverTimestamp(),
+              status: 'published',
+              reads: 0,
+              likes: 0,
+              comments: 0,
+              price: price ? parseFloat(price) : 0,
+              isFree: !price || parseFloat(price) === 0,
+              isPrivate: isPrivate || false,
+              termsAcceptedAt: serverTimestamp(),
+              termsVersion: termsAcceptance.termsVersion,
+            };
+
+            if (projectId && projectId !== 'new') {
+              // Mettre à jour dans la collection privée
+              const privateRef = doc(db, 'users', auth.currentUser.uid, 'books', projectId as string);
+              await setDoc(privateRef, { 
+                status: 'published', 
+                publishedAt: serverTimestamp(),
+                price: publishData.price,
+                isFree: publishData.isFree,
+              }, { merge: true });
+
+              // Publier dans la collection publique
+              const publicRef = doc(db, 'books', projectId as string);
+              await setDoc(publicRef, publishData);
+            } else {
+              // Créer un nouveau livre publié
+              const newBookRef = await addDoc(collection(db, 'books'), publishData);
+              
+              // Sauvegarder aussi dans la collection privée
+              const privateRef = doc(db, 'users', auth.currentUser.uid, 'books', newBookRef.id);
+              await setDoc(privateRef, publishData);
+            }
+
+            Alert.alert(
+              'Succès ! 🎉',
+              `Votre livre a été publié${publishData.price > 0 ? ` au prix de ${publishData.price}€` : ' gratuitement'} !`,
+              [
+                {
+                  text: 'OK',
+                  onPress: () => router.back()
+                }
+              ]
+            );
+          } catch (error) {
+            console.error('Erreur publication:', error);
+            Alert.alert('Erreur', 'Impossible de publier le livre');
+          } finally {
+            setIsPublishing(false);
+          }
+        }}
+      />
     </KeyboardAvoidingView>
   );
 };

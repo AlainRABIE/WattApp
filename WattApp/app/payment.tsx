@@ -124,21 +124,20 @@ const PaymentScreen: React.FC = () => {
       // Enregistrer la transaction
       await addDoc(collection(db, 'transactions'), transactionData);
 
-      // Mettre à jour le solde de l'utilisateur
+      // Mettre à jour les informations de l'utilisateur
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
-        walletBalance: increment(totalAmount),
         lastTopUp: serverTimestamp(),
         lastPaymentMethod: selectedMethod,
       });
 
       Alert.alert(
         '🎉 Paiement réussi !',
-        `${totalAmount.toFixed(2)}€ ont été ajoutés à votre portefeuille.`,
+        `Votre paiement de ${totalAmount.toFixed(2)}€ a été effectué avec succès.`,
         [
           {
-            text: 'Retour au portefeuille',
-            onPress: () => router.push('/wallet')
+            text: 'Retour',
+            onPress: () => router.push('/home/home')
           }
         ]
       );

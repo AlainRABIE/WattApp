@@ -250,7 +250,25 @@ const BookEditor: React.FC = () => {
       const bookData = { id: docSnap.id, ...docSnap.data() } as any;
       
       // Vérifier si l'utilisateur actuel est l'auteur
-      setIsAuthor(bookData.authorUid === user.uid);
+      // Vérifier plusieurs champs possibles pour la compatibilité
+      const isUserAuthor = 
+        bookData.authorUid === user.uid || 
+        bookData.authorId === user.uid || 
+        bookData.userId === user.uid ||
+        bookData.ownerUid === user.uid ||
+        bookData.createdBy === user.uid;
+      
+      console.log('🔍 Détection auteur:', {
+        bookAuthorUid: bookData.authorUid,
+        bookAuthorId: bookData.authorId,
+        bookUserId: bookData.userId,
+        bookOwnerId: bookData.ownerUid,
+        bookCreatedBy: bookData.createdBy,
+        currentUserId: user.uid,
+        isAuthor: isUserAuthor
+      });
+      
+      setIsAuthor(isUserAuthor);
 
     setBook(bookData);
     setTitle(bookData.title || '');
@@ -557,13 +575,13 @@ const BookEditor: React.FC = () => {
           <Text style={{ color: '#FFA94D', fontWeight: 'bold', fontSize: 16, marginLeft: 7 }}>
             {book?.status === 'finished'
               ? 'Fini'
-              : (book?.chapters && book.chapters > 0)
-                ? String(book.chapters)
+              : (typeof book?.chapters === 'number' && book.chapters > 0)
+                ? book.chapters.toString()
                 : 'En cours'}
           </Text>
-          {book?.status === 'finished' || !(book?.chapters && book.chapters > 0) ? null : (
+          {book?.status !== 'finished' && typeof book?.chapters === 'number' && book.chapters > 0 && (
             <Text style={{ color: '#FFA94D', fontSize: 13, marginLeft: 4 }}>
-              {book?.chapters === 1 ? 'chapitre' : 'chapitres'}
+              {book.chapters === 1 ? 'chapitre' : 'chapitres'}
             </Text>
           )}
         </TouchableOpacity>
@@ -739,7 +757,7 @@ const BookEditor: React.FC = () => {
             <View style={{ backgroundColor: '#23232a', borderRadius: 12, paddingVertical: 6, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' }}>
               <Ionicons name="bookmark-outline" size={16} color="#4FC3F7" style={{ marginRight: 6 }} />
               <Text style={{ color: '#4FC3F7', fontSize: 13, fontWeight: '600' }}>
-                Progression: {Math.round(((readingProgress.position || 0) / (book.body?.length || 1)) * 100)}%
+                {`Progression: ${Math.round(((readingProgress.position || 0) / (book.body?.length || 1)) * 100)}%`}
               </Text>
             </View>
           </View>
@@ -797,17 +815,17 @@ const BookEditor: React.FC = () => {
         <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 24, gap: 18 }}>
           <View style={{ alignItems: 'center', flexDirection: 'row', backgroundColor: '#23232a', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 18, marginHorizontal: 4 }}>
             <Ionicons name="eye-outline" size={20} color="#FFA94D" style={{ marginRight: 6 }} />
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{book?.reads ?? '—'}</Text>
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{typeof book?.reads === 'number' ? book.reads : 0}</Text>
             <Text style={{ color: '#888', fontSize: 13, marginLeft: 4 }}>vues</Text>
           </View>
           <View style={{ alignItems: 'center', flexDirection: 'row', backgroundColor: '#23232a', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 18, marginHorizontal: 4 }}>
             <Ionicons name="star-outline" size={20} color="#FFA94D" style={{ marginRight: 6 }} />
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{String(ratingCount)}</Text>
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{typeof ratingCount === 'number' ? ratingCount : 0}</Text>
             <Text style={{ color: '#888', fontSize: 13, marginLeft: 4 }}>votes</Text>
           </View>
           <View style={{ alignItems: 'center', flexDirection: 'row', backgroundColor: '#23232a', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 18, marginHorizontal: 4 }}>
             <Ionicons name="star" size={20} color="#FFA94D" style={{ marginRight: 6 }} />
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{Number(avgRating || 0).toFixed(1)}</Text>
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{(typeof avgRating === 'number' ? avgRating : 0).toFixed(1)}</Text>
             <Text style={{ color: '#888', fontSize: 13, marginLeft: 4 }}>/ 5</Text>
           </View>
         </View>
@@ -1139,30 +1157,249 @@ const BookEditor: React.FC = () => {
           })()}
         </View>
 
-        {/* Bouton pour créer un nouveau chapitre - UNIQUEMENT pour l'auteur */}
+        {/* Panel Outils d'Auteur - UNIQUEMENT pour l'auteur */}
         {isAuthor && (
-          <View style={{ width: '92%', marginTop: 16, alignItems: 'center' }}>
-            <TouchableOpacity
-              style={{
-                backgroundColor: '#4FC3F7',
-                borderRadius: 25,
-                paddingVertical: 12,
-                paddingHorizontal: 30,
-                flexDirection: 'row',
-                alignItems: 'center',
-                shadowColor: '#4FC3F7',
-                shadowOpacity: 0.3,
-                shadowRadius: 8,
-                elevation: 4,
-              }}
-              onPress={() => router.push(`/write/chapter/${bookId}`)}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="add-circle-outline" size={20} color="#181818" style={{ marginRight: 8 }} />
-              <Text style={{ color: '#181818', fontWeight: '600', fontSize: 16 }}>
-                Ajouter un chapitre
-              </Text>
-            </TouchableOpacity>
+          <View style={{ width: '92%', marginTop: 16, marginBottom: 24, backgroundColor: '#23232a', borderRadius: 20, padding: 20, shadowColor: '#4FC3F7', shadowOpacity: 0.15, shadowRadius: 12, elevation: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <Ionicons name="construct" size={24} color="#4FC3F7" style={{ marginRight: 10 }} />
+              <Text style={{ color: '#4FC3F7', fontWeight: 'bold', fontSize: 20 }}>Outils d'Auteur</Text>
+            </View>
+
+            {/* Grille de boutons d'actions */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+              {/* Modifier le livre */}
+              <TouchableOpacity
+                style={{ flex: 1, minWidth: '45%', backgroundColor: '#18191c', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#FFA94D', alignItems: 'center' }}
+                onPress={() => {
+                  Alert.alert(
+                    'Modifier le livre',
+                    'Que souhaitez-vous modifier ?',
+                    [
+                      { text: 'Titre et Synopsis', onPress: () => {
+                        Alert.prompt(
+                          'Modifier le titre',
+                          'Nouveau titre :',
+                          async (newTitle) => {
+                            if (newTitle && newTitle.trim()) {
+                              try {
+                                const docRef = doc(db, 'books', book.id);
+                                await updateDoc(docRef, { title: newTitle.trim(), updatedAt: serverTimestamp() });
+                                setTitle(newTitle.trim());
+                                setBook((prev: any) => ({ ...prev, title: newTitle.trim() }));
+                                Alert.alert('Succès', 'Titre modifié !');
+                              } catch (error) {
+                                Alert.alert('Erreur', 'Impossible de modifier le titre');
+                              }
+                            }
+                          }
+                        );
+                      }},
+                      { text: 'Couverture', onPress: pickCoverImage },
+                      { text: 'Annuler', style: 'cancel' }
+                    ]
+                  );
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="create-outline" size={28} color="#FFA94D" style={{ marginBottom: 8 }} />
+                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600', textAlign: 'center' }}>Modifier</Text>
+              </TouchableOpacity>
+
+              {/* Ajouter un chapitre */}
+              <TouchableOpacity
+                style={{ flex: 1, minWidth: '45%', backgroundColor: '#18191c', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#4FC3F7', alignItems: 'center' }}
+                onPress={() => router.push(`/write/chapter/${bookId}`)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="add-circle-outline" size={28} color="#4FC3F7" style={{ marginBottom: 8 }} />
+                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600', textAlign: 'center' }}>Nouveau Chapitre</Text>
+              </TouchableOpacity>
+
+              {/* Gérer les chapitres */}
+              <TouchableOpacity
+                style={{ flex: 1, minWidth: '45%', backgroundColor: '#18191c', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#9C27B0', alignItems: 'center' }}
+                onPress={() => {
+                  setShowChapters(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="list-outline" size={28} color="#9C27B0" style={{ marginBottom: 8 }} />
+                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600', textAlign: 'center' }}>Gérer Chapitres</Text>
+              </TouchableOpacity>
+
+              {/* Partager */}
+              <TouchableOpacity
+                style={{ flex: 1, minWidth: '45%', backgroundColor: '#18191c', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#4CAF50', alignItems: 'center' }}
+                onPress={() => setShareModalVisible(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="share-social-outline" size={28} color="#4CAF50" style={{ marginBottom: 8 }} />
+                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600', textAlign: 'center' }}>Partager</Text>
+              </TouchableOpacity>
+
+              {/* Publier/Dépublier */}
+              {book?.status !== 'published' ? (
+                <TouchableOpacity
+                  style={{ flex: 1, minWidth: '45%', backgroundColor: '#18191c', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#4CAF50', alignItems: 'center' }}
+                  onPress={publishBook}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="cloud-upload-outline" size={28} color="#4CAF50" style={{ marginBottom: 8 }} />
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600', textAlign: 'center' }}>Publier</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={{ flex: 1, minWidth: '45%', backgroundColor: '#18191c', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#FF9800', alignItems: 'center' }}
+                  onPress={() => {
+                    Alert.alert(
+                      'Dépublier le livre',
+                      'Voulez-vous retirer ce livre de la publication ? Il redeviendra un brouillon.',
+                      [
+                        { text: 'Annuler', style: 'cancel' },
+                        {
+                          text: 'Dépublier',
+                          style: 'destructive',
+                          onPress: async () => {
+                            try {
+                              const docRef = doc(db, 'books', book.id);
+                              await updateDoc(docRef, { status: 'draft', publishedAt: null, updatedAt: serverTimestamp() });
+                              setBook((prev: any) => ({ ...prev, status: 'draft' }));
+                              Alert.alert('Succès', 'Livre dépublié');
+                            } catch (error) {
+                              Alert.alert('Erreur', 'Impossible de dépublier');
+                            }
+                          }
+                        }
+                      ]
+                    );
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="cloud-offline-outline" size={28} color="#FF9800" style={{ marginBottom: 8 }} />
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600', textAlign: 'center' }}>Dépublier</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Supprimer */}
+              <TouchableOpacity
+                style={{ flex: 1, minWidth: '45%', backgroundColor: '#18191c', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#F44336', alignItems: 'center' }}
+                onPress={() => {
+                  Alert.alert(
+                    'Supprimer le livre',
+                    'Êtes-vous sûr de vouloir supprimer définitivement ce livre ? Cette action est irréversible.',
+                    [
+                      { text: 'Annuler', style: 'cancel' },
+                      {
+                        text: 'Supprimer',
+                        style: 'destructive',
+                        onPress: async () => {
+                          try {
+                            const docRef = doc(db, 'books', book.id);
+                            await deleteDoc(docRef);
+                            Alert.alert('Supprimé', 'Le livre a été supprimé', [
+                              { text: 'OK', onPress: () => router.push('/home/home') }
+                            ]);
+                          } catch (error) {
+                            Alert.alert('Erreur', 'Impossible de supprimer le livre');
+                          }
+                        }
+                      }
+                    ]
+                  );
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="trash-outline" size={28} color="#F44336" style={{ marginBottom: 8 }} />
+                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600', textAlign: 'center' }}>Supprimer</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Actions rapides supplémentaires */}
+            <View style={{ borderTopWidth: 1, borderTopColor: '#333', paddingTop: 16, marginTop: 8 }}>
+              <Text style={{ color: '#888', fontSize: 13, fontWeight: '600', marginBottom: 12 }}>Actions rapides</Text>
+              <View style={{ gap: 10 }}>
+                {/* Éditer le contenu */}
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#18191c', borderRadius: 12, padding: 14 }}
+                  onPress={() => router.push(`/write/enhanced/${bookId}`)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="document-text-outline" size={22} color="#FFA94D" style={{ marginRight: 12 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Éditer le contenu</Text>
+                    <Text style={{ color: '#888', fontSize: 12 }}>Modifier le texte du livre</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#666" />
+                </TouchableOpacity>
+
+                {/* Dupliquer le livre */}
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#18191c', borderRadius: 12, padding: 14 }}
+                  onPress={async () => {
+                    Alert.alert(
+                      'Dupliquer le livre',
+                      'Créer une copie de ce livre ?',
+                      [
+                        { text: 'Annuler', style: 'cancel' },
+                        {
+                          text: 'Dupliquer',
+                          onPress: async () => {
+                            try {
+                              const auth = getAuth(app);
+                              const user = auth.currentUser;
+                              if (!user) return;
+
+                              const newBookRef = await addDoc(collection(db, 'books'), {
+                                ...book,
+                                id: undefined,
+                                title: `${book.title} (Copie)`,
+                                status: 'draft',
+                                isPublished: false,
+                                publishedAt: null,
+                                createdAt: serverTimestamp(),
+                                updatedAt: serverTimestamp(),
+                                reads: 0,
+                              });
+
+                              Alert.alert('Succès', 'Livre dupliqué !', [
+                                { text: 'Voir la copie', onPress: () => router.push(`/book/${newBookRef.id}`) },
+                                { text: 'OK' }
+                              ]);
+                            } catch (error) {
+                              Alert.alert('Erreur', 'Impossible de dupliquer');
+                            }
+                          }
+                        }
+                      ]
+                    );
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="copy-outline" size={22} color="#9C27B0" style={{ marginRight: 12 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Dupliquer</Text>
+                    <Text style={{ color: '#888', fontSize: 12 }}>Créer une copie du livre</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#666" />
+                </TouchableOpacity>
+
+                {/* Exporter */}
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#18191c', borderRadius: 12, padding: 14 }}
+                  onPress={() => {
+                    Alert.alert('Export', 'Fonctionnalité d\'export en développement\n\nBientôt disponible:\n- Export PDF\n- Export EPUB\n- Export TXT');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="download-outline" size={22} color="#4CAF50" style={{ marginRight: 12 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Exporter</Text>
+                    <Text style={{ color: '#888', fontSize: 12 }}>PDF, EPUB, TXT...</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#666" />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         )}
 

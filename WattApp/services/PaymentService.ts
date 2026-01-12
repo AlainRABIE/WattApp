@@ -2,14 +2,16 @@
 // Gère les transactions et achats de livres
 
 import { getAuth } from 'firebase/auth';
+import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 import app, { db } from '../constants/firebaseConfig';
 import { doc, updateDoc, arrayUnion, serverTimestamp, addDoc, collection, increment, getDoc, query, where, orderBy, getDocs } from 'firebase/firestore';
+
+const functions = getFunctions(app);
 
 export class PaymentService {
   
   /**
    * Créer un Payment Intent pour un livre
-   * En production, ceci serait fait côté serveur sécurisé
    */
   static async createPaymentIntent(bookId: string, amount: number): Promise<{clientSecret: string, paymentIntentId: string}> {
     try {
@@ -25,20 +27,25 @@ export class PaymentService {
         throw new Error('Paramètres invalides');
       }
 
-      // Générer un Payment Intent simulé
-      const paymentIntentId = `pi_${bookId}_${Date.now()}`;
-      const clientSecret = `${paymentIntentId}_secret`;
+      // MODE DÉMO : Simuler localement (sans Firebase Functions)
+      // TODO : Activer les vraies Functions quand la facturation Firebase est activée
+      const simulatedPaymentIntentId = `pi_demo_${Date.now()}_${bookId}`;
+      const simulatedClientSecret = `${simulatedPaymentIntentId}_secret_${Math.random().toString(36).substring(7)}`;
 
-      console.log('Payment Intent créé:', {
-        paymentIntentId,
+      console.log('💳 MODE DÉMO - Payment Intent simulé:', {
+        paymentIntentId: simulatedPaymentIntentId,
         bookId,
         amount,
         userId: user.uid,
+        note: 'Activez la facturation Firebase pour utiliser les vrais paiements Stripe'
       });
 
+      // Simuler un délai réseau
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       return {
-        clientSecret,
-        paymentIntentId,
+        clientSecret: simulatedClientSecret,
+        paymentIntentId: simulatedPaymentIntentId,
       };
 
     } catch (error: any) {
@@ -60,8 +67,18 @@ export class PaymentService {
         throw new Error('Utilisateur non authentifié');
       }
 
-      // Marquer le livre comme acheté
+      // Récupérer les informations du livre pour avoir l'auteur
       const bookRef = doc(db, 'books', bookId);
+      const bookSnap = await getDoc(bookRef);
+      
+      if (!bookSnap.exists()) {
+        throw new Error('Livre introuvable');
+      }
+
+      const bookData = bookSnap.data();
+      const authorUid = bookData.authorUid || bookData.userId;
+
+      // Marquer le livre comme acheté
       await updateDoc(bookRef, {
         purchasedBy: arrayUnion(user.uid),
         sales: increment(1),
@@ -83,17 +100,23 @@ export class PaymentService {
         });
       }
 
+      // Calculer les commissions
+      const platformCommission = amount * 0.10; // 10% pour la plateforme
+      const authorRevenue = amount * 0.90; // 90% pour l'auteur
+
       // Enregistrer la transaction séparément
       await addDoc(collection(db, 'transactions'), {
         paymentIntentId,
         bookId,
         userId: user.uid,
+        authorUid: authorUid,
         amount,
         currency: 'eur',
         status: 'completed',
-        platformCommission: amount * 0.1,
-        authorRevenue: amount * 0.9,
+        platformCommission: platformCommission,
+        authorRevenue: authorRevenue,
         purchaseDate: Date.now(),
+        withdrawn: false, // Pas encore retiré par l'auteur
         createdAt: serverTimestamp(),
       });
 
@@ -113,6 +136,8 @@ export class PaymentService {
         paymentIntentId,
         amount,
         userId: user.uid,
+        authorUid: authorUid,
+        authorRevenue: authorRevenue,
       });
 
     } catch (error: any) {

@@ -76,7 +76,7 @@ export default function ExploreScreen() {
         <Text style={[styles.bookAuthor, { color: theme.colors.textSecondary }]} numberOfLines={1}>{item.auteur || item.author || 'Auteur inconnu'}</Text>
         <View style={styles.bookStatsRow}>
           <Text style={[styles.bookStat, { color: theme.colors.textSecondary }]}><Feather name="eye" size={14} color={theme.colors.textSecondary} /> {item.views || '—'}</Text>
-          <Text style={[styles.bookStat, { color: theme.colors.textSecondary }]}><Feather name="list" size={14} color={theme.colors.textSecondary} /> {item.chapters || item.nbChapitres || '—'}</Text>
+          <Text style={[styles.bookStat, { color: theme.colors.textSecondary }]}><Feather name="list" size={14} color={theme.colors.textSecondary} /> {typeof item.chapters === 'number' ? item.chapters : (typeof item.nbChapitres === 'number' ? item.nbChapitres : (Array.isArray(item.chapters) ? item.chapters.length : '—'))}</Text>
         </View>
         <View style={styles.bookTagsRow}>
           {(item.tags || []).slice(0, 3).map((tag: string, i: number) => (

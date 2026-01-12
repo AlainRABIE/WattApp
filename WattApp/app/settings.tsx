@@ -244,6 +244,25 @@ const SettingsScreen: React.FC = () => {
           />
         </View>
 
+        {/* Facturation & Revenus */}
+        <SettingSection title="Facturation" />
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <SettingRow
+            icon="wallet-outline"
+            title="Mes Revenus"
+            description="Gérer vos paiements Stripe & PayPal"
+            type="button"
+            onPress={() => router.push('/earnings')}
+          />
+          <SettingRow
+            icon="card-outline"
+            title="Historique des transactions"
+            description="Voir tous vos achats et ventes"
+            type="button"
+            onPress={() => Alert.alert('Bientôt disponible', 'Cette fonctionnalité sera disponible prochainement')}
+          />
+        </View>
+
         {/* Notifications */}
         <SettingSection title="Notifications" />
         <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>

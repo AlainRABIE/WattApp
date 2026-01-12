@@ -8,6 +8,7 @@ import app, { db } from '../../constants/firebaseConfig';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import ProfileMigrationService from '../../services/ProfileMigrationService';
 import { useTheme } from '../../contexts/ThemeContext';
+import NotificationService from '../../services/NotificationService';
 
 const Home: React.FC = () => {
 	const router = useRouter();
@@ -23,7 +24,7 @@ const Home: React.FC = () => {
 	const [email, setEmail] = useState('');
 	const [displayName, setDisplayName] = useState('');
 	const [photoURL, setPhotoURL] = useState<string | null>(null);
-	const [walletBalance, setWalletBalance] = useState<number>(0);
+	const [unreadCount, setUnreadCount] = useState(0);
 
 	// compute a fallback avatar URL based on the loaded user name so Home matches Profile
 	const nameForAvatar = (displayName || email || 'User') as string;
@@ -96,12 +97,6 @@ const Home: React.FC = () => {
 							setPhotoURL(data.photoURL);
 						}
 					}
-					// Charger le solde du portefeuille
-					if (data && typeof data.walletBalance === 'number') {
-						setWalletBalance(data.walletBalance);
-					} else {
-						setWalletBalance(0);
-					}
 				}
 			} catch (err) {
 				console.warn('Failed to fetch user photo from Firestore', err);
@@ -134,6 +129,23 @@ const Home: React.FC = () => {
 
 		loadProfile();
 		loadBooks();
+	}, []);
+
+	// Écouter les notifications en temps réel
+	useEffect(() => {
+		const auth = getAuth(app);
+		const user = auth.currentUser;
+		if (!user) return;
+
+		// S'abonner aux notifications
+		const unsubscribe = NotificationService.subscribeToNotifications(user.uid, (notifications) => {
+			const unread = notifications.filter(n => !n.read).length;
+			setUnreadCount(unread);
+		});
+
+		return () => {
+			unsubscribe();
+		};
 	}, []);
 
 	return (
@@ -194,33 +206,51 @@ const Home: React.FC = () => {
 					</Text>
 				</View>
 
-				{/* Section droite : Portefeuille + Avatar */}
+				{/* Section droite : Avatar */}
 				<View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-					{/* Portefeuille */}
-					<TouchableOpacity
-						onPress={() => router.push('/wallet')}
+					{/* Icône de notifications avec badge */}
+					<TouchableOpacity 
+						onPress={() => router.push('/notifications')} 
 						activeOpacity={0.8}
-						style={{
-							backgroundColor: theme.colors.surface,
-							borderRadius: 20,
-							paddingHorizontal: 12,
-							paddingVertical: 6,
-							flexDirection: 'row',
-							alignItems: 'center',
-							borderWidth: 1,
-							borderColor: theme.colors.primary,
+						style={{ position: 'relative' }}
+					>
+						<View style={{ 
+							backgroundColor: '#232323', 
+							borderRadius: 22, 
+							padding: 8,
 							shadowColor: '#000',
 							shadowOpacity: 0.3,
 							shadowRadius: 4,
 							elevation: 5
-						}}
-					>
-						<Ionicons name="wallet-outline" size={18} color={theme.colors.primary} />
-						<Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 13, marginLeft: 4 }}>
-							{String(walletBalance.toFixed(2))}€
-						</Text>
+						}}>
+							<Ionicons name="notifications" size={28} color={theme.colors.primary} />
+						</View>
+						{unreadCount > 0 && (
+							<View style={{
+								position: 'absolute',
+								top: -4,
+								right: -4,
+								backgroundColor: '#FF3B30',
+								borderRadius: 12,
+								minWidth: 24,
+								height: 24,
+								justifyContent: 'center',
+								alignItems: 'center',
+								paddingHorizontal: 6,
+								borderWidth: 2,
+								borderColor: theme.colors.background,
+							}}>
+								<Text style={{ 
+									color: '#fff', 
+									fontSize: 12, 
+									fontWeight: 'bold',
+								}}>
+									{unreadCount > 99 ? '99+' : unreadCount}
+								</Text>
+							</View>
+						)}
 					</TouchableOpacity>
-
+					
 					{/* Avatar profil */}
 					<TouchableOpacity onPress={() => router.push('/profile')} activeOpacity={0.8}>
 						<Image
